@@ -1,5 +1,5 @@
 /* ════════════════════════════════════════════════════════════
-   🌐 i18n — انگلیسی + فارسی (همه چیز در یه فایل)
+   🌐 i18n — انگلیسی + فارسی
    ════════════════════════════════════════════════════════════ */
 
 import type { Language } from '../types';
@@ -22,6 +22,7 @@ const en = {
     panel_empty_completed: 'No completed tasks yet',
     panel_new_task: 'New task',
     panel_reload: 'Rescan vault',
+    panel_reloading: 'Rescanning vault...',
     panel_show_more: 'Show more',
     panel_no_category: 'No category',
 
@@ -145,6 +146,7 @@ const fa: typeof en = {
     panel_empty_completed: 'هنوز تسکی انجام نشده',
     panel_new_task: 'تسک جدید',
     panel_reload: 'اسکن مجدد',
+    panel_reloading: 'در حال اسکن مجدد...',
     panel_show_more: 'نمایش بیشتر',
     panel_no_category: 'بدون دسته',
 
