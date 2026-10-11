@@ -4,7 +4,7 @@
 
 import { ItemView, WorkspaceLeaf, setIcon } from 'obsidian';
 import type FirstTaskPlugin from '../main';
-import type { ExtractedTask, TaskGroup } from '../types';
+import type { ExtractedTask } from '../types';
 import { t, applyDirection } from '../i18n';
 import { formatIso } from '../utils/jalaliDate';
 import { CreateTaskModal } from './CreateTaskModal';
@@ -136,7 +136,6 @@ export class TaskPanelView extends ItemView {
             return;
         }
 
-        /* گروه‌بندی یا لیست ساده */
         if (this.plugin.settings.groupByNote) {
             this.renderGrouped(body, tasks, false);
         } else {
@@ -183,7 +182,7 @@ export class TaskPanelView extends ItemView {
     }
 
     /* ═══════════════════════════════════════════════════════
-       📋 لیست ساده (بدون گروه‌بندی)
+       📋 لیست ساده
        ═══════════════════════════════════════════════════════ */
     private renderSimpleList(parent: HTMLElement, tasks: ExtractedTask[], isCompleted: boolean): void {
         const lang = this.plugin.settings.language;
@@ -193,7 +192,6 @@ export class TaskPanelView extends ItemView {
             this.renderTaskCard(parent, task, isCompleted);
         }
 
-        /* دکمه نمایش بیشتر */
         if (tasks.length > this.visibleCount) {
             const remaining = tasks.length - this.visibleCount;
             const moreBtn = parent.createEl('button', {
@@ -208,12 +206,11 @@ export class TaskPanelView extends ItemView {
     }
 
     /* ═══════════════════════════════════════════════════════
-       📁 لیست گروه‌بندی‌شده بر اساس نوت
+       📁 لیست گروه‌بندی‌شده
        ═══════════════════════════════════════════════════════ */
     private renderGrouped(parent: HTMLElement, tasks: ExtractedTask[], isCompleted: boolean): void {
         const lang = this.plugin.settings.language;
 
-        /* ─── گروه‌بندی ─── */
         const groups = new Map<string, ExtractedTask[]>();
         for (const task of tasks) {
             const key = task._source_file;
@@ -221,12 +218,10 @@ export class TaskPanelView extends ItemView {
             groups.get(key)!.push(task);
         }
 
-        /* ─── مرتب‌سازی گروه‌ها بر اساس تعداد ─── */
         const sortedGroups = Array.from(groups.entries())
             .map(([key, tasks]) => ({ key, tasks }))
             .sort((a, b) => b.tasks.length - a.tasks.length);
 
-        /* ─── نمایش گروه‌ها ─── */
         let totalRendered = 0;
         const perPage = this.plugin.settings.tasksPerPage;
 
@@ -239,7 +234,6 @@ export class TaskPanelView extends ItemView {
 
             const groupBody = parent.createDiv({ cls: 'first-task-group-body' });
 
-            /* چند تا از این گروه نشون بده */
             const remainingVisible = this.visibleCount - totalRendered;
             const tasksToShow = group.tasks.slice(0, remainingVisible);
 
@@ -249,7 +243,6 @@ export class TaskPanelView extends ItemView {
             totalRendered += tasksToShow.length;
         }
 
-        /* دکمه نمایش بیشتر */
         if (tasks.length > this.visibleCount) {
             const remaining = tasks.length - this.visibleCount;
             const moreBtn = parent.createEl('button', {
@@ -304,7 +297,6 @@ export class TaskPanelView extends ItemView {
         /* ─── متادیتا ─── */
         const meta = bodyCard.createDiv({ cls: 'first-task-card-meta' });
 
-        /* تاریخ انجام */
         if (task.due_date_iso) {
             const dateEl = meta.createSpan({ cls: 'first-task-card-date' });
             setIcon(dateEl.createSpan({ cls: 'first-task-icon' }), 'calendar');
@@ -313,14 +305,12 @@ export class TaskPanelView extends ItemView {
             });
         }
 
-        /* دسته‌بندی کاربر */
         if (task.category) {
             const catEl = meta.createSpan({ cls: 'first-task-card-cat' });
             setIcon(catEl.createSpan({ cls: 'first-task-icon' }), 'tag');
             catEl.createSpan({ text: ' ' + task.category });
         }
 
-        /* نام نوت */
         const noteEl = meta.createSpan({ cls: 'first-task-card-note' });
         setIcon(noteEl.createSpan({ cls: 'first-task-icon' }), 'file-text');
         noteEl.createSpan({
@@ -346,7 +336,7 @@ export class TaskPanelView extends ItemView {
     private async handleRescan(): Promise<void> {
         const lang = this.plugin.settings.language;
         this.plugin.toastManager.show(
-            t(lang, 'panel_reloading') || '...',
+            t(lang, 'panel_reloading'),
             'info',
             1500
         );
