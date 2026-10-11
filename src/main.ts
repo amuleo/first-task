@@ -12,6 +12,7 @@ import { TaskExtractor } from './managers/TaskExtractor';
 import { TaskManager } from './managers/TaskManager';
 import { Notifier } from './managers/Notifier';
 import { ToastManager } from './managers/ToastManager';
+import { t } from './i18n';
 
 export default class FirstTaskPlugin extends Plugin {
     settings: FirstTaskSettings;
@@ -111,9 +112,7 @@ export default class FirstTaskPlugin extends Plugin {
                 await this.taskManager.rescanAll();
                 this.refreshPanel();
                 this.toastManager.show(
-                    this.settings.language === 'fa'
-                        ? 'اسکن کامل انجام شد'
-                        : 'Vault rescan complete',
+                    t(this.settings.language, 'notice_rescan_ok'),
                     'success'
                 );
             },
