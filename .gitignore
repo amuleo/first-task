@@ -1,0 +1,17 @@
+# وابستگی‌ها
+node_modules/
+
+# بیلد
+main.js
+main.js.map
+
+# پوشه‌های سیستم
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# لاگ‌ها
+*.log
