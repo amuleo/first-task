@@ -1,0 +1,74 @@
+name: Release Obsidian Plugin
+
+on:
+  push:
+    tags:
+      - "*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      # ───── ۱. چک‌اوت ─────
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+
+      # ───── ۲. نصب Node.js ─────
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: 'npm'
+          cache-dependency-path: 'package.json'
+
+      # ───── ۳. نصب وابستگی‌ها ─────
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund --prefer-offline --loglevel=error
+
+      # ───── ۴. بیلد ─────
+      - name: Build plugin
+        run: npm run build
+
+      # ───── ۵. استخراج نسخه از tag ─────
+      - name: Get version from tag
+        id: version
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "📌 Version: ${TAG}"
+
+      # ───── ۶. اعتبارسنجی فایل‌ها ─────
+      - name: Verify build artifacts
+        run: |
+          set -e
+          for f in main.js manifest.json styles.css; do
+            if [ ! -f "$f" ]; then
+              echo "❌ Missing file: $f"
+              exit 1
+            fi
+            echo "✅ Found: $f ($(du -h "$f" | cut -f1))"
+          done
+
+      # ───── ۷. ساخت Release ─────
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            main.js
+            manifest.json
+            styles.css
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
