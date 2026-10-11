@@ -1,9 +1,10 @@
 /* ════════════════════════════════════════════════════════════
-   📋 مدیریت تسک‌ها — منطق اصلی
+   📋 مدیریت تسک‌ها — منطق اصلی (نسخه نهایی)
    ✅ استخراج از نوت‌ها + ادغام با ایندکس
+   ✅ کش هوشمند (mtime + hash) — سرعت بالا
    ✅ آمار (Jalali-aware)
    ✅ پین / انجام / ویرایش
-   ✅ کش هوشمند (hash + mtime)
+   ✅ متدهای کمکی برای UI (getDisplayNoteName, getScannableFiles)
    ════════════════════════════════════════════════════════════ */
 
 import { App, TFile } from 'obsidian';
@@ -16,7 +17,8 @@ import type {
 import { VaultScanner } from './VaultScanner';
 import { TaskExtractor } from './TaskExtractor';
 import { IndexManager } from './IndexManager';
-import { hashContent } from '../utils/hash';
+import { hashContent, generateTaskId } from '../utils/hash';
+import { getDisplayNoteName } from '../utils/noteUtils';
 import {
     isToday,
     isTomorrow,
@@ -115,18 +117,11 @@ export class TaskManager {
     }
 
     /* ═══════════════════════════════════════════════════════
-       📄 اسکن یه فایل (با کش هوشمند)
+       📄 اسکن یه فایل (با کش هوشمند mtime + hash)
        ═══════════════════════════════════════════════════════ */
     private async scanSingleFile(file: TFile): Promise<ExtractedTask[]> {
         const stat = this.scanner.getFileStat(file);
         const cached = this.index.getFileCache(file.path);
-
-        /* ─── چک mtime ─── */
-        if (cached && cached.mtime === stat.mtime && cached.size === stat.size) {
-            /* mtime و size یکی‌ان → از کش استفاده کن */
-            /* ولی تسک‌ها رو باید دوباره استخراج کنیم */
-            /* چون ایندکس توی index.json نگه داشته می‌شه */
-        }
 
         /* ─── خوندن محتوا ─── */
         const content = await this.scanner.readFile(file);
@@ -197,7 +192,7 @@ export class TaskManager {
     }
 
     /* ═══════════════════════════════════════════════════════
-       🗑️ حذف تسک‌های یه فایل (وقتی فایل حذف/تغییر می‌کنه)
+       🗑️ حذف تسک‌های یه فایل
        ═══════════════════════════════════════════════════════ */
     removeTasksForFile(path: string): void {
         for (const [id, task] of this.tasks.entries()) {
@@ -243,8 +238,7 @@ export class TaskManager {
             prevMonthStart = getGregorianPrevMonthStart(now);
         }
 
-        /* ─── فیلتر تسک‌های انجام‌شده معتبر ─── */
-        const upperBound = now + CLOCK_DRIFT_TOLERANCE;
+        /* ─── فیلتر تسک‌های انجام‌شده ─── */
         const completed = Array.from(this.tasks.values()).filter(t =>
             t.completed
         );
@@ -264,10 +258,9 @@ export class TaskManager {
 
     /* ═══════════════════════════════════════════════════════
        🕐 چک: تسک انجام شده بعد از این زمان؟
-       (چون تسک‌ها هیچ timestamp ندارن، از mtime فایل استفاده می‌کنیم)
+       (بر اساس mtime فایل مبدأ)
        ═══════════════════════════════════════════════════════ */
     private isCompletedSince(task: ExtractedTask, since: number): boolean {
-        /* ─── گرفتن mtime فایل مبدأ ─── */
         const file = this.scanner.getFileByPath(task._source_file);
         if (!file) return false;
         return file.stat.mtime >= since;
@@ -303,7 +296,7 @@ export class TaskManager {
     }
 
     /* ═══════════════════════════════════════════════════════
-       🔀 مرتب‌سازی (پین اول، بعد جدیدترین)
+       🔀 مرتب‌سازی (پین اول، بعد الفبایی)
        ═══════════════════════════════════════════════════════ */
     private sortTasks = (a: ExtractedTask, b: ExtractedTask): number => {
         if (a.pinned && !b.pinned) return -1;
@@ -312,17 +305,15 @@ export class TaskManager {
     };
 
     /* ═══════════════════════════════════════════════════════
-       🏷️ گرفتن دسته‌بندی‌های یه تسک (کاربر + داینامیک)
+       🏷️ دسته‌بندی‌های یه تسک (کاربر + داینامیک)
        ═══════════════════════════════════════════════════════ */
     getTaskCategories(task: ExtractedTask): string[] {
         const cats: string[] = [];
 
-        /* ─── دسته‌ی کاربر (از ایندکس) ─── */
         if (task.category) {
             cats.push(task.category);
         }
 
-        /* ─── دسته‌های داینامیک (بر اساس due_date) ─── */
         if (task.due_date_iso) {
             const dyn = this.settings.dynamicCategories;
 
@@ -349,7 +340,7 @@ export class TaskManager {
     }
 
     /* ═══════════════════════════════════════════════════════
-       🏷️ گرفتن همه‌ی دسته‌های کاربر (برای dropdown ها)
+       🏷️ همه‌ی دسته‌های کاربر
        ═══════════════════════════════════════════════════════ */
     getUserCategories(): string[] {
         const set = new Set<string>();
@@ -357,6 +348,20 @@ export class TaskManager {
             if (task.category) set.add(task.category);
         }
         return Array.from(set).sort();
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       🆕 کمکی: نام نمایشی نوت (برای UI)
+       ═══════════════════════════════════════════════════════ */
+    getDisplayNoteName(path: string): string {
+        return getDisplayNoteName(path);
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       🆕 کمکی: لیست فایل‌های قابل اسکن (برای مودال ساخت)
+       ═══════════════════════════════════════════════════════ */
+    getScannableFiles(): TFile[] {
+        return this.scanner.getMarkdownFiles();
     }
 
     /* ═══════════════════════════════════════════════════════
@@ -447,7 +452,6 @@ export class TaskManager {
             await this.app.vault.modify(file, result.content);
 
             /* ─── تسک جدید رو توی ایندکس ذخیره کن ─── */
-            const { generateTaskId } = await import('../utils/hash');
             const newId = generateTaskId(sourceFile, title);
 
             await this.index.updateEntry(newId, {
