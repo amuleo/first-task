@@ -1,0 +1,538 @@
+/* ════════════════════════════════════════════════════════════
+   🎨 استایل‌های First Task v0.1.0
+   ✅ Toast بالای صفحه + انیمیشن خروج
+   ✅ دو تب + کارت آماری
+   ✅ Lazy Loading + گروه‌بندی
+   ✅ RTL کامل + دو زبانه
+   ✅ جداکننده‌های نازک + تاگل معکوس
+   ════════════════════════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════════════════════════
+   🍞 Toast
+   ═══════════════════════════════════════════════════════════ */
+.first-task-toast-container {
+    position: fixed !important;
+    top: calc(max(12px, env(safe-area-inset-top)) + 48px) !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    z-index: 2147483647 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 8px !important;
+    pointer-events: none !important;
+    width: 100% !important;
+    max-width: 420px !important;
+    padding: 0 12px !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+.first-task-toast-container.first-task-toast-rtl {
+    direction: rtl !important;
+}
+
+.first-task-toast {
+    display: block !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    pointer-events: auto !important;
+    padding: 12px 16px;
+    border-radius: 10px;
+    background: var(--background-secondary);
+    color: var(--text-normal);
+    border: 1px solid var(--background-modifier-border);
+    font-size: var(--font-ui-smaller);
+    font-weight: 500;
+    line-height: 1.5;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+    cursor: pointer;
+    text-align: start;
+    opacity: 0;
+    transform: translateY(-20px);
+    transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.first-task-toast.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.first-task-toast.is-exiting {
+    opacity: 0 !important;
+    transform: translateY(-12px) scale(0.95) !important;
+    transition: opacity 0.25s ease, transform 0.25s ease !important;
+    pointer-events: none !important;
+}
+
+.first-task-toast-success { border-inline-start: 4px solid #2ecc71; }
+.first-task-toast-error   { border-inline-start: 4px solid #e74c3c; }
+.first-task-toast-warning { border-inline-start: 4px solid #f1c40f; }
+.first-task-toast-info    { border-inline-start: 4px solid var(--text-accent); }
+
+.first-task-toast:hover { background: var(--background-secondary-alt); }
+
+/* ═══════════════════════════════════════════════════════════
+   📋 پنل
+   ═══════════════════════════════════════════════════════════ */
+.first-task-panel {
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow-y: auto;
+}
+
+.first-task-header { margin-bottom: 10px; }
+.first-task-header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+.first-task-title {
+    margin: 0;
+    font-size: var(--font-ui-medium);
+    font-weight: 700;
+    color: var(--text-normal);
+}
+.first-task-header-actions { display: flex; gap: 2px; }
+
+/* ───── تب‌ها ───── */
+.first-task-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 12px;
+    padding: 3px;
+    background: var(--background-secondary);
+    border-radius: 8px;
+}
+.first-task-tab {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 7px 10px;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: var(--font-ui-smaller);
+    font-weight: 500;
+    color: var(--text-muted);
+    transition: all 0.15s ease;
+    box-shadow: none;
+}
+.first-task-tab:hover { color: var(--text-normal); }
+.first-task-tab.is-active {
+    background: var(--background-primary);
+    color: var(--text-accent);
+    font-weight: 600;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+.first-task-tab-icon svg { width: 14px; height: 14px; }
+
+/* ═══════════════════════════════════════════════════════════
+   📊 کارت‌های آماری
+   ═══════════════════════════════════════════════════════════ */
+.first-task-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    margin-bottom: 14px;
+}
+.first-task-stat-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 6px;
+    background: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 8px;
+}
+.first-task-stat-card:hover { border-color: var(--interactive-accent); }
+.first-task-stat-value {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-accent);
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+}
+.first-task-stat-label {
+    font-size: 10.5px;
+    color: var(--text-muted);
+    margin-top: 4px;
+    text-align: center;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   📁 گروه‌بندی
+   ═══════════════════════════════════════════════════════════ */
+.first-task-group-header {
+    margin: 12px 0 6px 0;
+    padding: 6px 10px;
+    background: var(--background-secondary);
+    border-radius: 6px;
+    border-inline-start: 3px solid var(--interactive-accent);
+}
+.first-task-group-title {
+    font-size: var(--font-ui-smaller);
+    font-weight: 600;
+    color: var(--text-muted);
+}
+.first-task-group-body {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 6px;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   📋 لیست تسک‌ها
+   ═══════════════════════════════════════════════════════════ */
+.first-task-body {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1;
+}
+
+/* ───── کارت تسک ───── */
+.first-task-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 11px 13px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 8px;
+    background: var(--background-secondary);
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+.first-task-card:hover {
+    border-color: var(--interactive-accent);
+    background: var(--background-secondary-alt);
+}
+.first-task-card.is-pinned {
+    border-inline-start: 3px solid var(--interactive-accent);
+    background: var(--background-secondary-alt);
+}
+.first-task-card-checkbox {
+    display: flex;
+    align-items: center;
+    padding-top: 2px;
+    flex-shrink: 0;
+}
+.first-task-card-body { flex: 1; min-width: 0; }
+.first-task-card-title-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+}
+.first-task-pin-icon {
+    display: inline-flex;
+    align-items: center;
+    color: var(--text-accent);
+    flex-shrink: 0;
+}
+.first-task-pin-icon svg { width: 13px; height: 13px; }
+.first-task-card-title {
+    font-size: var(--font-ui-small);
+    font-weight: 500;
+    color: var(--text-normal);
+    word-wrap: break-word;
+    line-height: 1.4;
+}
+.first-task-card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+}
+.first-task-card-date,
+.first-task-card-cat,
+.first-task-card-note {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+}
+.first-task-icon svg { width: 12px; height: 12px; }
+
+/* ───── حالت خالی ───── */
+.first-task-empty {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-muted);
+}
+.first-task-empty-title {
+    font-size: var(--font-ui-medium);
+    font-weight: 500;
+    margin-bottom: 4px;
+}
+.first-task-empty-hint {
+    font-size: var(--font-ui-smaller);
+    opacity: 0.8;
+}
+
+/* ───── دکمه نمایش بیشتر ───── */
+.first-task-show-more {
+    padding: 9px;
+    margin-top: 4px;
+    background: transparent;
+    border: 1px dashed var(--background-modifier-border);
+    border-radius: 6px;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: var(--font-ui-smaller);
+    transition: all 0.15s ease;
+}
+.first-task-show-more:hover {
+    border-color: var(--interactive-accent);
+    color: var(--text-accent);
+    border-style: solid;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   🪟 مودال‌ها
+   ═══════════════════════════════════════════════════════════ */
+.first-task-modal-content {
+    padding: 4px 0;
+}
+
+.first-task-modal-title {
+    margin: 0 0 12px 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    font-size: var(--font-ui-large);
+    line-height: 1.4;
+}
+
+.first-task-modal-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid var(--background-modifier-border);
+    border-radius: 0 !important;
+}
+
+.first-task-modal-buttons-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid var(--background-modifier-border);
+    border-radius: 0 !important;
+}
+.first-task-modal-buttons-stack button {
+    width: 100% !important;
+    justify-content: center;
+    text-align: center;
+}
+
+/* ───── مودال جزئیات ───── */
+.first-task-details-header {
+    margin-bottom: 12px;
+}
+.first-task-details-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.first-task-details-title {
+    margin: 0;
+    font-size: var(--font-ui-large);
+    line-height: 1.4;
+}
+.first-task-pinned-badge {
+    font-size: var(--font-ui-smaller);
+    color: var(--text-accent);
+    background: var(--background-secondary);
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-weight: 500;
+}
+
+.first-task-details-source {
+    margin: 8px 0 12px 0;
+    padding: 8px 10px;
+    background: var(--background-secondary);
+    border-radius: 6px;
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+}
+.first-task-source-link {
+    color: var(--text-accent) !important;
+    text-decoration: none;
+    border-bottom: 1px dashed var(--text-accent);
+    cursor: pointer;
+}
+.first-task-source-link:hover {
+    border-bottom-style: solid;
+}
+
+.first-task-details-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+    margin-bottom: 16px;
+    padding: 10px 12px;
+    background: var(--background-secondary);
+    border-radius: 6px;
+}
+.first-task-details-section h5 {
+    margin-top: 0;
+    margin-bottom: 8px;
+}
+.first-task-details-desc {
+    padding: 10px 12px;
+    background: var(--background-secondary);
+    border-radius: 6px;
+    font-size: var(--font-ui-small);
+    line-height: 1.7;
+    white-space: pre-wrap;
+    margin-bottom: 16px;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ⚙️ تنظیمات
+   ═══════════════════════════════════════════════════════════ */
+.first-task-settings[dir="rtl"] {
+    direction: rtl;
+}
+
+.first-task-settings[dir="rtl"] .setting-item-info,
+.first-task-settings[dir="rtl"] .setting-item-name,
+.first-task-settings[dir="rtl"] .setting-item-description {
+    text-align: right;
+}
+
+/* تاگل معکوس در RTL */
+.first-task-settings[dir="rtl"] .checkbox-container,
+.first-task-rtl .checkbox-container {
+    transform: scaleX(-1);
+}
+
+/* ورودی‌های متنی */
+.first-task-settings[dir="rtl"] input[type="text"]:not([dir="ltr"]),
+.first-task-settings[dir="rtl"] textarea:not([dir="ltr"]) {
+    direction: rtl;
+    text-align: right;
+}
+
+/* ورودی‌های LTR اجباری */
+.first-task-settings input[dir="ltr"],
+.first-task-settings textarea[dir="ltr"] {
+    direction: ltr !important;
+    text-align: left !important;
+}
+
+/* dropdown در RTL */
+.first-task-settings[dir="rtl"] select.dropdown {
+    direction: rtl !important;
+    text-align: right !important;
+    padding-right: 10px !important;
+    padding-left: 28px !important;
+    background-position: left 8px center !important;
+}
+
+/* دکمه mod-cta */
+.first-task-settings button.mod-cta,
+.first-task-settings button.mod-cta:focus {
+    background-color: var(--interactive-accent) !important;
+    color: var(--text-on-accent) !important;
+    border-color: var(--interactive-accent) !important;
+    opacity: 1 !important;
+}
+.first-task-settings button.mod-cta:hover {
+    background-color: var(--interactive-accent-hover) !important;
+}
+
+/* عنوان‌های تنظیمات: خط زیرین نازک */
+.first-task-settings .setting-item-heading,
+.first-task-settings .setting-item-heading .setting-item-info,
+.first-task-settings .setting-item-heading .setting-item-name {
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+}
+.first-task-settings .setting-item-heading {
+    border-bottom: 1px solid var(--background-modifier-border) !important;
+    padding: 12px 0 8px 0 !important;
+    margin-bottom: 10px !important;
+}
+.first-task-settings .setting-item-heading + .setting-item {
+    border-top: none !important;
+    padding-top: 10px !important;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   🔥 RTL مودال‌ها
+   ═══════════════════════════════════════════════════════════ */
+.first-task-modal-content[dir="rtl"] .setting-item-info,
+.first-task-modal-content[dir="rtl"] .setting-item-name,
+.first-task-modal-content[dir="rtl"] .setting-item-description {
+    text-align: right;
+}
+
+.first-task-modal-content[dir="rtl"] input[type="text"],
+.first-task-modal-content[dir="rtl"] textarea {
+    direction: rtl;
+    text-align: right;
+}
+
+/* دکمه‌های مودال فارسی: سمت چپ (برعکس انگلیسی) */
+.first-task-modal-content[dir="rtl"] .first-task-modal-buttons {
+    justify-content: flex-start !important;
+}
+
+.first-task-modal-content[dir="rtl"] select.dropdown {
+    direction: rtl !important;
+    text-align: right !important;
+    padding-right: 10px !important;
+    padding-left: 28px !important;
+    background-position: left 8px center !important;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   📱 موبایل
+   ═══════════════════════════════════════════════════════════ */
+@media (max-width: 600px) {
+    .first-task-panel { padding: 8px 10px; }
+    .first-task-card { padding: 10px 11px; }
+    .first-task-title { font-size: 14px; }
+    .first-task-card-title { font-size: 13.5px; }
+    .first-task-card-meta { font-size: 11px; }
+    .first-task-stat-value { font-size: 18px; }
+    .first-task-stat-label { font-size: 10px; }
+    .first-task-tab { font-size: 11.5px; padding: 6px 8px; }
+
+    .first-task-toast-container {
+        top: calc(max(16px, env(safe-area-inset-top)) + 56px) !important;
+        max-width: none !important;
+        padding: 0 10px !important;
+    }
+    .first-task-toast { padding: 10px 14px; font-size: 12px; }
+}
+
+/* تبلت */
+@media (min-width: 601px) and (max-width: 900px) {
+    .first-task-toast-container {
+        top: calc(max(14px, env(safe-area-inset-top)) + 24px) !important;
+    }
+}
