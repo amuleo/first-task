@@ -1,5 +1,7 @@
 /* ════════════════════════════════════════════════════════════
-   🚀 نقطه ورود First Task
+   🚀 نقطه ورود First Task — v0.2.0
+   ✅ CategoriesManager اضافه شد
+   ✅ TaskManager با ۶ پارامتر
    ════════════════════════════════════════════════════════════ */
 
 import { Plugin, WorkspaceLeaf } from 'obsidian';
@@ -7,6 +9,7 @@ import { DEFAULT_SETTINGS, FirstTaskSettings } from './types';
 import { FirstTaskSettingsTab } from './settings/SettingsTab';
 import { TaskPanelView, VIEW_TYPE_FIRST_TASK } from './views/TaskPanelView';
 import { IndexManager } from './managers/IndexManager';
+import { CategoriesManager } from './managers/CategoriesManager';
 import { VaultScanner } from './managers/VaultScanner';
 import { TaskExtractor } from './managers/TaskExtractor';
 import { TaskManager } from './managers/TaskManager';
@@ -19,6 +22,7 @@ export default class FirstTaskPlugin extends Plugin {
     taskManager: TaskManager;
     toastManager: ToastManager;
     indexManager: IndexManager;
+    categoriesManager: CategoriesManager;
 
     private scanner: VaultScanner;
     private extractor: TaskExtractor;
@@ -33,6 +37,7 @@ export default class FirstTaskPlugin extends Plugin {
 
         /* ─── Managers ─── */
         this.indexManager = new IndexManager(this.app);
+        this.categoriesManager = new CategoriesManager(this.app);
         this.scanner = new VaultScanner(this.app, () => this.settings);
         this.extractor = new TaskExtractor();
         this.taskManager = new TaskManager(
@@ -40,10 +45,11 @@ export default class FirstTaskPlugin extends Plugin {
             this.scanner,
             this.extractor,
             this.indexManager,
+            this.categoriesManager,
             () => this.settings
         );
 
-        /* ─── راه‌اندازی اولیه (async، بدون بلاک کردن) ─── */
+        /* ─── راه‌اندازی اولیه (async) ─── */
         this.taskManager.initialize().then(() => {
             this.refreshPanel();
         }).catch(e => {
