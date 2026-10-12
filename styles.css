@@ -1,10 +1,12 @@
 /* ════════════════════════════════════════════════════════════
-   🎨 استایل‌های First Task v1.0.0
+   🎨 استایل‌های First Task v0.2.0
    ✅ Toast بالای صفحه + انیمیشن خروج
    ✅ دو تب + کارت آماری
    ✅ Lazy Loading + گروه‌بندی
    ✅ RTL کامل + دو زبانه
-   ✅ جداکننده‌های نازک + تاگل معکوس
+   ✅ Badge های داینامیک
+   ✅ Dropdown راست‌چین در فارسی
+   ✅ Suggest برای نوت‌ها
    ════════════════════════════════════════════════════════════ */
 
 /* ═══════════════════════════════════════════════════════════
@@ -264,6 +266,55 @@
 }
 .first-task-icon svg { width: 12px; height: 12px; }
 
+/* ═══════════════════════════════════════════════════════════
+   🏷️ Badge های داینامیک
+   ═══════════════════════════════════════════════════════════ */
+.first-task-card-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 6px;
+}
+
+.first-task-dynamic-badge {
+    display: inline-flex;
+    align-items: center;
+    font-size: 10.5px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+    line-height: 1.4;
+    white-space: nowrap;
+}
+
+.first-task-dynamic-today {
+    background-color: rgba(46, 204, 113, 0.18);
+    color: #27ae60;
+}
+.first-task-dynamic-tomorrow {
+    background-color: rgba(52, 152, 219, 0.18);
+    color: #2980b9;
+}
+.first-task-dynamic-this_week {
+    background-color: rgba(155, 89, 182, 0.18);
+    color: #8e44ad;
+}
+.first-task-dynamic-this_month {
+    background-color: rgba(241, 196, 15, 0.18);
+    color: #d4ac0d;
+}
+.first-task-dynamic-this_year {
+    background-color: rgba(230, 126, 34, 0.18);
+    color: #d35400;
+}
+
+.first-task-details-dynamic {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+}
+
 /* ───── حالت خالی ───── */
 .first-task-empty {
     text-align: center;
@@ -323,6 +374,7 @@
     padding-top: 12px;
     border-top: 1px solid var(--background-modifier-border);
     border-radius: 0 !important;
+    flex-wrap: wrap;
 }
 
 .first-task-modal-buttons-stack {
@@ -405,6 +457,26 @@
     line-height: 1.7;
     white-space: pre-wrap;
     margin-bottom: 16px;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   🎯 Suggest برای انتخاب نوت
+   ═══════════════════════════════════════════════════════════ */
+.first-task-suggest-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 4px 0;
+}
+.first-task-suggest-name {
+    font-size: var(--font-ui-small);
+    font-weight: 500;
+    color: var(--text-normal);
+}
+.first-task-suggest-path {
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+    opacity: 0.8;
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -501,12 +573,24 @@
     justify-content: flex-start !important;
 }
 
+/* 🆕 dropdown راست‌چین در فارسی */
 .first-task-modal-content[dir="rtl"] select.dropdown {
     direction: rtl !important;
     text-align: right !important;
     padding-right: 10px !important;
     padding-left: 28px !important;
     background-position: left 8px center !important;
+}
+
+/* 🆕 select در مودال فارسی — گزینه‌ها راست‌چین */
+.first-task-modal-content[dir="rtl"] select.dropdown option {
+    direction: rtl !important;
+    text-align: right !important;
+}
+
+/* 🆕 suggest در مودال فارسی */
+.first-task-modal-content[dir="rtl"] .first-task-suggest-item {
+    text-align: right;
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -528,6 +612,13 @@
         padding: 0 10px !important;
     }
     .first-task-toast { padding: 10px 14px; font-size: 12px; }
+
+    .first-task-modal-buttons {
+        flex-direction: column-reverse;
+    }
+    .first-task-modal-buttons button {
+        width: 100%;
+    }
 }
 
 /* تبلت */
