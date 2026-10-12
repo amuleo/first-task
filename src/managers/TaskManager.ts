@@ -348,3 +348,253 @@ export class TaskManager {
                     }
                     return this.sortTasks(a, b);
                 });
+        }
+    }
+
+    getTasksByCategory(categoryId: string): ExtractedTask[] {
+        return this.getPendingByCategory(categoryId);
+    }
+
+    getCategoryStats(categoryId: string): CategoryStats {
+        const tasks = this.getTasksByCategory(categoryId);
+        return {
+            past: this.filterByCard(tasks, 'past').length,
+            today: this.filterByCard(tasks, 'today').length,
+            tomorrow: this.filterByCard(tasks, 'tomorrow').length,
+            this_week: this.filterByCard(tasks, 'this_week').length,
+            this_month: this.filterByCard(tasks, 'this_month').length,
+            this_year: this.filterByCard(tasks, 'this_year').length,
+            no_date: this.filterByCard(tasks, 'no_date').length,
+            all: tasks.length,
+        };
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       دسته‌بندی‌ها
+       ═══════════════════════════════════════════════════════ */
+    getCategories(): CategoryDef[] {
+        return this.categories.getAll();
+    }
+
+    getCategoryDisplayName(id: string): string {
+        return this.categories.getDisplayName(id, this.settings.language);
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       تغییرات تسک
+       ═══════════════════════════════════════════════════════ */
+    async toggleComplete(taskId: string): Promise<boolean> {
+        const task = this.tasks.get(taskId);
+        if (!task) return false;
+
+        const file = this.scanner.getFileByPath(task._source_file);
+        if (!file) return false;
+
+        try {
+            const content = await this.scanner.readFile(file);
+            const newContent = this.extractor.toggleTaskInContent(
+                content, task._source_file, taskId
+            );
+            if (newContent === null) return false;
+
+            await this.app.vault.modify(file, newContent);
+
+            const now = new Date();
+            const newCompleted = !task.completed;
+
+            const patch: Partial<TaskIndexEntry> = {
+                completed_jalali: newCompleted ? getJalaliDateFull(now) : '',
+                completed_gregorian: newCompleted ? getGregorianDateFull(now) : '',
+                completed_ts: newCompleted ? now.getTime() : 0,
+            };
+
+            if (!task.created_ts) {
+                patch.created_jalali = getJalaliDateFull(now);
+                patch.created_gregorian = getGregorianDateFull(now);
+                patch.created_ts = now.getTime();
+            }
+
+            await this.index.updateEntry(taskId, patch);
+
+            task.completed = newCompleted;
+            task.completed_jalali = patch.completed_jalali || '';
+            task.completed_gregorian = patch.completed_gregorian || '';
+            task.completed_ts = patch.completed_ts || 0;
+            if (patch.created_ts) {
+                task.created_jalali = patch.created_jalali || '';
+                task.created_gregorian = patch.created_gregorian || '';
+                task.created_ts = patch.created_ts;
+            }
+
+            this.recomputeStats();
+            return true;
+        } catch (e) {
+            console.warn('[First Task] toggleComplete failed:', e);
+            return false;
+        }
+    }
+
+    async togglePin(taskId: string): Promise<{ ok: boolean; pinned: boolean }> {
+        const task = this.tasks.get(taskId);
+        if (!task) return { ok: false, pinned: false };
+
+        const newPinned = !task.pinned;
+        await this.index.updateEntry(taskId, { pinned: newPinned });
+        task.pinned = newPinned;
+        return { ok: true, pinned: newPinned };
+    }
+
+    async updateTaskFull(
+        taskId: string,
+        updates: {
+            title: string;
+            description: string;
+            category: string;
+            dueDateJalali: string;
+            dueDateGregorian: string;
+            dueDateTs: number;
+        }
+    ): Promise<boolean> {
+        const task = this.tasks.get(taskId);
+        if (!task) return false;
+
+        const file = this.scanner.getFileByPath(task._source_file);
+        if (!file) return false;
+
+        try {
+            if (updates.title.trim() && updates.title.trim() !== task.title) {
+                const content = await this.scanner.readFile(file);
+                const lines = content.split('\n');
+                const lineIdx = this.extractor.findTaskLine(content, task._source_file, taskId);
+
+                if (lineIdx !== -1) {
+                    const oldLine = lines[lineIdx];
+                    const match = /^(\s*[-*+]\s+\[([ xX])\]\s+)(.+?)(\s*)$/.exec(oldLine);
+                    if (match) {
+                        lines[lineIdx] = `${match[1]}${updates.title.trim()}${match[4]}`;
+                        await this.app.vault.modify(file, lines.join('\n'));
+
+                        const newId = generateTaskId(task._source_file, updates.title.trim());
+                        const oldEntry = this.index.getEntry(taskId);
+                        await this.index.removeEntry(taskId);
+                        await this.index.updateEntry(newId, {
+                            ...oldEntry,
+                            description: updates.description,
+                            category: updates.category,
+                            due_date_jalali: updates.dueDateJalali,
+                            due_date_gregorian: updates.dueDateGregorian,
+                            due_date_ts: updates.dueDateTs,
+                        });
+
+                        this.tasks.delete(taskId);
+                        await this.rescanFile(file);
+                        this.recomputeStats();
+                        return true;
+                    }
+                }
+            }
+
+            await this.index.updateEntry(taskId, {
+                description: updates.description,
+                category: updates.category,
+                due_date_jalali: updates.dueDateJalali,
+                due_date_gregorian: updates.dueDateGregorian,
+                due_date_ts: updates.dueDateTs,
+            });
+
+            task.description = updates.description;
+            task.category = updates.category;
+            task.due_date_jalali = updates.dueDateJalali;
+            task.due_date_gregorian = updates.dueDateGregorian;
+            task.due_date_ts = updates.dueDateTs;
+
+            this.recomputeStats();
+            return true;
+        } catch (e) {
+            console.warn('[First Task] updateTaskFull failed:', e);
+            return false;
+        }
+    }
+
+    async createTask(
+        title: string,
+        sourceFile: string,
+        description: string = '',
+        category: string = '',
+        dueDateJalali: string = '',
+        dueDateGregorian: string = '',
+        dueDateTs: number = 0
+    ): Promise<boolean> {
+        const file = this.scanner.getFileByPath(sourceFile);
+        if (!file) return false;
+
+        try {
+            const content = await this.scanner.readFile(file);
+            const result = this.extractor.addTaskToContent(content, title);
+            await this.app.vault.modify(file, result.content);
+
+            const newId = generateTaskId(sourceFile, title);
+            const now = new Date();
+
+            await this.index.updateEntry(newId, {
+                description,
+                category,
+                pinned: false,
+                due_date_jalali: dueDateJalali,
+                due_date_gregorian: dueDateGregorian,
+                due_date_ts: dueDateTs,
+                created_jalali: getJalaliDateFull(now),
+                created_gregorian: getGregorianDateFull(now),
+                created_ts: now.getTime(),
+            });
+
+            await this.rescanFile(file);
+            return true;
+        } catch (e) {
+            console.warn('[First Task] createTask failed:', e);
+            return false;
+        }
+    }
+
+    async deleteTask(taskId: string): Promise<boolean> {
+        const task = this.tasks.get(taskId);
+        if (!task) return false;
+
+        const file = this.scanner.getFileByPath(task._source_file);
+        if (!file) return false;
+
+        try {
+            const content = await this.scanner.readFile(file);
+            const newContent = this.extractor.removeTaskFromContent(
+                content, task._source_file, taskId
+            );
+            if (newContent === null) return false;
+
+            await this.app.vault.modify(file, newContent);
+
+            await this.index.removeEntry(taskId);
+            this.tasks.delete(taskId);
+
+            this.recomputeStats();
+            return true;
+        } catch (e) {
+            console.warn('[First Task] deleteTask failed:', e);
+            return false;
+        }
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       اطلاعات کمکی
+       ═══════════════════════════════════════════════════════ */
+    getStats(): CompletedStats { return this.stats; }
+    getLastSyncTs(): number { return this.lastSyncTs; }
+    getTaskCount(): number { return this.tasks.size; }
+    getDisplayNoteName(path: string): string { return getDisplayNoteName(path); }
+    getScannableFiles(): TFile[] { return this.scanner.getMarkdownFiles(); }
+
+    private chunkArray<T>(arr: T[], size: number): T[][] {
+        const out: T[][] = [];
+        for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+        return out;
+    }
+}
