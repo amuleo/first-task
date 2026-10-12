@@ -1,15 +1,79 @@
 /* ════════════════════════════════════════════════════════════
-   ➕ مودال ساخت تسک جدید
-   ✅ خوندن مستقیم از inputEl.value در لحظه submit
-   ✅ دکمه‌ها ستونی، تمام عرض
-   ✅ انتخاب نوت مبدأ
+   ➕ مودال ساخت تسک جدید — v0.2.0
+   ✅ AbstractInputSuggest برای انتخاب نوت (لیزی + هوشمند)
+   ✅ تاریخ پیش‌فرض = امروز (شمسی/میلادی)
+   ✅ dropdown دسته‌بندی از CategoriesManager
    ════════════════════════════════════════════════════════════ */
 
-import { App, Modal, Setting, TextComponent, TextAreaComponent, DropdownComponent, TFile } from 'obsidian';
+import {
+    App, Modal, Setting, TFile, AbstractInputSuggest,
+    TextComponent, TextAreaComponent, DropdownComponent,
+} from 'obsidian';
 import type FirstTaskPlugin from '../main';
 import { t, applyDirection } from '../i18n';
-import { parseIsoInput, isValidDateInput } from '../utils/jalaliDate';
+import {
+    parseDateInput, getTodayDateInput, getTodayJalali, getTodayGregorian,
+} from '../utils/jalaliDate';
 
+/* ═══════════════════════════════════════════════════════
+   🎯 Input Suggest برای انتخاب نوت
+   ✅ مرتب بر اساس mtime (آخرین تغییر)
+   ✅ لیزی: فقط ۲۰ مورد نشون می‌ده
+   ═══════════════════════════════════════════════════════ */
+class NoteSuggest extends AbstractInputSuggest<TFile> {
+    private plugin: FirstTaskPlugin;
+    private onSelect: (file: TFile) => void;
+
+    constructor(
+        app: App,
+        inputEl: HTMLInputElement,
+        plugin: FirstTaskPlugin,
+        onSelect: (file: TFile) => void
+    ) {
+        super(app, inputEl);
+        this.plugin = plugin;
+        this.onSelect = onSelect;
+    }
+
+    getSuggestions(query: string): TFile[] {
+        const files = this.plugin.taskManager.getScannableFiles();
+        const lowerQuery = (query || '').toLowerCase();
+
+        /* ─── مرتب بر اساس mtime (جدیدترین اول) ─── */
+        const sorted = [...files].sort((a, b) => b.stat.mtime - a.stat.mtime);
+
+        /* ─── فیلتر بر اساس query ─── */
+        let filtered = sorted;
+        if (lowerQuery) {
+            filtered = sorted.filter(f =>
+                f.path.toLowerCase().includes(lowerQuery)
+            );
+        }
+
+        /* ─── محدودیت ۲۰ مورد ─── */
+        return filtered.slice(0, 20);
+    }
+
+    renderSuggestion(file: TFile, el: HTMLElement): void {
+        const name = file.path.split('/').pop() || file.path;
+        const folder = file.parent?.path || '';
+
+        const container = el.createDiv({ cls: 'first-task-suggest-item' });
+        container.createDiv({ text: name, cls: 'first-task-suggest-name' });
+        if (folder && folder !== '/') {
+            container.createDiv({ text: folder, cls: 'first-task-suggest-path' });
+        }
+    }
+
+    selectSuggestion(file: TFile): void {
+        this.onSelect(file);
+        this.close();
+    }
+}
+
+/* ═══════════════════════════════════════════════════════
+   ➕ مودال
+   ═══════════════════════════════════════════════════════ */
 export class CreateTaskModal extends Modal {
     plugin: FirstTaskPlugin;
     onDone: () => void;
@@ -18,7 +82,8 @@ export class CreateTaskModal extends Modal {
     private titleComponent: TextComponent | null = null;
     private descriptionComponent: TextAreaComponent | null = null;
     private dateComponent: TextComponent | null = null;
-    private categoryComponent: TextComponent | null = null;
+    private categoryComponent: DropdownComponent | null = null;
+    private fileInputEl: HTMLInputElement | null = null;
     private sourceFile: string = '';
 
     constructor(app: App, plugin: FirstTaskPlugin, onDone: () => void) {
@@ -59,43 +124,55 @@ export class CreateTaskModal extends Modal {
                 ta.inputEl.style.width = '100%';
             });
 
-        /* ─── تاریخ ─── */
+        /* ─── تاریخ (پیش‌فرض امروز) ─── */
         new Setting(contentEl)
             .setName(t(lang, 'field_due_date'))
             .addText(text => {
                 this.dateComponent = text;
-                const ph = this.plugin.settings.useJalaliDate
-                    ? t(lang, 'field_due_date_placeholder')
-                    : 'YYYY-MM-DD';
-                text.setPlaceholder(ph);
+                const useJalali = this.plugin.settings.useJalaliDate;
+                text.setValue(getTodayDateInput(useJalali));
                 text.inputEl.dir = 'ltr';
+                text.setPlaceholder(useJalali ? '1405/07/25' : '2026-10-15');
             });
 
         /* ─── دسته‌بندی ─── */
         if (this.plugin.settings.enableCategories) {
+            const cats = this.plugin.taskManager.getCategories();
             new Setting(contentEl)
                 .setName(t(lang, 'field_category'))
-                .addText(text => {
-                    this.categoryComponent = text;
-                    text.setPlaceholder(t(lang, 'field_category_placeholder'));
+                .addDropdown(dd => {
+                    this.categoryComponent = dd;
+                    dd.addOption('', t(lang, 'panel_no_category'));
+                    for (const c of cats) {
+                        const label = lang === 'fa' ? c.name_fa : c.name;
+                        dd.addOption(c.id, label);
+                    }
+                    dd.setValue('');
                 });
         }
 
-        /* ─── فایل مبدأ ─── */
-        const files = this.getAvailableFiles();
-        const defaultFile = this.getDefaultFile(files);
+        /* ─── فایل مبدأ با Suggest ─── */
+        const files = this.plugin.taskManager.getScannableFiles();
+        this.sourceFile = this.getDefaultFile(files);
 
-        new Setting(contentEl)
+        const sourceSetting = new Setting(contentEl)
             .setName(t(lang, 'field_source_file'))
-            .setDesc(t(lang, 'field_source_file_hint'))
-            .addDropdown(dd => {
-                for (const f of files) {
-                    dd.addOption(f.path, f.path);
-                }
-                dd.setValue(defaultFile);
-                this.sourceFile = defaultFile;
-                dd.onChange(v => { this.sourceFile = v; });
+            .setDesc(t(lang, 'field_source_file_hint'));
+
+        sourceSetting.addText(text => {
+            this.fileInputEl = text.inputEl;
+            text.setValue(this.sourceFile);
+            text.inputEl.style.width = '100%';
+
+            /* ─── Suggest ─── */
+            new NoteSuggest(this.app, text.inputEl, this.plugin, (file) => {
+                this.sourceFile = file.path;
+                text.setValue(file.path);
             });
+
+            /* ─── هر تغییر، sourceFile رو آپدیت کن ─── */
+            text.onChange(v => { this.sourceFile = v.trim(); });
+        });
 
         /* ─── دکمه‌ها ─── */
         const btnRow = contentEl.createDiv({ cls: 'first-task-modal-buttons-stack' });
@@ -110,27 +187,16 @@ export class CreateTaskModal extends Modal {
         save.onclick = () => this.submit();
     }
 
-    /* ─── لیست فایل‌های قابل انتخاب ─── */
-    private getAvailableFiles(): TFile[] {
-        const files = this.plugin.taskManager.getScannableFiles();
-        /* ─── مرتب بر اساس مسیر ─── */
-        return files.sort((a, b) => a.path.localeCompare(b.path, 'fa'));
-    }
-
-    /* ─── فایل پیش‌فرض (inbox یا اولین فایل) ─── */
+    /* ─── فایل پیش‌فرض (inbox یا جدیدترین) ─── */
     private getDefaultFile(files: TFile[]): string {
         if (files.length === 0) return '';
 
-        /* ─── اگه inbox هست، اونو انتخاب کن ─── */
-        const inbox = files.find(f => /^inbox\.md$/i.test(f.path));
+        const inbox = files.find(f => /(^|\/)inbox\.md$/i.test(f.path));
         if (inbox) return inbox.path;
 
-        /* ─── اگه inbox توی ریشه نبود، تو هر پوشه بگرد ─── */
-        const inboxAny = files.find(f => /(^|\/)inbox\.md$/i.test(f.path));
-        if (inboxAny) return inboxAny.path;
-
-        /* ─── وگرنه اولین فایل ─── */
-        return files[0]?.path || '';
+        /* جدیدترین */
+        const sorted = [...files].sort((a, b) => b.stat.mtime - a.stat.mtime);
+        return sorted[0]?.path || '';
     }
 
     /* ─── ارسال ─── */
@@ -141,22 +207,28 @@ export class CreateTaskModal extends Modal {
         const title = (this.titleComponent?.inputEl.value ?? '').trim();
         const description = (this.descriptionComponent?.inputEl.value ?? '').trim();
         const dateInput = (this.dateComponent?.inputEl.value ?? '').trim();
-        const category = (this.categoryComponent?.inputEl.value ?? '').trim();
+        const category = this.categoryComponent?.getValue() ?? '';
 
         if (!title) {
             this.plugin.toastManager.show(t(lang, 'notice_no_title'), 'warning');
             return;
         }
 
-        if (!this.sourceFile) {
+        /* ─── اگه sourceFile خالی، از input بخون ─── */
+        const sourceFile = this.sourceFile || (this.fileInputEl?.value ?? '').trim();
+        if (!sourceFile) {
             this.plugin.toastManager.show(t(lang, 'notice_no_file'), 'warning');
             return;
         }
 
-        /* ─── اعتبارسنجی تاریخ ─── */
-        let dueDateIso = '';
+        /* ─── پارس تاریخ ─── */
+        let dueJalali = '';
+        let dueGregorian = '';
+        let dueTs = 0;
+
         if (dateInput) {
-            if (!isValidDateInput(dateInput, this.plugin.settings.useJalaliDate)) {
+            const parsed = parseDateInput(dateInput, this.plugin.settings.useJalaliDate);
+            if (!parsed) {
                 this.plugin.toastManager.show(
                     lang === 'fa'
                         ? 'قالب تاریخ اشتباهه (مثال: ۱۴۰۵/۰۷/۲۵)'
@@ -165,24 +237,21 @@ export class CreateTaskModal extends Modal {
                 );
                 return;
             }
-            dueDateIso = parseIsoInput(dateInput, this.plugin.settings.useJalaliDate);
-            if (!dueDateIso) {
-                this.plugin.toastManager.show(
-                    lang === 'fa' ? 'تاریخ معتبر نیست' : 'Invalid date',
-                    'warning'
-                );
-                return;
-            }
+            dueJalali = parsed.jalali;
+            dueGregorian = parsed.gregorian;
+            dueTs = parsed.ts;
         }
 
         this.submitting = true;
 
         const ok = await this.plugin.taskManager.createTask(
             title,
-            this.sourceFile,
+            sourceFile,
             description,
-            dueDateIso,
-            category
+            category,
+            dueJalali,
+            dueGregorian,
+            dueTs
         );
 
         if (ok) {
