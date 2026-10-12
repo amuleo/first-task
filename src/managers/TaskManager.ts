@@ -1,8 +1,8 @@
 /* ════════════════════════════════════════════════════════════
-   📋 مدیریت تسک‌ها — v0.1.2
-   ✅ متدهای دسته‌بندی + فیلتر زمانی برای Planner
-   ✅ فیلتر بر اساس دسته برای پنل اصلی
-   ✅ رفع باگ پین (بروزرسانی سریع)
+   📋 مدیریت تسک‌ها — v0.1.2 (نهایی)
+   ✅ استفاده از توابع دقیق تاریخ
+   ✅ پشتیبانی از weekStartDay
+   ✅ متدهای Planner
    ════════════════════════════════════════════════════════════ */
 
 import { App, TFile } from 'obsidian';
@@ -22,7 +22,7 @@ import { CategoriesManager } from './CategoriesManager';
 import { hashContent, generateTaskId } from '../utils/hash';
 import { getDisplayNoteName } from '../utils/noteUtils';
 import {
-    isTodayTs, isTomorrowTs, isWithinNextWeekTs, isThisMonthTs, isThisYearTs,
+    isPastTs, isTodayTs, isTomorrowTs, isThisWeekTs, isThisMonthTs, isThisYearTs,
     startOfDay, startOfYesterday, startOfDaysAgo,
     getJalaliYearStart, getJalaliPrevMonthStart,
     getGregorianYearStart, getGregorianPrevMonthStart,
@@ -179,9 +179,7 @@ export class TaskManager {
 
     removeTasksForFile(path: string): void {
         for (const [id, task] of this.tasks.entries()) {
-            if (task._source_file === path) {
-                this.tasks.delete(id);
-            }
+            if (task._source_file === path) this.tasks.delete(id);
         }
         this.index.removeFileCache(path);
     }
@@ -262,34 +260,24 @@ export class TaskManager {
     };
 
     /* ═══════════════════════════════════════════════════════
-       فیلتر بر اساس دسته (برای پنل اصلی)
+       فیلتر بر اساس دسته
        ═══════════════════════════════════════════════════════ */
     getPendingByCategory(categoryId: string): ExtractedTask[] {
         const pending = this.getPendingTasks();
-
         if (!categoryId) return pending;
-
-        if (categoryId === 'none') {
-            return pending.filter(t => !t.category);
-        }
-
+        if (categoryId === 'none') return pending.filter(t => !t.category);
         return pending.filter(t => t.category === categoryId);
     }
 
     getCompletedByCategory(categoryId: string): ExtractedTask[] {
         const completed = this.getCompletedTasks();
-
         if (!categoryId) return completed;
-
-        if (categoryId === 'none') {
-            return completed.filter(t => !t.category);
-        }
-
+        if (categoryId === 'none') return completed.filter(t => !t.category);
         return completed.filter(t => t.category === categoryId);
     }
 
     /* ═══════════════════════════════════════════════════════
-       دسته‌بندی داینامیک
+       دسته‌بندی داینامیک (روی تسک)
        ═══════════════════════════════════════════════════════ */
     getTaskDynamicCategories(task: ExtractedTask): string[] {
         const cats: string[] = [];
@@ -297,27 +285,29 @@ export class TaskManager {
         if (!ts) return cats;
 
         const dyn = this.settings.dynamicCategories;
+        const useJalali = this.settings.useJalaliDate;
+        const weekStart = this.settings.weekStartDay;
 
         if (isTodayTs(ts)) cats.push('today');
         if (dyn.tomorrow && isTomorrowTs(ts)) cats.push('tomorrow');
-        if (dyn.this_week && isWithinNextWeekTs(ts)) cats.push('this_week');
-        if (dyn.this_month && isThisMonthTs(ts)) cats.push('this_month');
-        if (dyn.this_year && isThisYearTs(ts)) cats.push('this_year');
+        if (dyn.this_week && isThisWeekTs(ts, weekStart)) cats.push('this_week');
+        if (dyn.this_month && isThisMonthTs(ts, useJalali)) cats.push('this_month');
+        if (dyn.this_year && isThisYearTs(ts, useJalali)) cats.push('this_year');
 
         return cats;
     }
 
     /* ═══════════════════════════════════════════════════════
-       Planner: فیلتر زمانی
+       Planner: فیلتر زمانی (دقیق)
        ═══════════════════════════════════════════════════════ */
     filterByCard(tasks: ExtractedTask[], card: PlannerCard): ExtractedTask[] {
-        const now = Date.now();
-        const today = startOfDay(now);
+        const useJalali = this.settings.useJalaliDate;
+        const weekStart = this.settings.weekStartDay;
 
         switch (card) {
             case 'past':
                 return tasks
-                    .filter(t => t.due_date_ts > 0 && t.due_date_ts < today)
+                    .filter(t => t.due_date_ts > 0 && isPastTs(t.due_date_ts))
                     .sort((a, b) => a.due_date_ts - b.due_date_ts);
 
             case 'today':
@@ -327,13 +317,19 @@ export class TaskManager {
                 return tasks.filter(t => isTomorrowTs(t.due_date_ts)).sort(this.sortTasks);
 
             case 'this_week':
-                return tasks.filter(t => isWithinNextWeekTs(t.due_date_ts)).sort(this.sortTasks);
+                return tasks
+                    .filter(t => isThisWeekTs(t.due_date_ts, weekStart) && !isPastTs(t.due_date_ts))
+                    .sort(this.sortTasks);
 
             case 'this_month':
-                return tasks.filter(t => isThisMonthTs(t.due_date_ts)).sort(this.sortTasks);
+                return tasks
+                    .filter(t => isThisMonthTs(t.due_date_ts, useJalali) && !isPastTs(t.due_date_ts))
+                    .sort(this.sortTasks);
 
             case 'this_year':
-                return tasks.filter(t => isThisYearTs(t.due_date_ts)).sort(this.sortTasks);
+                return tasks
+                    .filter(t => isThisYearTs(t.due_date_ts, useJalali) && !isPastTs(t.due_date_ts))
+                    .sort(this.sortTasks);
 
             case 'no_date':
                 return tasks.filter(t => !t.due_date_ts).sort(this.sortTasks);
@@ -378,6 +374,11 @@ export class TaskManager {
 
     getCategoryDisplayName(id: string): string {
         return this.categories.getDisplayName(id, this.settings.language);
+    }
+
+    /* ─── آیا تسکی بدون دسته وجود داره؟ ─── */
+    hasTasksWithoutCategory(): boolean {
+        return this.getPendingTasks().some(t => !t.category);
     }
 
     /* ═══════════════════════════════════════════════════════
