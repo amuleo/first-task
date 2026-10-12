@@ -1,9 +1,8 @@
 /* ════════════════════════════════════════════════════════════
-   📋 پنل اصلی تسک‌ها — v0.1.2
-   ✅ dropdown دسته‌بندی بالای لیست
-   ✅ دو تب (در انتظار / انجام شده)
-   ✅ Lazy Loading
-   ✅ رفع باگ پین (بروزرسانی سریع)
+   📋 پنل اصلی — v0.1.2
+   ✅ dropdown دسته‌بندی
+   ✅ اعداد داینامیک
+   ✅ نمایش badge ها بر اساس تنظیمات کاربر
    ✅ بدون گروه‌بندی
    ════════════════════════════════════════════════════════════ */
 
@@ -11,7 +10,7 @@ import { ItemView, WorkspaceLeaf, setIcon } from 'obsidian';
 import type FirstTaskPlugin from '../main';
 import type { ExtractedTask } from '../types';
 import { t, applyDirection } from '../i18n';
-import { formatCount } from '../utils/formatUtils';
+import { displayNumber, displayString } from '../utils/numberUtils';
 import { CreateTaskModal } from './CreateTaskModal';
 import { TaskDetailsModal } from './TaskDetailsModal';
 
@@ -38,13 +37,8 @@ export class TaskPanelView extends ItemView {
 
     async onClose(): Promise<void> {}
 
-    refresh(): void {
-        this.render();
-    }
+    refresh(): void { this.render(); }
 
-    /* ═══════════════════════════════════════════════════════
-       رندر
-       ═══════════════════════════════════════════════════════ */
     private render(): void {
         const { contentEl } = this;
         const savedScroll = contentEl.scrollTop;
@@ -69,7 +63,6 @@ export class TaskPanelView extends ItemView {
         });
     }
 
-    /* ─── هدر ─── */
     private renderHeader(parent: HTMLElement): void {
         const lang = this.plugin.settings.language;
         const header = parent.createDiv({ cls: 'first-task-header' });
@@ -101,24 +94,30 @@ export class TaskPanelView extends ItemView {
     private renderCategoryDropdown(parent: HTMLElement): void {
         const lang = this.plugin.settings.language;
         const cats = this.plugin.taskManager.getCategories();
+        const hasUncategorized = this.plugin.taskManager.hasTasksWithoutCategory();
 
         const row = parent.createDiv({ cls: 'first-task-category-row' });
         const select = row.createEl('select', { cls: 'dropdown first-task-category-select' });
 
+        /* ۱. همه */
         select.createEl('option', {
             value: '',
             text: t(lang, 'panel_all_categories'),
         });
 
+        /* ۲. بدون دسته (اگه وجود داره) */
+        if (hasUncategorized) {
+            select.createEl('option', {
+                value: 'none',
+                text: t(lang, 'panel_no_category'),
+            });
+        }
+
+        /* ۳. بقیه دسته‌ها */
         for (const c of cats) {
             const label = lang === 'fa' ? c.name_fa : c.name;
             select.createEl('option', { value: c.id, text: label });
         }
-
-        select.createEl('option', {
-            value: 'none',
-            text: t(lang, 'panel_no_category'),
-        });
 
         select.value = this.plugin.settings.panelCategory || '';
         select.onchange = async () => {
@@ -144,7 +143,7 @@ export class TaskPanelView extends ItemView {
                 cls: 'first-task-tab' + (this.plugin.settings.currentTab === id ? ' is-active' : ''),
             });
             setIcon(btn.createSpan({ cls: 'first-task-tab-icon' }), icon);
-            btn.createSpan({ text: ` ${label} (${formatCount(count)})` });
+            btn.createSpan({ text: ` ${label} (${displayNumber(count, lang)})` });
             btn.onclick = async () => {
                 if (this.plugin.settings.currentTab === id) return;
                 this.plugin.settings.currentTab = id;
@@ -163,7 +162,6 @@ export class TaskPanelView extends ItemView {
     private renderPending(parent: HTMLElement): void {
         const lang = this.plugin.settings.language;
         const body = parent.createDiv({ cls: 'first-task-body' });
-
         const category = this.plugin.settings.panelCategory || '';
         const tasks = this.plugin.taskManager.getPendingByCategory(category);
 
@@ -179,7 +177,7 @@ export class TaskPanelView extends ItemView {
             const remaining = tasks.length - this.visibleCount;
             const moreBtn = body.createEl('button', {
                 cls: 'first-task-show-more',
-                text: `${t(lang, 'panel_show_more')} (${formatCount(remaining)})`,
+                text: `${t(lang, 'panel_show_more')} (${displayNumber(remaining, lang)})`,
             });
             moreBtn.onclick = () => {
                 this.visibleCount += this.plugin.settings.tasksPerPage;
@@ -196,7 +194,7 @@ export class TaskPanelView extends ItemView {
 
         const mkCard = (label: string, value: number) => {
             const card = statsGrid.createDiv({ cls: 'first-task-stat-card' });
-            card.createDiv({ cls: 'first-task-stat-value', text: formatCount(value) });
+            card.createDiv({ cls: 'first-task-stat-value', text: displayNumber(value, lang) });
             card.createDiv({ cls: 'first-task-stat-label', text: label });
         };
 
@@ -223,7 +221,7 @@ export class TaskPanelView extends ItemView {
             const remaining = tasks.length - this.visibleCount;
             const moreBtn = body.createEl('button', {
                 cls: 'first-task-show-more',
-                text: `${t(lang, 'panel_show_more')} (${formatCount(remaining)})`,
+                text: `${t(lang, 'panel_show_more')} (${displayNumber(remaining, lang)})`,
             });
             moreBtn.onclick = () => {
                 this.visibleCount += this.plugin.settings.tasksPerPage;
@@ -240,7 +238,6 @@ export class TaskPanelView extends ItemView {
         const card = parent.createDiv({ cls: 'first-task-card' + pinnedClass });
         card.dataset.taskId = task._id;
 
-        /* ─── چک‌باکس ─── */
         const cbWrap = card.createDiv({ cls: 'first-task-card-checkbox' });
         const cb = cbWrap.createEl('input', { type: 'checkbox' });
         cb.checked = isCompleted;
@@ -260,7 +257,6 @@ export class TaskPanelView extends ItemView {
             }
         };
 
-        /* ─── بدنه ─── */
         const bodyCard = card.createDiv({ cls: 'first-task-card-body' });
 
         const titleRow = bodyCard.createDiv({ cls: 'first-task-card-title-row' });
@@ -270,14 +266,13 @@ export class TaskPanelView extends ItemView {
         }
         titleRow.createDiv({ cls: 'first-task-card-title', text: task.title });
 
-        /* ─── متادیتا ─── */
         const meta = bodyCard.createDiv({ cls: 'first-task-card-meta' });
 
         const dateDisplay = useJalali ? task.due_date_jalali : task.due_date_gregorian;
         if (dateDisplay) {
             const dateEl = meta.createSpan({ cls: 'first-task-card-date' });
             setIcon(dateEl.createSpan({ cls: 'first-task-icon' }), 'calendar');
-            dateEl.createSpan({ text: ' ' + dateDisplay });
+            dateEl.createSpan({ text: ' ' + displayString(dateDisplay, lang) });
         }
 
         if (task.category) {
@@ -294,8 +289,8 @@ export class TaskPanelView extends ItemView {
             text: ' ' + this.plugin.taskManager.getDisplayNoteName(task._source_file),
         });
 
-        /* ─── badge های داینامیک ─── */
-        if (!isCompleted) {
+        /* ─── badge های داینامیک (فقط اگه کاربر بخواد) ─── */
+        if (!isCompleted && this.plugin.settings.showTaskBadges) {
             const dynCats = this.plugin.taskManager.getTaskDynamicCategories(task);
             if (dynCats.length > 0) {
                 const badgesRow = bodyCard.createDiv({ cls: 'first-task-card-badges' });
@@ -308,20 +303,17 @@ export class TaskPanelView extends ItemView {
             }
         }
 
-        /* ─── کلیک روی کارت ─── */
         bodyCard.onclick = () => {
             new TaskDetailsModal(this.app, this.plugin, task, () => this.render()).open();
         };
     }
 
-    /* ─── حالت خالی ─── */
     private renderEmpty(parent: HTMLElement, title: string, hint: string): void {
         const empty = parent.createDiv({ cls: 'first-task-empty' });
         empty.createEl('p', { text: title, cls: 'first-task-empty-title' });
         if (hint) empty.createEl('p', { text: hint, cls: 'first-task-empty-hint' });
     }
 
-    /* ─── Rescan ─── */
     private async handleRescan(): Promise<void> {
         const lang = this.plugin.settings.language;
         this.plugin.toastManager.show(t(lang, 'panel_reloading'), 'info', 1500);
