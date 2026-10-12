@@ -1,41 +1,12 @@
 /* ════════════════════════════════════════════════════════════
-   📦 تایپ‌های First Task v0.2.0
+   📦 تایپ‌های First Task v0.1.2
    ════════════════════════════════════════════════════════════ */
 
 /* ───── تسک استخراج‌شده ───── */
 export interface ExtractedTask {
-    /* ─── از markdown ─── */
     title: string;
     completed: boolean;
 
-    /* ─── از ایندکس (همه string، خالی اگه نداشت) ─── */
-    description: string;
-    category: string;
-    pinned: boolean;
-
-    /* ─── تاریخ انجام (دو فرمت) ─── */
-    due_date_jalali: string;      // "1405/07/25" یا ""
-    due_date_gregorian: string;   // "2026-10-15" یا ""
-    due_date_ts: number;          // 0 اگه نداشت
-
-    /* ─── زمان ساخت ─── */
-    created_jalali: string;       // "1405/07/18 - 14:30"
-    created_gregorian: string;    // "2026-10-10 14:30"
-    created_ts: number;
-
-    /* ─── زمان انجام ─── */
-    completed_jalali: string;
-    completed_gregorian: string;
-    completed_ts: number;
-
-    /* ─── متادیتای داخلی ─── */
-    _id: string;
-    _source_file: string;
-    _source_line: number;
-}
-
-/* ───── ورودی ایندکس ───── */
-export interface TaskIndexEntry {
     description: string;
     category: string;
     pinned: boolean;
@@ -48,6 +19,26 @@ export interface TaskIndexEntry {
     created_gregorian: string;
     created_ts: number;
 
+    completed_jalali: string;
+    completed_gregorian: string;
+    completed_ts: number;
+
+    _id: string;
+    _source_file: string;
+    _source_line: number;
+}
+
+/* ───── ورودی ایندکس ───── */
+export interface TaskIndexEntry {
+    description: string;
+    category: string;
+    pinned: boolean;
+    due_date_jalali: string;
+    due_date_gregorian: string;
+    due_date_ts: number;
+    created_jalali: string;
+    created_gregorian: string;
+    created_ts: number;
     completed_jalali: string;
     completed_gregorian: string;
     completed_ts: number;
@@ -113,6 +104,27 @@ export const DEFAULT_CATEGORIES: CategoriesFile = {
     ],
 };
 
+/* ───── آمار ───── */
+export interface CompletedStats {
+    today: number;
+    yesterday: number;
+    this_week: number;
+    last_month: number;
+    this_year: number;
+    total: number;
+}
+
+export interface CategoryStats {
+    past: number;
+    today: number;
+    tomorrow: number;
+    this_week: number;
+    this_month: number;
+    this_year: number;
+    no_date: number;
+    all: number;
+}
+
 /* ───── تنظیمات ───── */
 export interface DynamicCategorySettings {
     tomorrow: boolean;
@@ -123,12 +135,12 @@ export interface DynamicCategorySettings {
 
 export type Language = 'en' | 'fa';
 export type TabType = 'pending' | 'completed';
+export type PlannerCard = 'past' | 'today' | 'tomorrow' | 'this_week' | 'this_month' | 'this_year' | 'no_date' | 'all';
 
 export interface FirstTaskSettings {
     language: Language;
     useJalaliDate: boolean;
     tasksPerPage: number;
-    groupByNote: boolean;
     showNoteInModal: boolean;
     includeFolders: string[];
     excludeFolders: string[];
@@ -136,13 +148,15 @@ export interface FirstTaskSettings {
     enableCategories: boolean;
     dynamicCategories: DynamicCategorySettings;
     currentTab: TabType;
+    panelCategory: string;
+    plannerCategory: string;
+    plannerCard: PlannerCard;
 }
 
 export const DEFAULT_SETTINGS: FirstTaskSettings = {
     language: 'en',
     useJalaliDate: false,
     tasksPerPage: 20,
-    groupByNote: false,
     showNoteInModal: true,
     includeFolders: [],
     excludeFolders: ['.obsidian', 'FirstTask', '.trash'],
@@ -155,14 +169,7 @@ export const DEFAULT_SETTINGS: FirstTaskSettings = {
         this_year: true,
     },
     currentTab: 'pending',
+    panelCategory: '',
+    plannerCategory: '',
+    plannerCard: 'all',
 };
-
-/* ───── آمار ───── */
-export interface CompletedStats {
-    today: number;
-    yesterday: number;
-    this_week: number;
-    last_month: number;
-    this_year: number;
-    total: number;
-}
