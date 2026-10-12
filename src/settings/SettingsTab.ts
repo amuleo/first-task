@@ -1,11 +1,10 @@
 /* ════════════════════════════════════════════════════════════
-   ⚙️ تب تنظیمات First Task
-   ✅ دو زبانه + RTL
-   ✅ جداکننده‌های نازک زیر عنوان‌ها
-   ✅ تاگل‌ها معکوس در RTL
+   ⚙️ تب تنظیمات First Task — v0.1.2
+   ✅ حذف groupByNote (چون حذف شد)
+   ✅ حذف showNoteInModal (چون همیشه نمایش داده می‌شه)
    ════════════════════════════════════════════════════════════ */
 
-import { App, PluginSettingTab, Setting, Notice } from 'obsidian';
+import { App, PluginSettingTab, Setting } from 'obsidian';
 import type FirstTaskPlugin from '../main';
 import type { Language } from '../types';
 import { t, applyDirection } from '../i18n';
@@ -19,7 +18,7 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
         this.plugin = plugin;
     }
 
-    /* رفرش با تأخیر کوچیک (به جای display فوری) */
+    /* رفرش با تأخیر کوچیک */
     private scheduleRefresh(): void {
         if (this.refreshTimer !== null) {
             window.clearTimeout(this.refreshTimer);
@@ -88,27 +87,6 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
                     this.plugin.refreshPanel();
                 });
             });
-
-        new Setting(containerEl)
-            .setName(t(lang, 'settings_group_by_note'))
-            .setDesc(t(lang, 'settings_group_by_note_desc'))
-            .addToggle(tg => tg
-                .setValue(this.plugin.settings.groupByNote)
-                .onChange(async (v) => {
-                    this.plugin.settings.groupByNote = v;
-                    await this.plugin.saveSettings();
-                    this.plugin.refreshPanel();
-                }));
-
-        new Setting(containerEl)
-            .setName(t(lang, 'settings_show_note_in_modal'))
-            .setDesc(t(lang, 'settings_show_note_in_modal_desc'))
-            .addToggle(tg => tg
-                .setValue(this.plugin.settings.showNoteInModal)
-                .onChange(async (v) => {
-                    this.plugin.settings.showNoteInModal = v;
-                    await this.plugin.saveSettings();
-                }));
 
         /* ═══════ پوشه‌ها ═══════ */
         new Setting(containerEl).setName(t(lang, 'settings_folders')).setHeading();
@@ -214,7 +192,7 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
                 }));
     }
 
-    /* تبدیل لیست پوشه‌ها از string به array */
+    /* تبدیل لیست پوشه‌ها */
     private parseFolders(input: string): string[] {
         return input
             .split(',')
