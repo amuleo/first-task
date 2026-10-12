@@ -6,23 +6,18 @@
 export interface ExtractedTask {
     title: string;
     completed: boolean;
-
     description: string;
     category: string;
     pinned: boolean;
-
     due_date_jalali: string;
     due_date_gregorian: string;
     due_date_ts: number;
-
     created_jalali: string;
     created_gregorian: string;
     created_ts: number;
-
     completed_jalali: string;
     completed_gregorian: string;
     completed_ts: number;
-
     _id: string;
     _source_file: string;
     _source_line: number;
@@ -136,17 +131,29 @@ export interface DynamicCategorySettings {
 export type Language = 'en' | 'fa';
 export type TabType = 'pending' | 'completed';
 export type PlannerCard = 'past' | 'today' | 'tomorrow' | 'this_week' | 'this_month' | 'this_year' | 'no_date' | 'all';
+export type WeekStartDay = 0 | 1 | 2 | 3 | 4 | 5 | 6;  /* 0=Sunday, 6=Saturday */
+
+export interface PlannerCardsVisibility {
+    past: boolean;
+    today: boolean;
+    tomorrow: boolean;
+    this_week: boolean;
+    this_month: boolean;
+    this_year: boolean;
+}
 
 export interface FirstTaskSettings {
     language: Language;
     useJalaliDate: boolean;
     tasksPerPage: number;
-    showNoteInModal: boolean;
+    weekStartDay: WeekStartDay;
     includeFolders: string[];
     excludeFolders: string[];
     onlyMarkdown: boolean;
     enableCategories: boolean;
+    showTaskBadges: boolean;
     dynamicCategories: DynamicCategorySettings;
+    plannerCards: PlannerCardsVisibility;
     currentTab: TabType;
     panelCategory: string;
     plannerCategory: string;
@@ -157,12 +164,21 @@ export const DEFAULT_SETTINGS: FirstTaskSettings = {
     language: 'en',
     useJalaliDate: false,
     tasksPerPage: 20,
-    showNoteInModal: true,
+    weekStartDay: 6,              /* شنبه */
     includeFolders: [],
     excludeFolders: ['.obsidian', 'FirstTask', '.trash'],
     onlyMarkdown: true,
     enableCategories: true,
+    showTaskBadges: false,
     dynamicCategories: {
+        tomorrow: true,
+        this_week: true,
+        this_month: true,
+        this_year: true,
+    },
+    plannerCards: {
+        past: true,
+        today: true,
         tomorrow: true,
         this_week: true,
         this_month: true,
