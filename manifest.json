@@ -1,7 +1,7 @@
 {
     "id": "first-task",
     "name": "First Task",
-    "version": "0.1.1",
+    "version": "0.1.2",
     "minAppVersion": "1.4.0",
     "description": "Extract all tasks from your vault notes and manage them in one place. Supports categories, due dates, pinning, and Persian calendar. Works completely offline.",
     "author": "amooLeo",
