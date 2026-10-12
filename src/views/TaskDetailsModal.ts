@@ -1,15 +1,17 @@
 /* ════════════════════════════════════════════════════════════
-   🔎 مودال جزئیات + ویرایش تسک — v0.2.0
+   🔎 مودال جزئیات + ویرایش تسک — v0.1.2
    ✅ حالت نمایش + حالت ویرایش
-   ✅ نمایش تاریخ ساخت و اتمام (شمسی + میلادی)
-   ✅ دکمه‌ها: پین / انجام / ویرایش / باز کردن نوت / حذف
+   ✅ باکس عنوان و توضیحات (readonly)
+   ✅ ترتیب دکمه‌ها: ویرایش / پین / حذف / انجام شد
+   ✅ رفع باگ پیام پین
+   ✅ بدون دکمه "باز کردن نوت"
    ════════════════════════════════════════════════════════════ */
 
-import { App, Modal, Setting, setIcon } from 'obsidian';
+import { App, Modal, Setting, DropdownComponent } from 'obsidian';
 import type FirstTaskPlugin from '../main';
 import type { ExtractedTask } from '../types';
 import { t, applyDirection } from '../i18n';
-import { parseDateInput, getTodayDateInput } from '../utils/jalaliDate';
+import { parseDateInput } from '../utils/jalaliDate';
 import { truncateNoteName } from '../utils/noteUtils';
 
 const NOTE_NAME_MAX = 25;
@@ -55,18 +57,6 @@ export class TaskDetailsModal extends Modal {
         const lang = this.plugin.settings.language;
         const useJalali = this.plugin.settings.useJalaliDate;
 
-        /* ─── هدر (عنوان تسک + بج پین) ─── */
-        const header = parent.createDiv({ cls: 'first-task-details-header' });
-        const titleRow = header.createDiv({ cls: 'first-task-details-title-row' });
-        titleRow.createEl('h4', { text: this.task.title, cls: 'first-task-details-title' });
-
-        if (this.task.pinned && !this.task.completed) {
-            titleRow.createSpan({
-                cls: 'first-task-pinned-badge',
-                text: '📌 ' + t(lang, 'pinned_badge'),
-            });
-        }
-
         /* ─── نام نوت مبدأ ─── */
         if (this.plugin.settings.showNoteInModal) {
             const noteName = this.task._source_file.split('/').pop() || this.task._source_file;
@@ -86,6 +76,18 @@ export class TaskDetailsModal extends Modal {
             };
         }
 
+        /* ─── باکس عنوان (readonly) ─── */
+        const titleBox = parent.createDiv({ cls: 'first-task-details-box' });
+        titleBox.createDiv({ cls: 'first-task-details-box-label', text: t(lang, 'field_title') });
+        const titleContent = titleBox.createDiv({ cls: 'first-task-details-box-content' });
+        titleContent.setText(this.task.title);
+
+        /* ─── باکس توضیحات (readonly) ─── */
+        const descBox = parent.createDiv({ cls: 'first-task-details-box' });
+        descBox.createDiv({ cls: 'first-task-details-box-label', text: t(lang, 'field_description') });
+        const descContent = descBox.createDiv({ cls: 'first-task-details-box-content' });
+        descContent.setText(this.task.description || t(lang, 'details_no_description'));
+
         /* ─── متادیتا ─── */
         const meta = parent.createDiv({ cls: 'first-task-details-meta' });
 
@@ -93,7 +95,6 @@ export class TaskDetailsModal extends Modal {
             text: `${t(lang, 'details_status')}: ${this.task.completed ? t(lang, 'task_done') : t(lang, 'task_pending')}`,
         });
 
-        /* ─── تاریخ ساخت ─── */
         const createdDisplay = useJalali ? this.task.created_jalali : this.task.created_gregorian;
         if (createdDisplay) {
             meta.createEl('div', {
@@ -101,7 +102,6 @@ export class TaskDetailsModal extends Modal {
             });
         }
 
-        /* ─── تاریخ انجام ─── */
         const dueDisplay = useJalali ? this.task.due_date_jalali : this.task.due_date_gregorian;
         if (dueDisplay) {
             meta.createEl('div', {
@@ -109,7 +109,6 @@ export class TaskDetailsModal extends Modal {
             });
         }
 
-        /* ─── تاریخ اتمام ─── */
         const completedDisplay = useJalali ? this.task.completed_jalali : this.task.completed_gregorian;
         if (completedDisplay) {
             meta.createEl('div', {
@@ -117,7 +116,6 @@ export class TaskDetailsModal extends Modal {
             });
         }
 
-        /* ─── دسته‌بندی ─── */
         if (this.task.category) {
             const catName = this.plugin.taskManager.getCategoryDisplayName(this.task.category);
             meta.createEl('div', {
@@ -125,7 +123,7 @@ export class TaskDetailsModal extends Modal {
             });
         }
 
-        /* ─── دسته‌بندی‌های داینامیک ─── */
+        /* ─── دسته‌های داینامیک ─── */
         const dynCats = this.plugin.taskManager.getTaskDynamicCategories(this.task);
         if (dynCats.length > 0) {
             const dynRow = meta.createDiv({ cls: 'first-task-details-dynamic' });
@@ -138,66 +136,89 @@ export class TaskDetailsModal extends Modal {
             }
         }
 
-        /* ─── توضیحات ─── */
-        const descSection = parent.createDiv({ cls: 'first-task-details-section' });
-        descSection.createEl('h5', { text: t(lang, 'details_description') });
-        const descBox = descSection.createDiv({ cls: 'first-task-details-desc' });
-        descBox.setText(this.task.description || t(lang, 'details_no_description'));
-
         /* ─── دکمه‌ها ─── */
-        const actions = parent.createDiv({ cls: 'first-task-modal-buttons' });
+        this.renderButtons(parent);
+    }
 
-        /* ۱. ویرایش */
-        const editBtn = actions.createEl('button', { text: t(lang, 'btn_edit') });
-        editBtn.onclick = () => {
-            this.editing = true;
-            this.editTitle = this.task.title;
-            this.editDescription = this.task.description;
-            this.editCategory = this.task.category;
-            this.editDate = useJalali ? this.task.due_date_jalali : this.task.due_date_gregorian;
-            this.render();
-        };
+    /* ═══════════════════════════════════════════════════════
+       دکمه‌های داینامیک
+       ─ در انتظار:
+           [ویرایش] [پین/آنپین] [حذف]
+           [       انجام شد       ]
+       ─ انجام شده:
+           [ویرایش] [حذف]
+           [    برگرداندن    ]
+       ═══════════════════════════════════════════════════════ */
+    private renderButtons(parent: HTMLElement): void {
+        const lang = this.plugin.settings.language;
+        const container = parent.createDiv({ cls: 'first-task-action-container' });
 
-        /* ۲. حذف */
-        const delBtn = actions.createEl('button', {
-            text: t(lang, 'btn_delete'),
-            cls: 'mod-warning',
-        });
-        delBtn.onclick = () => this.handleDelete();
-
-        /* ۳. پین (فقط در انتظار) */
         if (!this.task.completed) {
-            const pinBtn = actions.createEl('button', {
+            /* ═══ تسک در انتظار ═══ */
+            const topRow = container.createDiv({ cls: 'first-task-action-row' });
+
+            const editBtn = topRow.createEl('button', {
+                text: t(lang, 'btn_edit'),
+                cls: 'first-task-action-btn',
+            });
+            editBtn.onclick = () => this.startEdit();
+
+            const pinBtn = topRow.createEl('button', {
                 text: this.task.pinned ? t(lang, 'btn_unpin') : t(lang, 'btn_pin'),
+                cls: 'first-task-action-btn',
             });
             pinBtn.onclick = () => this.handleTogglePin();
-        }
 
-        /* ۴. انجام / برگرداندن */
-        if (this.task.completed) {
-            const pendingBtn = actions.createEl('button', {
-                text: t(lang, 'btn_mark_pending'),
-                cls: 'mod-cta',
+            const delBtn = topRow.createEl('button', {
+                text: t(lang, 'btn_delete'),
+                cls: 'first-task-action-btn mod-warning',
             });
-            pendingBtn.onclick = () => this.handleToggleComplete();
-        } else {
-            const doneBtn = actions.createEl('button', {
+            delBtn.onclick = () => this.handleDelete();
+
+            const bottomRow = container.createDiv({ cls: 'first-task-action-row' });
+            const doneBtn = bottomRow.createEl('button', {
                 text: t(lang, 'btn_mark_done'),
-                cls: 'mod-cta',
+                cls: 'first-task-action-btn mod-cta first-task-action-btn-full',
             });
             doneBtn.onclick = () => this.handleToggleComplete();
-        }
+        } else {
+            /* ═══ تسک انجام شده ═══ */
+            const topRow = container.createDiv({ cls: 'first-task-action-row' });
 
-        /* ۵. باز کردن نوت */
-        const openBtn = actions.createEl('button', {
-            text: t(lang, 'btn_open_note'),
-        });
-        openBtn.onclick = () => this.openSourceNote();
+            const editBtn = topRow.createEl('button', {
+                text: t(lang, 'btn_edit'),
+                cls: 'first-task-action-btn',
+            });
+            editBtn.onclick = () => this.startEdit();
+
+            const delBtn = topRow.createEl('button', {
+                text: t(lang, 'btn_delete'),
+                cls: 'first-task-action-btn mod-warning',
+            });
+            delBtn.onclick = () => this.handleDelete();
+
+            const bottomRow = container.createDiv({ cls: 'first-task-action-row' });
+            const restoreBtn = bottomRow.createEl('button', {
+                text: t(lang, 'btn_mark_pending'),
+                cls: 'first-task-action-btn mod-cta first-task-action-btn-full',
+            });
+            restoreBtn.onclick = () => this.handleToggleComplete();
+        }
     }
 
     /* ═══════════════════════════════════════════════════════
        حالت ویرایش
        ═══════════════════════════════════════════════════════ */
+    private startEdit(): void {
+        const useJalali = this.plugin.settings.useJalaliDate;
+        this.editing = true;
+        this.editTitle = this.task.title;
+        this.editDescription = this.task.description;
+        this.editCategory = this.task.category;
+        this.editDate = useJalali ? this.task.due_date_jalali : this.task.due_date_gregorian;
+        this.render();
+    }
+
     private renderEditMode(parent: HTMLElement): void {
         const lang = this.plugin.settings.language;
         const useJalali = this.plugin.settings.useJalaliDate;
@@ -254,8 +275,14 @@ export class TaskDetailsModal extends Modal {
         /* ─── دکمه‌ها ─── */
         const actions = parent.createDiv({ cls: 'first-task-modal-buttons' });
         const cancelBtn = actions.createEl('button', { text: t(lang, 'btn_cancel') });
-        cancelBtn.onclick = () => { this.editing = false; this.render(); };
-        const saveBtn = actions.createEl('button', { text: t(lang, 'btn_save'), cls: 'mod-cta' });
+        cancelBtn.onclick = () => {
+            this.editing = false;
+            this.render();
+        };
+        const saveBtn = actions.createEl('button', {
+            text: t(lang, 'btn_save'),
+            cls: 'mod-cta',
+        });
         saveBtn.onclick = () => this.handleSave();
     }
 
@@ -267,12 +294,12 @@ export class TaskDetailsModal extends Modal {
         this.busy = true;
 
         const lang = this.plugin.settings.language;
-        const ok = await this.plugin.taskManager.togglePin(this.task._id);
+        const res = await this.plugin.taskManager.togglePin(this.task._id);
 
-        if (ok) {
-            this.task.pinned = !this.task.pinned;
+        if (res.ok) {
+            /* ─── پیام درست بر اساس مقدار جدید ─── */
             this.plugin.toastManager.show(
-                t(lang, this.task.pinned ? 'notice_task_pinned' : 'notice_task_unpinned'),
+                t(lang, res.pinned ? 'notice_task_pinned' : 'notice_task_unpinned'),
                 'success'
             );
             this.onDone();
@@ -312,7 +339,6 @@ export class TaskDetailsModal extends Modal {
             return;
         }
 
-        /* ─── پارس تاریخ ─── */
         let dueJalali = '';
         let dueGregorian = '';
         let dueTs = 0;
@@ -321,9 +347,7 @@ export class TaskDetailsModal extends Modal {
             const parsed = parseDateInput(this.editDate, useJalali);
             if (!parsed) {
                 this.plugin.toastManager.show(
-                    lang === 'fa'
-                        ? 'قالب تاریخ اشتباهه'
-                        : 'Invalid date format',
+                    lang === 'fa' ? 'قالب تاریخ اشتباهه' : 'Invalid date format',
                     'warning'
                 );
                 return;
