@@ -1,9 +1,8 @@
 /* ════════════════════════════════════════════════════════════
-   📋 مدیریت تسک‌ها — v0.2.0
-   ✅ ذخیره تمام اطلاعات در ایندکس (نه markdown)
-   ✅ زمان ساخت + زمان اتمام خودکار
-   ✅ دو تاریخ (شمسی + میلادی) برای سوییچ داینامیک
-   ✅ دسته‌بندی‌ها از CategoriesManager
+   📋 مدیریت تسک‌ها — v0.1.2
+   ✅ متدهای دسته‌بندی + فیلتر زمانی برای Planner
+   ✅ فیلتر بر اساس دسته برای پنل اصلی
+   ✅ رفع باگ پین (بروزرسانی سریع)
    ════════════════════════════════════════════════════════════ */
 
 import { App, TFile } from 'obsidian';
@@ -11,7 +10,10 @@ import type {
     ExtractedTask,
     FirstTaskSettings,
     CompletedStats,
+    CategoryStats,
     TaskIndexEntry,
+    CategoryDef,
+    PlannerCard,
 } from '../types';
 import { VaultScanner } from './VaultScanner';
 import { TaskExtractor } from './TaskExtractor';
@@ -49,7 +51,7 @@ export class TaskManager {
     }
 
     /* ═══════════════════════════════════════════════════════
-       🚀 راه‌اندازی
+       راه‌اندازی
        ═══════════════════════════════════════════════════════ */
     async initialize(): Promise<void> {
         await this.index.ensureFolder();
@@ -61,7 +63,7 @@ export class TaskManager {
     }
 
     /* ═══════════════════════════════════════════════════════
-       🔄 اسکن کامل
+       اسکن
        ═══════════════════════════════════════════════════════ */
     async rescanAll(): Promise<void> {
         const files = this.scanner.getMarkdownFiles();
@@ -77,12 +79,10 @@ export class TaskManager {
             }
         }
 
-        /* ─── ادغام با ایندکس ─── */
         for (const task of newTasks.values()) {
             const entry = this.index.getEntry(task._id);
             this.applyEntry(task, entry);
 
-            /* ─── اگه تسک جدید بود و created_ts نداشت ─── */
             if (!entry.created_ts) {
                 await this.setCreatedTime(task._id);
                 const refreshed = this.index.getEntry(task._id);
@@ -122,7 +122,6 @@ export class TaskManager {
         });
     }
 
-    /* ─── اسکن یه فایل ─── */
     private async scanSingleFile(file: TFile): Promise<ExtractedTask[]> {
         const content = await this.scanner.readFile(file);
         if (!content) return [];
@@ -140,7 +139,6 @@ export class TaskManager {
         return tasks;
     }
 
-    /* ─── اسکن یه فایل (بعد از تغییر) ─── */
     async rescanFile(file: TFile): Promise<void> {
         if (!this.scanner.shouldInclude(file)) {
             this.removeTasksForFile(file.path);
@@ -179,7 +177,6 @@ export class TaskManager {
         this.recomputeStats();
     }
 
-    /* ─── حذف تسک‌های یه فایل ─── */
     removeTasksForFile(path: string): void {
         for (const [id, task] of this.tasks.entries()) {
             if (task._source_file === path) {
@@ -189,7 +186,6 @@ export class TaskManager {
         this.index.removeFileCache(path);
     }
 
-    /* ─── تسک‌های یه فایل ─── */
     getTasksForFile(path: string): ExtractedTask[] {
         const result: ExtractedTask[] = [];
         for (const task of this.tasks.values()) {
@@ -199,7 +195,7 @@ export class TaskManager {
     }
 
     /* ═══════════════════════════════════════════════════════
-       📊 آمار (بر اساس completed_ts ایندکس)
+       آمار
        ═══════════════════════════════════════════════════════ */
     private recomputeStats(): void {
         const now = Date.now();
@@ -220,7 +216,6 @@ export class TaskManager {
             prevMonthStart = getGregorianPrevMonthStart(now);
         }
 
-        /* ─── تسک‌های انجام‌شده با completed_ts معتبر ─── */
         const completed = Array.from(this.tasks.values()).filter(t =>
             t.completed && t.completed_ts > 0
         );
@@ -238,9 +233,11 @@ export class TaskManager {
     }
 
     /* ═══════════════════════════════════════════════════════
-       📋 گرفتن تسک‌ها
+       گرفتن تسک‌ها
        ═══════════════════════════════════════════════════════ */
-    getAllTasks(): ExtractedTask[] { return Array.from(this.tasks.values()); }
+    getAllTasks(): ExtractedTask[] {
+        return Array.from(this.tasks.values());
+    }
 
     getPendingTasks(): ExtractedTask[] {
         return Array.from(this.tasks.values())
@@ -265,7 +262,34 @@ export class TaskManager {
     };
 
     /* ═══════════════════════════════════════════════════════
-       🏷️ دسته‌بندی‌های داینامیک (بر اساس due_date_ts)
+       فیلتر بر اساس دسته (برای پنل اصلی)
+       ═══════════════════════════════════════════════════════ */
+    getPendingByCategory(categoryId: string): ExtractedTask[] {
+        const pending = this.getPendingTasks();
+
+        if (!categoryId) return pending;
+
+        if (categoryId === 'none') {
+            return pending.filter(t => !t.category);
+        }
+
+        return pending.filter(t => t.category === categoryId);
+    }
+
+    getCompletedByCategory(categoryId: string): ExtractedTask[] {
+        const completed = this.getCompletedTasks();
+
+        if (!categoryId) return completed;
+
+        if (categoryId === 'none') {
+            return completed.filter(t => !t.category);
+        }
+
+        return completed.filter(t => t.category === categoryId);
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       دسته‌بندی داینامیک
        ═══════════════════════════════════════════════════════ */
     getTaskDynamicCategories(task: ExtractedTask): string[] {
         const cats: string[] = [];
@@ -274,9 +298,7 @@ export class TaskManager {
 
         const dyn = this.settings.dynamicCategories;
 
-        /* ─── امروز (اجباری) ─── */
         if (isTodayTs(ts)) cats.push('today');
-
         if (dyn.tomorrow && isTomorrowTs(ts)) cats.push('tomorrow');
         if (dyn.this_week && isWithinNextWeekTs(ts)) cats.push('this_week');
         if (dyn.this_month && isThisMonthTs(ts)) cats.push('this_month');
@@ -285,259 +307,44 @@ export class TaskManager {
         return cats;
     }
 
-    /* ─── نام نمایشی نوت ─── */
-    getDisplayNoteName(path: string): string {
-        return getDisplayNoteName(path);
-    }
-
-    /* ─── فایل‌های قابل اسکن ─── */
-    getScannableFiles(): TFile[] {
-        return this.scanner.getMarkdownFiles();
-    }
-
-    /* ─── دسته‌بندی‌ها ─── */
-    getCategories(): CategoryDef[] {
-        return this.categories.getAll();
-    }
-
-    getCategoryDisplayName(id: string): string {
-        return this.categories.getDisplayName(id, this.settings.language);
-    }
-
     /* ═══════════════════════════════════════════════════════
-       ✅ انجام / انجام نشده
+       Planner: فیلتر زمانی
        ═══════════════════════════════════════════════════════ */
-    async toggleComplete(taskId: string): Promise<boolean> {
-        const task = this.tasks.get(taskId);
-        if (!task) return false;
+    filterByCard(tasks: ExtractedTask[], card: PlannerCard): ExtractedTask[] {
+        const now = Date.now();
+        const today = startOfDay(now);
 
-        const file = this.scanner.getFileByPath(task._source_file);
-        if (!file) return false;
+        switch (card) {
+            case 'past':
+                return tasks
+                    .filter(t => t.due_date_ts > 0 && t.due_date_ts < today)
+                    .sort((a, b) => a.due_date_ts - b.due_date_ts);
 
-        try {
-            const content = await this.scanner.readFile(file);
-            const newContent = this.extractor.toggleTaskInContent(
-                content, task._source_file, taskId
-            );
-            if (newContent === null) return false;
+            case 'today':
+                return tasks.filter(t => isTodayTs(t.due_date_ts)).sort(this.sortTasks);
 
-            await this.app.vault.modify(file, newContent);
+            case 'tomorrow':
+                return tasks.filter(t => isTomorrowTs(t.due_date_ts)).sort(this.sortTasks);
 
-            /* ─── آپدیت ایندکس ─── */
-            const now = new Date();
-            const newCompleted = !task.completed;
+            case 'this_week':
+                return tasks.filter(t => isWithinNextWeekTs(t.due_date_ts)).sort(this.sortTasks);
 
-            const patch: Partial<TaskIndexEntry> = {
-                completed_jalali: newCompleted ? getJalaliDateFull(now) : '',
-                completed_gregorian: newCompleted ? getGregorianDateFull(now) : '',
-                completed_ts: newCompleted ? now.getTime() : 0,
-            };
+            case 'this_month':
+                return tasks.filter(t => isThisMonthTs(t.due_date_ts)).sort(this.sortTasks);
 
-            /* اگه تسک تازه ساخته شده بود و created_ts نداره */
-            if (!task.created_ts) {
-                patch.created_jalali = getJalaliDateFull(now);
-                patch.created_gregorian = getGregorianDateFull(now);
-                patch.created_ts = now.getTime();
-            }
+            case 'this_year':
+                return tasks.filter(t => isThisYearTs(t.due_date_ts)).sort(this.sortTasks);
 
-            await this.index.updateEntry(taskId, patch);
+            case 'no_date':
+                return tasks.filter(t => !t.due_date_ts).sort(this.sortTasks);
 
-            /* ─── آپدیت حافظه ─── */
-            task.completed = newCompleted;
-            task.completed_jalali = patch.completed_jalali || '';
-            task.completed_gregorian = patch.completed_gregorian || '';
-            task.completed_ts = patch.completed_ts || 0;
-            if (patch.created_ts) {
-                task.created_jalali = patch.created_jalali || '';
-                task.created_gregorian = patch.created_gregorian || '';
-                task.created_ts = patch.created_ts;
-            }
-
-            this.recomputeStats();
-            return true;
-        } catch (e) {
-            console.warn('[First Task] toggleComplete failed:', e);
-            return false;
-        }
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       📌 پین / آنپین
-       ═══════════════════════════════════════════════════════ */
-    async togglePin(taskId: string): Promise<boolean> {
-        const task = this.tasks.get(taskId);
-        if (!task) return false;
-
-        const newPinned = !task.pinned;
-        await this.index.updateEntry(taskId, { pinned: newPinned });
-        task.pinned = newPinned;
-        return true;
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       ✏️ ویرایش کامل تسک (توی مودال جزئیات)
-       ═══════════════════════════════════════════════════════ */
-    async updateTaskFull(
-        taskId: string,
-        updates: {
-            title: string;
-            description: string;
-            category: string;
-            dueDateJalali: string;
-            dueDateGregorian: string;
-            dueDateTs: number;
-        }
-    ): Promise<boolean> {
-        const task = this.tasks.get(taskId);
-        if (!task) return false;
-
-        const file = this.scanner.getFileByPath(task._source_file);
-        if (!file) return false;
-
-        try {
-            /* ─── اگه عنوان تغییر کرده، توی markdown عوض کن ─── */
-            if (updates.title.trim() && updates.title.trim() !== task.title) {
-                const content = await this.scanner.readFile(file);
-                const lines = content.split('\n');
-                const lineIdx = this.extractor.findTaskLine(content, task._source_file, taskId);
-
-                if (lineIdx !== -1) {
-                    const oldLine = lines[lineIdx];
-                    const match = /^(\s*[-*+]\s+\[([ xX])\]\s+)(.+?)(\s*)$/.exec(oldLine);
-                    if (match) {
-                        lines[lineIdx] = `${match[1]}${updates.title.trim()}${match[4]}`;
-                        await this.app.vault.modify(file, lines.join('\n'));
-
-                        /* ─── تغییر ID چون عنوان عوض شده ─── */
-                        const newId = generateTaskId(task._source_file, updates.title.trim());
-
-                        /* ─── منتقل کردن ایندکس به ID جدید ─── */
-                        const oldEntry = this.index.getEntry(taskId);
-                        await this.index.removeEntry(taskId);
-                        await this.index.updateEntry(newId, {
-                            ...oldEntry,
-                            description: updates.description,
-                            category: updates.category,
-                            due_date_jalali: updates.dueDateJalali,
-                            due_date_gregorian: updates.dueDateGregorian,
-                            due_date_ts: updates.dueDateTs,
-                        });
-
-                        this.tasks.delete(taskId);
-                        await this.rescanFile(file);
-                        this.recomputeStats();
-                        return true;
+            case 'all':
+            default:
+                return [...tasks].sort((a, b) => {
+                    if (a.due_date_ts && !b.due_date_ts) return -1;
+                    if (!a.due_date_ts && b.due_date_ts) return 1;
+                    if (a.due_date_ts && b.due_date_ts) {
+                        return a.due_date_ts - b.due_date_ts;
                     }
-                }
-            }
-
-            /* ─── اگه عنوان عوض نشده، فقط ایندکس رو آپدیت کن ─── */
-            await this.index.updateEntry(taskId, {
-                description: updates.description,
-                category: updates.category,
-                due_date_jalali: updates.dueDateJalali,
-                due_date_gregorian: updates.dueDateGregorian,
-                due_date_ts: updates.dueDateTs,
-            });
-
-            task.description = updates.description;
-            task.category = updates.category;
-            task.due_date_jalali = updates.dueDateJalali;
-            task.due_date_gregorian = updates.dueDateGregorian;
-            task.due_date_ts = updates.dueDateTs;
-
-            this.recomputeStats();
-            return true;
-        } catch (e) {
-            console.warn('[First Task] updateTaskFull failed:', e);
-            return false;
-        }
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       ➕ ساخت تسک جدید
-       ═══════════════════════════════════════════════════════ */
-    async createTask(
-        title: string,
-        sourceFile: string,
-        description: string = '',
-        category: string = '',
-        dueDateJalali: string = '',
-        dueDateGregorian: string = '',
-        dueDateTs: number = 0
-    ): Promise<boolean> {
-        const file = this.scanner.getFileByPath(sourceFile);
-        if (!file) return false;
-
-        try {
-            const content = await this.scanner.readFile(file);
-            const result = this.extractor.addTaskToContent(content, title);
-            await this.app.vault.modify(file, result.content);
-
-            const newId = generateTaskId(sourceFile, title);
-            const now = new Date();
-
-            await this.index.updateEntry(newId, {
-                description,
-                category,
-                pinned: false,
-                due_date_jalali: dueDateJalali,
-                due_date_gregorian: dueDateGregorian,
-                due_date_ts: dueDateTs,
-                created_jalali: getJalaliDateFull(now),
-                created_gregorian: getGregorianDateFull(now),
-                created_ts: now.getTime(),
-            });
-
-            await this.rescanFile(file);
-            return true;
-        } catch (e) {
-            console.warn('[First Task] createTask failed:', e);
-            return false;
-        }
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       🗑️ حذف تسک
-       ═══════════════════════════════════════════════════════ */
-    async deleteTask(taskId: string): Promise<boolean> {
-        const task = this.tasks.get(taskId);
-        if (!task) return false;
-
-        const file = this.scanner.getFileByPath(task._source_file);
-        if (!file) return false;
-
-        try {
-            const content = await this.scanner.readFile(file);
-            const newContent = this.extractor.removeTaskFromContent(
-                content, task._source_file, taskId
-            );
-            if (newContent === null) return false;
-
-            await this.app.vault.modify(file, newContent);
-
-            await this.index.removeEntry(taskId);
-            this.tasks.delete(taskId);
-
-            this.recomputeStats();
-            return true;
-        } catch (e) {
-            console.warn('[First Task] deleteTask failed:', e);
-            return false;
-        }
-    }
-
-    /* ─── اطلاعات کمکی ─── */
-    getStats(): CompletedStats { return this.stats; }
-    getLastSyncTs(): number { return this.lastSyncTs; }
-    getTaskCount(): number { return this.tasks.size; }
-
-    private chunkArray<T>(arr: T[], size: number): T[][] {
-        const out: T[][] = [];
-        for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
-        return out;
-    }
-}
-
-/* نیاز به import CategoryDef */
-import type { CategoryDef } from '../types';
+                    return this.sortTasks(a, b);
+                });
