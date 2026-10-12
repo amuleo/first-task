@@ -4,9 +4,6 @@
 
 import type { Language } from '../types';
 
-/* ═══════════════════════════════════════════════════════
-   🇬🇧 English
-   ═══════════════════════════════════════════════════════ */
 const en = {
     plugin_name: 'First Task',
 
@@ -106,12 +103,25 @@ const en = {
     settings_language: 'Language',
     settings_language_desc: 'Plugin interface language',
     settings_jalali: 'Jalali (Persian) date',
-    settings_jalali_desc: 'Show due dates in Persian calendar',
+    settings_jalali_desc: 'Show dates in Persian calendar',
+
+    settings_week_start: 'Week starts on',
+    settings_week_start_desc: 'Which day should a week begin?',
+    week_saturday: 'Saturday',
+    week_sunday: 'Sunday',
+    week_monday: 'Monday',
+    week_tuesday: 'Tuesday',
+    week_wednesday: 'Wednesday',
+    week_thursday: 'Thursday',
+    week_friday: 'Friday',
+
     settings_display: 'Display',
     settings_tasks_per_page: 'Tasks per page',
     settings_tasks_per_page_desc: 'How many tasks to load at once',
-    settings_show_note_in_modal: 'Show note name in details',
-    settings_show_note_in_modal_desc: 'Display the source note in task details',
+
+    settings_show_task_badges: 'Show time badges on tasks',
+    settings_show_task_badges_desc: 'Display Today, Tomorrow, etc. badges on task cards',
+
     settings_folders: 'Folders',
     settings_include_folders: 'Include folders',
     settings_include_folders_desc: 'Only scan these folders (leave empty for all)',
@@ -119,15 +129,19 @@ const en = {
     settings_exclude_folders_desc: 'Skip these folders when scanning',
     settings_only_markdown: 'Markdown files only',
     settings_only_markdown_desc: 'Skip non-markdown files',
+
     settings_categories: 'Categories',
     settings_enable_categories: 'Enable categories',
     settings_enable_categories_desc: 'Let tasks be assigned to categories',
-    settings_dynamic_categories: 'Dynamic time categories',
-    settings_dynamic_categories_desc: 'Auto-categorize tasks by their due date',
-    settings_dynamic_tomorrow: 'Tomorrow',
-    settings_dynamic_this_week: 'This week',
-    settings_dynamic_this_month: 'This month',
-    settings_dynamic_this_year: 'This year',
+
+    settings_planner_cards: 'Planner cards',
+    settings_planner_cards_desc: 'Choose which time-based cards to show in Planner',
+    settings_planner_cards_past: 'Past due',
+    settings_planner_cards_today: 'Today',
+    settings_planner_cards_tomorrow: 'Tomorrow',
+    settings_planner_cards_this_week: 'This week',
+    settings_planner_cards_this_month: 'This month',
+    settings_planner_cards_this_year: 'This year',
 
     /* ─── Notices ─── */
     notice_task_created: 'Task created',
@@ -141,22 +155,15 @@ const en = {
     notice_no_file: 'Please select a note',
     notice_rescan_ok: 'Vault rescanned',
     notice_rescan_failed: 'Rescan failed: {error}',
+    notice_invalid_date: 'Invalid date format',
 
-    /* ─── Other ─── */
     unspecified: 'Unspecified',
 };
 
-/* ═══════════════════════════════════════════════════════
-   🇮🇷 فارسی
-   ═══════════════════════════════════════════════════════ */
 const fa: typeof en = {
     plugin_name: 'تسک اول',
-
-    /* ─── تب‌ها ─── */
     tab_pending: 'تسک ها',
     tab_completed: 'انجام شده',
-
-    /* ─── پنل ─── */
     panel_title: 'تسک ها',
     panel_title_completed: 'تسک های انجام شده',
     panel_empty: 'همه‌ی تسک‌ها انجام شدن!',
@@ -169,7 +176,6 @@ const fa: typeof en = {
     panel_no_category: 'بدون دسته',
     panel_all_categories: 'همه دسته‌ها',
 
-    /* ─── آمار ─── */
     stats_today: 'امروز',
     stats_yesterday: 'دیروز',
     stats_this_week: 'این هفته',
@@ -177,19 +183,16 @@ const fa: typeof en = {
     stats_this_year: 'امسال',
     stats_total: 'کل',
 
-    /* ─── تسک ─── */
     task_pending: 'در انتظار',
     task_done: 'انجام شده',
     pinned_badge: 'پین شده',
 
-    /* ─── دسته‌بندی داینامیک ─── */
     category_today: 'امروز',
     category_tomorrow: 'فردا',
     category_this_week: 'این هفته',
     category_this_month: 'این ماه',
     category_this_year: 'امسال',
 
-    /* ─── پلنر ─── */
     planner_title: 'پلنر',
     planner_no_tasks: 'تسکی اینجا نیست',
     planner_stat_past: 'گذشته',
@@ -202,7 +205,6 @@ const fa: typeof en = {
     planner_stat_all: 'همه',
     planner_tasks_in: 'تسک‌های',
 
-    /* ─── مودال ساخت ─── */
     create_title: 'تسک جدید',
     field_title: 'عنوان',
     field_title_placeholder: 'چی کار کنم؟',
@@ -213,7 +215,6 @@ const fa: typeof en = {
     field_source_file: 'افزودن به نوت',
     field_source_file_hint: 'تسک به صورت markdown به این نوت اضافه می‌شه',
 
-    /* ─── مودال جزئیات ─── */
     details_title: 'جزئیات تسک',
     details_source: 'از نوت',
     details_status: 'وضعیت',
@@ -225,10 +226,8 @@ const fa: typeof en = {
     details_no_description: 'بدون توضیحات',
     details_dynamic_categories: 'دسته‌های زمانی',
 
-    /* ─── مودال ویرایش ─── */
     edit_title: 'ویرایش تسک',
 
-    /* ─── دکمه‌ها ─── */
     btn_cancel: 'لغو',
     btn_create: 'ایجاد',
     btn_edit: 'ویرایش',
@@ -239,21 +238,32 @@ const fa: typeof en = {
     btn_pin: 'پین کردن',
     btn_unpin: 'برداشتن پین',
 
-    /* ─── تأیید ─── */
     confirm_delete_body: 'این تسک حذف بشه؟ خط از نوت پاک می‌شه.',
 
-    /* ─── تنظیمات ─── */
     settings_title: 'تنظیمات تسک اول',
     settings_general: 'عمومی',
     settings_language: 'زبان',
     settings_language_desc: 'زبان رابط کاربری پلاگین',
     settings_jalali: 'تاریخ شمسی',
-    settings_jalali_desc: 'نمایش تاریخ انجام به شمسی',
+    settings_jalali_desc: 'نمایش تاریخ‌ها به شمسی',
+
+    settings_week_start: 'شروع هفته',
+    settings_week_start_desc: 'هفته از چه روزی شروع می‌شه؟',
+    week_saturday: 'شنبه',
+    week_sunday: 'یکشنبه',
+    week_monday: 'دوشنبه',
+    week_tuesday: 'سه‌شنبه',
+    week_wednesday: 'چهارشنبه',
+    week_thursday: 'پنجشنبه',
+    week_friday: 'جمعه',
+
     settings_display: 'نمایش',
     settings_tasks_per_page: 'تعداد تسک در هر بار',
     settings_tasks_per_page_desc: 'هر بار چند تسک لود بشه',
-    settings_show_note_in_modal: 'نمایش نام نوت در جزئیات',
-    settings_show_note_in_modal_desc: 'نام نوت مبدأ توی مودال جزئیات نشون داده بشه',
+
+    settings_show_task_badges: 'نمایش badge های زمانی',
+    settings_show_task_badges_desc: 'نمایش برچسب‌های «امروز»، «فردا» و... روی کارت تسک‌ها',
+
     settings_folders: 'پوشه‌ها',
     settings_include_folders: 'پوشه‌های شامل',
     settings_include_folders_desc: 'فقط این پوشه‌ها اسکن بشن (خالی = همه)',
@@ -261,17 +271,20 @@ const fa: typeof en = {
     settings_exclude_folders_desc: 'این پوشه‌ها موقع اسکن نادیده گرفته بشن',
     settings_only_markdown: 'فقط فایل‌های markdown',
     settings_only_markdown_desc: 'فایل‌های غیر markdown نادیده گرفته بشن',
+
     settings_categories: 'دسته‌بندی',
     settings_enable_categories: 'فعال‌سازی دسته‌بندی',
     settings_enable_categories_desc: 'اجازه بده تسک‌ها به دسته اختصاص داده بشن',
-    settings_dynamic_categories: 'دسته‌بندی‌های زمانی خودکار',
-    settings_dynamic_categories_desc: 'تسک‌ها بر اساس تاریخ انجام، خودکار دسته‌بندی بشن',
-    settings_dynamic_tomorrow: 'فردا',
-    settings_dynamic_this_week: 'این هفته',
-    settings_dynamic_this_month: 'این ماه',
-    settings_dynamic_this_year: 'امسال',
 
-    /* ─── اعلان‌ها ─── */
+    settings_planner_cards: 'کارت‌های پلنر',
+    settings_planner_cards_desc: 'انتخاب کن کدوم کارت‌های زمانی توی پلنر نمایش داده بشن',
+    settings_planner_cards_past: 'گذشته',
+    settings_planner_cards_today: 'امروز',
+    settings_planner_cards_tomorrow: 'فردا',
+    settings_planner_cards_this_week: 'این هفته',
+    settings_planner_cards_this_month: 'این ماه',
+    settings_planner_cards_this_year: 'امسال',
+
     notice_task_created: 'تسک ساخته شد',
     notice_task_updated: 'تسک بروزرسانی شد',
     notice_task_completed: 'تسک انجام شد',
@@ -283,17 +296,16 @@ const fa: typeof en = {
     notice_no_file: 'اول یه نوت انتخاب کن',
     notice_rescan_ok: 'والت دوباره اسکن شد',
     notice_rescan_failed: 'اسکن ناموفق: {error}',
+    notice_invalid_date: 'قالب تاریخ اشتباهه',
 
-    /* ─── متفرقه ─── */
     unspecified: 'مشخص نشده',
 };
 
-/* ═══════════════════════════════════════════════════════
-   🌐 توابع کمکی
-   ═══════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════
+   توابع
+   ═══════════════════════════════════════════════════════════ */
 
 const translations = { en, fa };
-
 type TranslationKey = keyof typeof en;
 
 export function t(
