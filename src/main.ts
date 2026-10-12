@@ -1,13 +1,14 @@
 /* ════════════════════════════════════════════════════════════
-   🚀 نقطه ورود First Task — v0.2.0
-   ✅ CategoriesManager اضافه شد
-   ✅ TaskManager با ۶ پارامتر
+   🚀 نقطه ورود First Task — v0.1.2
+   ✅ Planner View + دو آیکون ریبون
+   ✅ دو کامند جداگانه
    ════════════════════════════════════════════════════════════ */
 
 import { Plugin, WorkspaceLeaf } from 'obsidian';
 import { DEFAULT_SETTINGS, FirstTaskSettings } from './types';
 import { FirstTaskSettingsTab } from './settings/SettingsTab';
 import { TaskPanelView, VIEW_TYPE_FIRST_TASK } from './views/TaskPanelView';
+import { PlannerView, VIEW_TYPE_PLANNER } from './views/PlannerView';
 import { IndexManager } from './managers/IndexManager';
 import { CategoriesManager } from './managers/CategoriesManager';
 import { VaultScanner } from './managers/VaultScanner';
@@ -49,27 +50,24 @@ export default class FirstTaskPlugin extends Plugin {
             () => this.settings
         );
 
-        /* ─── راه‌اندازی اولیه (async) ─── */
+        /* ─── راه‌اندازی اولیه ─── */
         this.taskManager.initialize().then(() => {
             this.refreshPanel();
         }).catch(e => {
             console.warn('[First Task] Initialization failed:', e);
         });
 
-        /* ─── Notifier (real-time) ─── */
+        /* ─── Notifier ─── */
         this.notifier = new Notifier(
             this.app,
-            /* onFileChanged */
             async (file) => {
                 await this.taskManager.rescanFile(file);
                 this.refreshPanel();
             },
-            /* onFileDeleted */
             (path) => {
                 this.taskManager.removeTasksForFile(path);
                 this.refreshPanel();
             },
-            /* onFileRenamed */
             async (oldPath, file) => {
                 this.taskManager.removeTasksForFile(oldPath);
                 await this.taskManager.rescanFile(file);
@@ -78,15 +76,24 @@ export default class FirstTaskPlugin extends Plugin {
         );
         this.notifier.start();
 
-        /* ─── View ─── */
+        /* ─── Views ─── */
         this.registerView(
             VIEW_TYPE_FIRST_TASK,
             (leaf) => new TaskPanelView(leaf, this)
         );
 
-        /* ─── Ribbon icon ─── */
+        this.registerView(
+            VIEW_TYPE_PLANNER,
+            (leaf) => new PlannerView(leaf, this)
+        );
+
+        /* ─── Ribbon icons ─── */
         this.addRibbonIcon('check-square', 'First Task', () => {
             this.activateView();
+        });
+
+        this.addRibbonIcon('calendar-days', 'Planner', () => {
+            this.activatePlannerView();
         });
 
         /* ─── Settings tab ─── */
@@ -102,13 +109,19 @@ export default class FirstTaskPlugin extends Plugin {
     }
 
     /* ═══════════════════════════════════════════════════════
-       📋 کامندها
+       کامندها
        ═══════════════════════════════════════════════════════ */
     private registerCommands(): void {
         this.addCommand({
             id: 'open-panel',
             name: 'Open task panel',
             callback: () => this.activateView(),
+        });
+
+        this.addCommand({
+            id: 'open-planner',
+            name: 'Open planner',
+            callback: () => this.activatePlannerView(),
         });
 
         this.addCommand({
@@ -140,7 +153,7 @@ export default class FirstTaskPlugin extends Plugin {
     }
 
     /* ═══════════════════════════════════════════════════════
-       📂 باز کردن پنل
+       باز کردن پنل‌ها
        ═══════════════════════════════════════════════════════ */
     async activateView(): Promise<void> {
         const { workspace } = this.app;
@@ -161,35 +174,59 @@ export default class FirstTaskPlugin extends Plugin {
         if (leaf) workspace.revealLeaf(leaf);
     }
 
+    async activatePlannerView(): Promise<void> {
+        const { workspace } = this.app;
+
+        let leaf: WorkspaceLeaf | null = null;
+        const leaves = workspace.getLeavesOfType(VIEW_TYPE_PLANNER);
+
+        if (leaves.length > 0) {
+            leaf = leaves[0];
+        } else {
+            leaf = workspace.getRightLeaf(false);
+            await leaf?.setViewState({
+                type: VIEW_TYPE_PLANNER,
+                active: true,
+            });
+        }
+
+        if (leaf) workspace.revealLeaf(leaf);
+    }
+
     /* ═══════════════════════════════════════════════════════
-       🔄 رفرش پنل
+       رفرش همه پنل‌ها
        ═══════════════════════════════════════════════════════ */
     refreshPanel(): void {
-        const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_FIRST_TASK);
-        for (const leaf of leaves) {
+        /* پنل اصلی */
+        const mainLeaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_FIRST_TASK);
+        for (const leaf of mainLeaves) {
             const view = leaf.view;
-            if (
-                view &&
-                typeof (view as any).refresh === 'function' &&
-                view.getViewType?.() === VIEW_TYPE_FIRST_TASK
-            ) {
-                try {
-                    (view as TaskPanelView).refresh();
-                } catch (e) {
-                    console.warn('[First Task] Panel refresh failed:', e);
+            if (view && typeof (view as any).refresh === 'function') {
+                try { (view as TaskPanelView).refresh(); } catch (e) {
+                    console.warn('[First Task] Main panel refresh failed:', e);
+                }
+            }
+        }
+
+        /* پلنر */
+        const plannerLeaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_PLANNER);
+        for (const leaf of plannerLeaves) {
+            const view = leaf.view;
+            if (view && typeof (view as any).refresh === 'function') {
+                try { (view as PlannerView).refresh(); } catch (e) {
+                    console.warn('[First Task] Planner refresh failed:', e);
                 }
             }
         }
     }
 
     /* ═══════════════════════════════════════════════════════
-       💾 تنظیمات
+       تنظیمات
        ═══════════════════════════════════════════════════════ */
     async loadSettings(): Promise<void> {
         try {
             const data = await this.loadData();
             this.settings = Object.assign({}, DEFAULT_SETTINGS, data || {});
-            /* ادغام nested objects */
             this.settings.dynamicCategories = Object.assign(
                 {},
                 DEFAULT_SETTINGS.dynamicCategories,
@@ -204,7 +241,6 @@ export default class FirstTaskPlugin extends Plugin {
     async saveSettings(): Promise<void> {
         try {
             await this.saveData(this.settings);
-            /* بروزرسانی RTL برای Toast */
             this.toastManager.setRTL(this.settings.language === 'fa');
         } catch (e) {
             console.warn('[First Task] Failed to save settings:', e);
