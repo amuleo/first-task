@@ -1,12 +1,14 @@
 /* ════════════════════════════════════════════════════════════
-   📋 پنل اصلی — دو تب + Lazy Loading + گروه‌بندی اختیاری
+   📋 پنل اصلی — v0.2.0
+   ✅ نمایش badge های داینامیک
+   ✅ نمایش دسته‌بندی اصلی
+   ✅ Lazy Loading + گروه‌بندی
    ════════════════════════════════════════════════════════════ */
 
 import { ItemView, WorkspaceLeaf, setIcon } from 'obsidian';
 import type FirstTaskPlugin from '../main';
 import type { ExtractedTask } from '../types';
 import { t, applyDirection } from '../i18n';
-import { formatIso } from '../utils/jalaliDate';
 import { CreateTaskModal } from './CreateTaskModal';
 import { TaskDetailsModal } from './TaskDetailsModal';
 
@@ -33,13 +35,9 @@ export class TaskPanelView extends ItemView {
 
     async onClose(): Promise<void> {}
 
-    refresh(): void {
-        this.render();
-    }
+    refresh(): void { this.render(); }
 
-    /* ═══════════════════════════════════════════════════════
-       🎨 رندر کامل
-       ═══════════════════════════════════════════════════════ */
+    /* ─── رندر کامل ─── */
     private render(): void {
         const { contentEl } = this;
         const savedScroll = contentEl.scrollTop;
@@ -47,7 +45,6 @@ export class TaskPanelView extends ItemView {
         contentEl.empty();
         contentEl.addClass('first-task-panel');
         applyDirection(contentEl, this.plugin.settings.language);
-
         this.plugin.toastManager.setRTL(this.plugin.settings.language === 'fa');
 
         this.renderHeader(contentEl);
@@ -59,12 +56,9 @@ export class TaskPanelView extends ItemView {
             this.renderCompleted(contentEl);
         }
 
-        requestAnimationFrame(() => {
-            contentEl.scrollTop = savedScroll;
-        });
+        requestAnimationFrame(() => { contentEl.scrollTop = savedScroll; });
     }
 
-    /* ───── هدر ───── */
     private renderHeader(parent: HTMLElement): void {
         const lang = this.plugin.settings.language;
         const header = parent.createDiv({ cls: 'first-task-header' });
@@ -79,13 +73,11 @@ export class TaskPanelView extends ItemView {
 
         const actions = topRow.createDiv({ cls: 'first-task-header-actions' });
 
-        /* اسکن مجدد */
         const syncBtn = actions.createEl('button', { cls: 'clickable-icon' });
         setIcon(syncBtn, 'refresh-cw');
         syncBtn.setAttribute('aria-label', t(lang, 'panel_reload'));
         syncBtn.onclick = () => this.handleRescan();
 
-        /* تسک جدید (فقط توی تب در انتظار) */
         if (this.plugin.settings.currentTab === 'pending') {
             const addBtn = actions.createEl('button', { cls: 'clickable-icon' });
             setIcon(addBtn, 'plus');
@@ -94,7 +86,6 @@ export class TaskPanelView extends ItemView {
         }
     }
 
-    /* ───── تب‌ها ───── */
     private renderTabs(parent: HTMLElement): void {
         const lang = this.plugin.settings.language;
         const tabs = parent.createDiv({ cls: 'first-task-tabs' });
@@ -122,13 +113,9 @@ export class TaskPanelView extends ItemView {
         mkTab('completed', 'check-circle', `${t(lang, 'tab_completed')} (${completedCount})`);
     }
 
-    /* ═══════════════════════════════════════════════════════
-       تب تسک‌های در انتظار
-       ═══════════════════════════════════════════════════════ */
     private renderPending(parent: HTMLElement): void {
         const lang = this.plugin.settings.language;
         const body = parent.createDiv({ cls: 'first-task-body' });
-
         const tasks = this.plugin.taskManager.getPendingTasks();
 
         if (tasks.length === 0) {
@@ -143,13 +130,8 @@ export class TaskPanelView extends ItemView {
         }
     }
 
-    /* ═══════════════════════════════════════════════════════
-       تب تسک‌های انجام‌شده
-       ═══════════════════════════════════════════════════════ */
     private renderCompleted(parent: HTMLElement): void {
         const lang = this.plugin.settings.language;
-
-        /* ─── کارت‌های آماری ─── */
         const stats = this.plugin.taskManager.getStats();
         const statsGrid = parent.createDiv({ cls: 'first-task-stats-grid' });
 
@@ -165,7 +147,6 @@ export class TaskPanelView extends ItemView {
         mkCard(t(lang, 'stats_this_year'), stats.this_year);
         mkCard(t(lang, 'stats_total'), stats.total);
 
-        /* ─── لیست تسک‌ها ─── */
         const body = parent.createDiv({ cls: 'first-task-body' });
         const tasks = this.plugin.taskManager.getCompletedTasks();
 
@@ -181,16 +162,11 @@ export class TaskPanelView extends ItemView {
         }
     }
 
-    /* ═══════════════════════════════════════════════════════
-       📋 لیست ساده
-       ═══════════════════════════════════════════════════════ */
     private renderSimpleList(parent: HTMLElement, tasks: ExtractedTask[], isCompleted: boolean): void {
         const lang = this.plugin.settings.language;
         const visible = tasks.slice(0, this.visibleCount);
 
-        for (const task of visible) {
-            this.renderTaskCard(parent, task, isCompleted);
-        }
+        for (const task of visible) this.renderTaskCard(parent, task, isCompleted);
 
         if (tasks.length > this.visibleCount) {
             const remaining = tasks.length - this.visibleCount;
@@ -205,9 +181,6 @@ export class TaskPanelView extends ItemView {
         }
     }
 
-    /* ═══════════════════════════════════════════════════════
-       📁 لیست گروه‌بندی‌شده
-       ═══════════════════════════════════════════════════════ */
     private renderGrouped(parent: HTMLElement, tasks: ExtractedTask[], isCompleted: boolean): void {
         const lang = this.plugin.settings.language;
 
@@ -223,7 +196,6 @@ export class TaskPanelView extends ItemView {
             .sort((a, b) => b.tasks.length - a.tasks.length);
 
         let totalRendered = 0;
-        const perPage = this.plugin.settings.tasksPerPage;
 
         for (const group of sortedGroups) {
             if (totalRendered >= this.visibleCount) break;
@@ -233,13 +205,10 @@ export class TaskPanelView extends ItemView {
             groupHeader.createSpan({ cls: 'first-task-group-title', text: `📁 ${groupTitle} (${group.tasks.length})` });
 
             const groupBody = parent.createDiv({ cls: 'first-task-group-body' });
-
             const remainingVisible = this.visibleCount - totalRendered;
             const tasksToShow = group.tasks.slice(0, remainingVisible);
 
-            for (const task of tasksToShow) {
-                this.renderTaskCard(groupBody, task, isCompleted);
-            }
+            for (const task of tasksToShow) this.renderTaskCard(groupBody, task, isCompleted);
             totalRendered += tasksToShow.length;
         }
 
@@ -256,11 +225,10 @@ export class TaskPanelView extends ItemView {
         }
     }
 
-    /* ═══════════════════════════════════════════════════════
-       🎴 کارت تسک
-       ═══════════════════════════════════════════════════════ */
+    /* ─── کارت تسک ─── */
     private renderTaskCard(parent: HTMLElement, task: ExtractedTask, isCompleted: boolean): void {
         const lang = this.plugin.settings.language;
+        const useJalali = this.plugin.settings.useJalaliDate;
         const pinnedClass = (task.pinned && !isCompleted) ? ' is-pinned' : '';
         const card = parent.createDiv({ cls: 'first-task-card' + pinnedClass });
 
@@ -297,25 +265,39 @@ export class TaskPanelView extends ItemView {
         /* ─── متادیتا ─── */
         const meta = bodyCard.createDiv({ cls: 'first-task-card-meta' });
 
-        if (task.due_date_iso) {
+        /* ─── تاریخ ─── */
+        const dateDisplay = useJalali ? task.due_date_jalali : task.due_date_gregorian;
+        if (dateDisplay) {
             const dateEl = meta.createSpan({ cls: 'first-task-card-date' });
             setIcon(dateEl.createSpan({ cls: 'first-task-icon' }), 'calendar');
-            dateEl.createSpan({
-                text: ' ' + formatIso(task.due_date_iso, this.plugin.settings.useJalaliDate),
-            });
+            dateEl.createSpan({ text: ' ' + dateDisplay });
         }
 
+        /* ─── دسته‌بندی اصلی ─── */
         if (task.category) {
             const catEl = meta.createSpan({ cls: 'first-task-card-cat' });
             setIcon(catEl.createSpan({ cls: 'first-task-icon' }), 'tag');
-            catEl.createSpan({ text: ' ' + task.category });
+            catEl.createSpan({ text: ' ' + this.plugin.taskManager.getCategoryDisplayName(task.category) });
         }
 
+        /* ─── نام نوت ─── */
         const noteEl = meta.createSpan({ cls: 'first-task-card-note' });
         setIcon(noteEl.createSpan({ cls: 'first-task-icon' }), 'file-text');
-        noteEl.createSpan({
-            text: ' ' + this.plugin.taskManager.getDisplayNoteName(task._source_file),
-        });
+        noteEl.createSpan({ text: ' ' + this.plugin.taskManager.getDisplayNoteName(task._source_file) });
+
+        /* ─── badge های داینامیک ─── */
+        if (!isCompleted) {
+            const dynCats = this.plugin.taskManager.getTaskDynamicCategories(task);
+            if (dynCats.length > 0) {
+                const badgesRow = bodyCard.createDiv({ cls: 'first-task-card-badges' });
+                for (const c of dynCats) {
+                    const badge = badgesRow.createSpan({
+                        cls: `first-task-dynamic-badge first-task-dynamic-${c}`,
+                    });
+                    badge.setText(t(lang, `category_${c}` as any));
+                }
+            }
+        }
 
         /* ─── کلیک روی کارت ─── */
         bodyCard.onclick = () => {
@@ -323,24 +305,15 @@ export class TaskPanelView extends ItemView {
         };
     }
 
-    /* ───── حالت خالی ───── */
     private renderEmpty(parent: HTMLElement, title: string, hint: string): void {
         const empty = parent.createDiv({ cls: 'first-task-empty' });
         empty.createEl('p', { text: title, cls: 'first-task-empty-title' });
         if (hint) empty.createEl('p', { text: hint, cls: 'first-task-empty-hint' });
     }
 
-    /* ═══════════════════════════════════════════════════════
-       🎯 اکشن‌ها
-       ═══════════════════════════════════════════════════════ */
     private async handleRescan(): Promise<void> {
         const lang = this.plugin.settings.language;
-        this.plugin.toastManager.show(
-            t(lang, 'panel_reloading'),
-            'info',
-            1500
-        );
-
+        this.plugin.toastManager.show(t(lang, 'panel_reloading'), 'info', 1500);
         try {
             await this.plugin.taskManager.rescanAll();
             this.visibleCount = this.plugin.settings.tasksPerPage;
