@@ -1,8 +1,8 @@
 /* ════════════════════════════════════════════════════════════
-   ➕ مودال ساخت تسک جدید — v0.2.0
-   ✅ AbstractInputSuggest برای انتخاب نوت (لیزی + هوشمند)
-   ✅ تاریخ پیش‌فرض = امروز (شمسی/میلادی)
-   ✅ dropdown دسته‌بندی از CategoriesManager
+   ➕ مودال ساخت تسک جدید — v0.1.2
+   ✅ AbstractInputSuggest (بدون تداخل با onSelect)
+   ✅ تاریخ پیش‌فرض = امروز
+   ✅ dropdown دسته‌بندی
    ════════════════════════════════════════════════════════════ */
 
 import {
@@ -11,28 +11,26 @@ import {
 } from 'obsidian';
 import type FirstTaskPlugin from '../main';
 import { t, applyDirection } from '../i18n';
-import {
-    parseDateInput, getTodayDateInput, getTodayJalali, getTodayGregorian,
-} from '../utils/jalaliDate';
+import { parseDateInput, getTodayDateInput } from '../utils/jalaliDate';
 
 /* ═══════════════════════════════════════════════════════
    🎯 Input Suggest برای انتخاب نوت
    ✅ مرتب بر اساس mtime (آخرین تغییر)
-   ✅ لیزی: فقط ۲۰ مورد نشون می‌ده
+   ✅ لیزی: فقط ۲۰ مورد
    ═══════════════════════════════════════════════════════ */
 class NoteSuggest extends AbstractInputSuggest<TFile> {
     private plugin: FirstTaskPlugin;
-    private onSelect: (file: TFile) => void;
+    private selectCallback: (file: TFile) => void;
 
     constructor(
         app: App,
         inputEl: HTMLInputElement,
         plugin: FirstTaskPlugin,
-        onSelect: (file: TFile) => void
+        selectCallback: (file: TFile) => void
     ) {
         super(app, inputEl);
         this.plugin = plugin;
-        this.onSelect = onSelect;
+        this.selectCallback = selectCallback;
     }
 
     getSuggestions(query: string): TFile[] {
@@ -66,7 +64,7 @@ class NoteSuggest extends AbstractInputSuggest<TFile> {
     }
 
     selectSuggestion(file: TFile): void {
-        this.onSelect(file);
+        this.selectCallback(file);
         this.close();
     }
 }
@@ -214,7 +212,6 @@ export class CreateTaskModal extends Modal {
             return;
         }
 
-        /* ─── اگه sourceFile خالی، از input بخون ─── */
         const sourceFile = this.sourceFile || (this.fileInputEl?.value ?? '').trim();
         if (!sourceFile) {
             this.plugin.toastManager.show(t(lang, 'notice_no_file'), 'warning');
