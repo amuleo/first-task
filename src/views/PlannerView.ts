@@ -1,15 +1,15 @@
 /* ════════════════════════════════════════════════════════════
-   📅 پلنر — نمایش تسک‌ها بر اساس زمان‌بندی
-   ✅ dropdown دسته‌بندی
-   ✅ ۸ کارت آماری کلیک‌پذیر
-   ✅ لیست تسک بر اساس کارت انتخاب‌شده
+   📅 پلنر — v0.1.2
+   ✅ کارت‌های قابل تنظیم
+   ✅ اعداد داینامیک (فارسی/انگلیسی)
+   ✅ نمایش دقیق بر اساس weekStartDay
    ════════════════════════════════════════════════════════════ */
 
 import { ItemView, WorkspaceLeaf, setIcon } from 'obsidian';
 import type FirstTaskPlugin from '../main';
 import type { ExtractedTask, PlannerCard } from '../types';
 import { t, applyDirection } from '../i18n';
-import { formatCount } from '../utils/formatUtils';
+import { displayNumber, displayString } from '../utils/numberUtils';
 import { TaskDetailsModal } from './TaskDetailsModal';
 
 export const VIEW_TYPE_PLANNER = 'first-task-planner';
@@ -17,7 +17,6 @@ export const VIEW_TYPE_PLANNER = 'first-task-planner';
 export class PlannerView extends ItemView {
     plugin: FirstTaskPlugin;
     private visibleCount: number = 0;
-    private scrolling: boolean = false;
 
     constructor(leaf: WorkspaceLeaf, plugin: FirstTaskPlugin) {
         super(leaf);
@@ -36,11 +35,7 @@ export class PlannerView extends ItemView {
 
     async onClose(): Promise<void> {}
 
-    refresh(): void {
-        /* اگه کاربر داره اسکرول می‌کنه، رفرش رو بذار برای بعد */
-        if (this.scrolling) return;
-        this.render();
-    }
+    refresh(): void { this.render(); }
 
     /* ═══════════════════════════════════════════════════════
        رندر
@@ -88,24 +83,30 @@ export class PlannerView extends ItemView {
     private renderCategoryDropdown(parent: HTMLElement): void {
         const lang = this.plugin.settings.language;
         const cats = this.plugin.taskManager.getCategories();
+        const hasUncategorized = this.plugin.taskManager.hasTasksWithoutCategory();
 
         const row = parent.createDiv({ cls: 'first-task-category-row' });
         const select = row.createEl('select', { cls: 'dropdown first-task-category-select' });
 
+        /* ۱. همه */
         select.createEl('option', {
             value: '',
             text: t(lang, 'panel_all_categories'),
         });
 
+        /* ۲. بدون دسته (اگه وجود داره) */
+        if (hasUncategorized) {
+            select.createEl('option', {
+                value: 'none',
+                text: t(lang, 'panel_no_category'),
+            });
+        }
+
+        /* ۳. بقیه دسته‌ها */
         for (const c of cats) {
             const label = lang === 'fa' ? c.name_fa : c.name;
             select.createEl('option', { value: c.id, text: label });
         }
-
-        select.createEl('option', {
-            value: 'none',
-            text: t(lang, 'panel_no_category'),
-        });
 
         select.value = this.plugin.settings.plannerCategory || '';
         select.onchange = async () => {
@@ -125,23 +126,54 @@ export class PlannerView extends ItemView {
             this.plugin.settings.plannerCategory || ''
         );
         const activeCard = this.plugin.settings.plannerCard || 'all';
+        const visibility = this.plugin.settings.plannerCards;
 
-        /* ─── ردیف ۱: گذشته، امروز، فردا ─── */
-        const row1 = parent.createDiv({ cls: 'first-task-stats-grid' });
-        this.mkStatCard(row1, 'past', t(lang, 'planner_stat_past'), stats.past, activeCard);
-        this.mkStatCard(row1, 'today', t(lang, 'planner_stat_today'), stats.today, activeCard);
-        this.mkStatCard(row1, 'tomorrow', t(lang, 'planner_stat_tomorrow'), stats.tomorrow, activeCard);
+        /* ─── ردیف ۱ (گذشته، امروز، فردا) ─── */
+        const row1Cards: PlannerCard[] = [];
+        if (visibility.past) row1Cards.push('past');
+        if (visibility.today) row1Cards.push('today');
+        if (visibility.tomorrow) row1Cards.push('tomorrow');
 
-        /* ─── ردیف ۲: این هفته، این ماه، امسال ─── */
-        const row2 = parent.createDiv({ cls: 'first-task-stats-grid' });
-        this.mkStatCard(row2, 'this_week', t(lang, 'planner_stat_this_week'), stats.this_week, activeCard);
-        this.mkStatCard(row2, 'this_month', t(lang, 'planner_stat_this_month'), stats.this_month, activeCard);
-        this.mkStatCard(row2, 'this_year', t(lang, 'planner_stat_this_year'), stats.this_year, activeCard);
+        if (row1Cards.length > 0) {
+            const row1 = parent.createDiv({ cls: 'first-task-stats-grid' });
+            for (const cardId of row1Cards) {
+                this.mkStatCard(row1, cardId, this.getCardLabel(cardId, lang), this.getCount(stats, cardId), activeCard);
+            }
+        }
 
-        /* ─── ردیف ۳: بدون تاریخ، همه ─── */
+        /* ─── ردیف ۲ (این هفته، این ماه، امسال) ─── */
+        const row2Cards: PlannerCard[] = [];
+        if (visibility.this_week) row2Cards.push('this_week');
+        if (visibility.this_month) row2Cards.push('this_month');
+        if (visibility.this_year) row2Cards.push('this_year');
+
+        if (row2Cards.length > 0) {
+            const row2 = parent.createDiv({ cls: 'first-task-stats-grid' });
+            for (const cardId of row2Cards) {
+                this.mkStatCard(row2, cardId, this.getCardLabel(cardId, lang), this.getCount(stats, cardId), activeCard);
+            }
+        }
+
+        /* ─── ردیف ۳ (بدون تاریخ، همه) ─── */
         const row3 = parent.createDiv({ cls: 'first-task-planner-stats-row-3' });
         this.mkStatCard(row3, 'no_date', t(lang, 'planner_stat_no_date'), stats.no_date, activeCard);
         this.mkStatCard(row3, 'all', t(lang, 'planner_stat_all'), stats.all, activeCard);
+    }
+
+    private getCardLabel(card: PlannerCard, lang: 'en' | 'fa'): string {
+        const map: Record<string, any> = {
+            past: 'planner_stat_past',
+            today: 'planner_stat_today',
+            tomorrow: 'planner_stat_tomorrow',
+            this_week: 'planner_stat_this_week',
+            this_month: 'planner_stat_this_month',
+            this_year: 'planner_stat_this_year',
+        };
+        return t(lang, map[card]);
+    }
+
+    private getCount(stats: any, card: PlannerCard): number {
+        return stats[card] || 0;
     }
 
     private mkStatCard(
@@ -151,6 +183,7 @@ export class PlannerView extends ItemView {
         count: number,
         activeCard: PlannerCard
     ): void {
+        const lang = this.plugin.settings.language;
         const isActive = activeCard === cardId;
         const card = parent.createDiv({
             cls: 'first-task-stat-card first-task-planner-stat-card' + (isActive ? ' is-active' : ''),
@@ -159,7 +192,7 @@ export class PlannerView extends ItemView {
 
         card.createDiv({
             cls: 'first-task-stat-value',
-            text: formatCount(count),
+            text: displayNumber(count, lang),
         });
         card.createDiv({
             cls: 'first-task-stat-label',
@@ -184,18 +217,16 @@ export class PlannerView extends ItemView {
         /* ─── عنوان لیست ─── */
         const headerRow = parent.createDiv({ cls: 'first-task-planner-tasks-header' });
         const titleSpan = headerRow.createEl('span', { cls: 'first-task-planner-tasks-title' });
-        titleSpan.setText(`${t(lang, 'planner_tasks_in')} ${t(lang, `planner_stat_${card}` as any)}`);
+        titleSpan.setText(`${t(lang, 'planner_tasks_in')} ${this.getCardLabel(card, lang)}`);
 
-        /* ─── گرفتن تسک‌ها ─── */
         const allTasks = this.plugin.taskManager.getTasksByCategory(
             this.plugin.settings.plannerCategory || ''
         );
         const filtered = this.plugin.taskManager.filterByCard(allTasks, card);
 
         const countSpan = headerRow.createEl('span', { cls: 'first-task-planner-tasks-count' });
-        countSpan.setText(`(${formatCount(filtered.length)})`);
+        countSpan.setText(`(${displayNumber(filtered.length, lang)})`);
 
-        /* ─── حالت خالی ─── */
         if (filtered.length === 0) {
             const empty = parent.createDiv({ cls: 'first-task-empty' });
             empty.createEl('p', {
@@ -205,20 +236,16 @@ export class PlannerView extends ItemView {
             return;
         }
 
-        /* ─── لیست ─── */
         const body = parent.createDiv({ cls: 'first-task-body' });
         const visible = filtered.slice(0, this.visibleCount);
 
-        for (const task of visible) {
-            this.renderTaskCard(body, task);
-        }
+        for (const task of visible) this.renderTaskCard(body, task);
 
-        /* ─── نمایش بیشتر ─── */
         if (filtered.length > this.visibleCount) {
             const remaining = filtered.length - this.visibleCount;
             const moreBtn = body.createEl('button', {
                 cls: 'first-task-show-more',
-                text: `${t(lang, 'panel_show_more')} (${formatCount(remaining)})`,
+                text: `${t(lang, 'panel_show_more')} (${displayNumber(remaining, lang)})`,
             });
             moreBtn.onclick = () => {
                 this.visibleCount += this.plugin.settings.tasksPerPage;
@@ -266,7 +293,7 @@ export class PlannerView extends ItemView {
         if (dateDisplay) {
             const dateEl = meta.createSpan({ cls: 'first-task-card-date' });
             setIcon(dateEl.createSpan({ cls: 'first-task-icon' }), 'calendar');
-            dateEl.createSpan({ text: ' ' + dateDisplay });
+            dateEl.createSpan({ text: ' ' + displayString(dateDisplay, lang) });
         }
 
         if (task.category) {
@@ -283,7 +310,6 @@ export class PlannerView extends ItemView {
             text: ' ' + this.plugin.taskManager.getDisplayNoteName(task._source_file),
         });
 
-        /* ─── کلیک روی کارت ─── */
         bodyCard.onclick = () => {
             new TaskDetailsModal(this.app, this.plugin, task, () => this.render()).open();
         };
