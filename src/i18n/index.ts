@@ -1,5 +1,5 @@
 /* ════════════════════════════════════════════════════════════
-   🌐 i18n — انگلیسی + فارسی (نسخه v0.2.0)
+   🌐 i18n — انگلیسی + فارسی (v0.1.2)
    ════════════════════════════════════════════════════════════ */
 
 import type { Language } from '../types';
@@ -25,6 +25,7 @@ const en = {
     panel_reloading: 'Rescanning vault...',
     panel_show_more: 'Show more',
     panel_no_category: 'No category',
+    panel_all_categories: 'All categories',
 
     /* ─── Stats ─── */
     stats_today: 'Today',
@@ -46,6 +47,19 @@ const en = {
     category_this_month: 'This month',
     category_this_year: 'This year',
 
+    /* ─── Planner ─── */
+    planner_title: 'Planner',
+    planner_no_tasks: 'No tasks here',
+    planner_stat_past: 'Past due',
+    planner_stat_today: 'Today',
+    planner_stat_tomorrow: 'Tomorrow',
+    planner_stat_this_week: 'This week',
+    planner_stat_this_month: 'This month',
+    planner_stat_this_year: 'This year',
+    planner_stat_no_date: 'No date',
+    planner_stat_all: 'All',
+    planner_tasks_in: 'Tasks in',
+
     /* ─── Create Modal ─── */
     create_title: 'New task',
     field_title: 'Title',
@@ -53,9 +67,7 @@ const en = {
     field_description: 'Description (optional)',
     field_description_placeholder: 'Add details...',
     field_due_date: 'Due date (optional)',
-    field_due_date_placeholder: 'YYYY-MM-DD',
     field_category: 'Category (optional)',
-    field_category_placeholder: 'Select or type...',
     field_source_file: 'Add to note',
     field_source_file_hint: 'The task will be added to this note as markdown',
 
@@ -65,10 +77,10 @@ const en = {
     details_status: 'Status',
     details_category: 'Category',
     details_due_date: 'Due date',
-    details_description: 'Description',
-    details_no_description: 'No description',
     details_created: 'Created',
     details_completed: 'Completed',
+    details_description: 'Description',
+    details_no_description: 'No description',
     details_dynamic_categories: 'Time categories',
 
     /* ─── Edit Modal ─── */
@@ -84,28 +96,22 @@ const en = {
     btn_mark_pending: 'Restore',
     btn_pin: 'Pin',
     btn_unpin: 'Unpin',
-    btn_open_note: 'Open note',
 
     /* ─── Confirm ─── */
     confirm_delete_body: 'Delete this task? The line will be removed from the note.',
 
     /* ─── Settings ─── */
     settings_title: 'First Task Settings',
-
     settings_general: 'General',
     settings_language: 'Language',
     settings_language_desc: 'Plugin interface language',
     settings_jalali: 'Jalali (Persian) date',
     settings_jalali_desc: 'Show due dates in Persian calendar',
-
     settings_display: 'Display',
     settings_tasks_per_page: 'Tasks per page',
     settings_tasks_per_page_desc: 'How many tasks to load at once',
-    settings_group_by_note: 'Group tasks by note',
-    settings_group_by_note_desc: 'Show tasks grouped by their source note',
     settings_show_note_in_modal: 'Show note name in details',
     settings_show_note_in_modal_desc: 'Display the source note in task details',
-
     settings_folders: 'Folders',
     settings_include_folders: 'Include folders',
     settings_include_folders_desc: 'Only scan these folders (leave empty for all)',
@@ -113,7 +119,6 @@ const en = {
     settings_exclude_folders_desc: 'Skip these folders when scanning',
     settings_only_markdown: 'Markdown files only',
     settings_only_markdown_desc: 'Skip non-markdown files',
-
     settings_categories: 'Categories',
     settings_enable_categories: 'Enable categories',
     settings_enable_categories_desc: 'Let tasks be assigned to categories',
@@ -162,6 +167,7 @@ const fa: typeof en = {
     panel_reloading: 'در حال اسکن مجدد...',
     panel_show_more: 'نمایش بیشتر',
     panel_no_category: 'بدون دسته',
+    panel_all_categories: 'همه دسته‌ها',
 
     /* ─── آمار ─── */
     stats_today: 'امروز',
@@ -183,6 +189,19 @@ const fa: typeof en = {
     category_this_month: 'این ماه',
     category_this_year: 'امسال',
 
+    /* ─── پلنر ─── */
+    planner_title: 'پلنر',
+    planner_no_tasks: 'تسکی اینجا نیست',
+    planner_stat_past: 'گذشته',
+    planner_stat_today: 'امروز',
+    planner_stat_tomorrow: 'فردا',
+    planner_stat_this_week: 'این هفته',
+    planner_stat_this_month: 'این ماه',
+    planner_stat_this_year: 'امسال',
+    planner_stat_no_date: 'بدون تاریخ',
+    planner_stat_all: 'همه',
+    planner_tasks_in: 'تسک‌های',
+
     /* ─── مودال ساخت ─── */
     create_title: 'تسک جدید',
     field_title: 'عنوان',
@@ -190,9 +209,7 @@ const fa: typeof en = {
     field_description: 'توضیحات (اختیاری)',
     field_description_placeholder: 'جزئیات رو بنویس...',
     field_due_date: 'تاریخ انجام (اختیاری)',
-    field_due_date_placeholder: '۱۴۰۵/۰۷/۲۵',
     field_category: 'دسته‌بندی (اختیاری)',
-    field_category_placeholder: 'انتخاب یا تایپ...',
     field_source_file: 'افزودن به نوت',
     field_source_file_hint: 'تسک به صورت markdown به این نوت اضافه می‌شه',
 
@@ -202,10 +219,10 @@ const fa: typeof en = {
     details_status: 'وضعیت',
     details_category: 'دسته‌بندی',
     details_due_date: 'تاریخ انجام',
-    details_description: 'توضیحات',
-    details_no_description: 'بدون توضیحات',
     details_created: 'تاریخ ساخت',
     details_completed: 'تاریخ انجام',
+    details_description: 'توضیحات',
+    details_no_description: 'بدون توضیحات',
     details_dynamic_categories: 'دسته‌های زمانی',
 
     /* ─── مودال ویرایش ─── */
@@ -221,28 +238,22 @@ const fa: typeof en = {
     btn_mark_pending: 'برگرداندن',
     btn_pin: 'پین کردن',
     btn_unpin: 'برداشتن پین',
-    btn_open_note: 'باز کردن نوت',
 
     /* ─── تأیید ─── */
     confirm_delete_body: 'این تسک حذف بشه؟ خط از نوت پاک می‌شه.',
 
     /* ─── تنظیمات ─── */
     settings_title: 'تنظیمات تسک اول',
-
     settings_general: 'عمومی',
     settings_language: 'زبان',
     settings_language_desc: 'زبان رابط کاربری پلاگین',
     settings_jalali: 'تاریخ شمسی',
     settings_jalali_desc: 'نمایش تاریخ انجام به شمسی',
-
     settings_display: 'نمایش',
     settings_tasks_per_page: 'تعداد تسک در هر بار',
     settings_tasks_per_page_desc: 'هر بار چند تسک لود بشه',
-    settings_group_by_note: 'گروه‌بندی بر اساس نوت',
-    settings_group_by_note_desc: 'تسک‌ها بر اساس نوت مبدأ گروه‌بندی بشن',
     settings_show_note_in_modal: 'نمایش نام نوت در جزئیات',
     settings_show_note_in_modal_desc: 'نام نوت مبدأ توی مودال جزئیات نشون داده بشه',
-
     settings_folders: 'پوشه‌ها',
     settings_include_folders: 'پوشه‌های شامل',
     settings_include_folders_desc: 'فقط این پوشه‌ها اسکن بشن (خالی = همه)',
@@ -250,7 +261,6 @@ const fa: typeof en = {
     settings_exclude_folders_desc: 'این پوشه‌ها موقع اسکن نادیده گرفته بشن',
     settings_only_markdown: 'فقط فایل‌های markdown',
     settings_only_markdown_desc: 'فایل‌های غیر markdown نادیده گرفته بشن',
-
     settings_categories: 'دسته‌بندی',
     settings_enable_categories: 'فعال‌سازی دسته‌بندی',
     settings_enable_categories_desc: 'اجازه بده تسک‌ها به دسته اختصاص داده بشن',
@@ -286,14 +296,12 @@ const translations = { en, fa };
 
 type TranslationKey = keyof typeof en;
 
-/* ترجمه */
 export function t(
     lang: Language,
     key: TranslationKey,
     params?: Record<string, string>
 ): string {
     let text = translations[lang][key] ?? translations.en[key] ?? key;
-
     if (params) {
         for (const [k, v] of Object.entries(params)) {
             text = text.replace(new RegExp(`\\{${k}\\}`, 'g'), v);
@@ -302,12 +310,10 @@ export function t(
     return text;
 }
 
-/* آیا RTL؟ */
 export function isRTL(lang: Language): boolean {
     return lang === 'fa';
 }
 
-/* اعمال جهت روی یه عنصر */
 export function applyDirection(el: HTMLElement, lang: Language): void {
     el.setAttribute('dir', isRTL(lang) ? 'rtl' : 'ltr');
     el.classList.toggle('first-task-rtl', isRTL(lang));
