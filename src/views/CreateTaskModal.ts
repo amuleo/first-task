@@ -1,8 +1,8 @@
 /* ════════════════════════════════════════════════════════════
    ➕ مودال ساخت تسک جدید — v0.1.2
-   ✅ AbstractInputSuggest (بدون تداخل با onSelect)
+   ✅ Suggest هوشمند برای انتخاب نوت (mtime + active)
    ✅ تاریخ پیش‌فرض = امروز
-   ✅ dropdown دسته‌بندی
+   ✅ پدینگ بالای مودال
    ════════════════════════════════════════════════════════════ */
 
 import {
@@ -14,9 +14,10 @@ import { t, applyDirection } from '../i18n';
 import { parseDateInput, getTodayDateInput } from '../utils/jalaliDate';
 
 /* ═══════════════════════════════════════════════════════
-   🎯 Input Suggest برای انتخاب نوت
+   🎯 Suggest هوشمند برای انتخاب نوت
+   ✅ پیشنهاد اول: نوت فعلی
    ✅ مرتب بر اساس mtime (آخرین تغییر)
-   ✅ لیزی: فقط ۲۰ مورد
+   ✅ محدودیت ۲۰ مورد
    ═══════════════════════════════════════════════════════ */
 class NoteSuggest extends AbstractInputSuggest<TFile> {
     private plugin: FirstTaskPlugin;
@@ -37,10 +38,18 @@ class NoteSuggest extends AbstractInputSuggest<TFile> {
         const files = this.plugin.taskManager.getScannableFiles();
         const lowerQuery = (query || '').toLowerCase();
 
-        /* ─── مرتب بر اساس mtime (جدیدترین اول) ─── */
-        const sorted = [...files].sort((a, b) => b.stat.mtime - a.stat.mtime);
+        /* ─── نوت فعلی ─── */
+        const activeFile = this.app.workspace.getActiveFile();
+        const activePath = activeFile?.path || '';
 
-        /* ─── فیلتر بر اساس query ─── */
+        /* ─── مرتب‌سازی: active اول، بعد mtime ─── */
+        const sorted = [...files].sort((a, b) => {
+            if (a.path === activePath) return -1;
+            if (b.path === activePath) return 1;
+            return b.stat.mtime - a.stat.mtime;
+        });
+
+        /* ─── فیلتر ─── */
         let filtered = sorted;
         if (lowerQuery) {
             filtered = sorted.filter(f =>
@@ -48,16 +57,23 @@ class NoteSuggest extends AbstractInputSuggest<TFile> {
             );
         }
 
-        /* ─── محدودیت ۲۰ مورد ─── */
         return filtered.slice(0, 20);
     }
 
     renderSuggestion(file: TFile, el: HTMLElement): void {
+        const activeFile = this.app.workspace.getActiveFile();
+        const isActive = activeFile?.path === file.path;
+
         const name = file.path.split('/').pop() || file.path;
         const folder = file.parent?.path || '';
 
         const container = el.createDiv({ cls: 'first-task-suggest-item' });
-        container.createDiv({ text: name, cls: 'first-task-suggest-name' });
+        const nameRow = container.createDiv({ cls: 'first-task-suggest-name' });
+        if (isActive) {
+            nameRow.createSpan({ cls: 'first-task-suggest-active-dot', text: '● ' });
+        }
+        nameRow.createSpan({ text: name });
+
         if (folder && folder !== '/') {
             container.createDiv({ text: folder, cls: 'first-task-suggest-path' });
         }
@@ -70,7 +86,7 @@ class NoteSuggest extends AbstractInputSuggest<TFile> {
 }
 
 /* ═══════════════════════════════════════════════════════
-   ➕ مودال
+   ➕ مودال ساخت تسک
    ═══════════════════════════════════════════════════════ */
 export class CreateTaskModal extends Modal {
     plugin: FirstTaskPlugin;
@@ -122,7 +138,7 @@ export class CreateTaskModal extends Modal {
                 ta.inputEl.style.width = '100%';
             });
 
-        /* ─── تاریخ (پیش‌فرض امروز) ─── */
+        /* ─── تاریخ ─── */
         new Setting(contentEl)
             .setName(t(lang, 'field_due_date'))
             .addText(text => {
@@ -151,7 +167,7 @@ export class CreateTaskModal extends Modal {
 
         /* ─── فایل مبدأ با Suggest ─── */
         const files = this.plugin.taskManager.getScannableFiles();
-        this.sourceFile = this.getDefaultFile(files);
+        this.sourceFile = this.getSmartDefaultFile(files);
 
         const sourceSetting = new Setting(contentEl)
             .setName(t(lang, 'field_source_file'))
@@ -162,13 +178,11 @@ export class CreateTaskModal extends Modal {
             text.setValue(this.sourceFile);
             text.inputEl.style.width = '100%';
 
-            /* ─── Suggest ─── */
             new NoteSuggest(this.app, text.inputEl, this.plugin, (file) => {
                 this.sourceFile = file.path;
                 text.setValue(file.path);
             });
 
-            /* ─── هر تغییر، sourceFile رو آپدیت کن ─── */
             text.onChange(v => { this.sourceFile = v.trim(); });
         });
 
@@ -185,14 +199,36 @@ export class CreateTaskModal extends Modal {
         save.onclick = () => this.submit();
     }
 
-    /* ─── فایل پیش‌فرض (inbox یا جدیدترین) ─── */
-    private getDefaultFile(files: TFile[]): string {
+    /* ═══════════════════════════════════════════════════════
+       🎯 انتخاب نوت پیش‌فرض هوشمند
+       اولویت:
+       1. نوت فعلی
+       2. آخرین نوت فعال
+       3. inbox.md
+       4. جدیدترین نوت
+       ═══════════════════════════════════════════════════════ */
+    private getSmartDefaultFile(files: TFile[]): string {
         if (files.length === 0) return '';
 
+        /* ۱. نوت فعلی */
+        const activeFile = this.app.workspace.getActiveFile();
+        if (activeFile && activeFile.extension === 'md') {
+            const exists = files.find(f => f.path === activeFile.path);
+            if (exists) return activeFile.path;
+        }
+
+        /* ۲. آخرین نوت فعال */
+        const lastOpen = this.app.workspace.getLastOpenFiles();
+        for (const path of lastOpen) {
+            const found = files.find(f => f.path === path);
+            if (found) return found.path;
+        }
+
+        /* ۳. inbox.md */
         const inbox = files.find(f => /(^|\/)inbox\.md$/i.test(f.path));
         if (inbox) return inbox.path;
 
-        /* جدیدترین */
+        /* ۴. جدیدترین */
         const sorted = [...files].sort((a, b) => b.stat.mtime - a.stat.mtime);
         return sorted[0]?.path || '';
     }
