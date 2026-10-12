@@ -1,5 +1,5 @@
 /* ════════════════════════════════════════════════════════════
-   🌐 i18n — انگلیسی + فارسی
+   🌐 i18n — انگلیسی + فارسی (نسخه v0.2.0)
    ════════════════════════════════════════════════════════════ */
 
 import type { Language } from '../types';
@@ -67,15 +67,27 @@ const en = {
     details_due_date: 'Due date',
     details_description: 'Description',
     details_no_description: 'No description',
+    details_created: 'Created',
+    details_completed: 'Completed',
+    details_dynamic_categories: 'Time categories',
+
+    /* ─── Edit Modal ─── */
+    edit_title: 'Edit task',
 
     /* ─── Buttons ─── */
     btn_cancel: 'Cancel',
     btn_create: 'Create',
+    btn_edit: 'Edit',
+    btn_save: 'Save',
+    btn_delete: 'Delete',
     btn_mark_done: 'Mark as done',
     btn_mark_pending: 'Restore',
     btn_pin: 'Pin',
     btn_unpin: 'Unpin',
     btn_open_note: 'Open note',
+
+    /* ─── Confirm ─── */
+    confirm_delete_body: 'Delete this task? The line will be removed from the note.',
 
     /* ─── Settings ─── */
     settings_title: 'First Task Settings',
@@ -117,6 +129,7 @@ const en = {
     notice_task_updated: 'Task updated',
     notice_task_completed: 'Task marked as done',
     notice_task_restored: 'Task restored',
+    notice_task_deleted: 'Task deleted',
     notice_task_pinned: 'Task pinned',
     notice_task_unpinned: 'Task unpinned',
     notice_no_title: 'Title is required',
@@ -191,15 +204,27 @@ const fa: typeof en = {
     details_due_date: 'تاریخ انجام',
     details_description: 'توضیحات',
     details_no_description: 'بدون توضیحات',
+    details_created: 'تاریخ ساخت',
+    details_completed: 'تاریخ انجام',
+    details_dynamic_categories: 'دسته‌های زمانی',
+
+    /* ─── مودال ویرایش ─── */
+    edit_title: 'ویرایش تسک',
 
     /* ─── دکمه‌ها ─── */
     btn_cancel: 'لغو',
     btn_create: 'ایجاد',
+    btn_edit: 'ویرایش',
+    btn_save: 'ذخیره',
+    btn_delete: 'حذف',
     btn_mark_done: 'انجام شد',
     btn_mark_pending: 'برگرداندن',
     btn_pin: 'پین کردن',
     btn_unpin: 'برداشتن پین',
     btn_open_note: 'باز کردن نوت',
+
+    /* ─── تأیید ─── */
+    confirm_delete_body: 'این تسک حذف بشه؟ خط از نوت پاک می‌شه.',
 
     /* ─── تنظیمات ─── */
     settings_title: 'تنظیمات تسک اول',
@@ -241,6 +266,7 @@ const fa: typeof en = {
     notice_task_updated: 'تسک بروزرسانی شد',
     notice_task_completed: 'تسک انجام شد',
     notice_task_restored: 'تسک برگردونده شد',
+    notice_task_deleted: 'تسک حذف شد',
     notice_task_pinned: 'تسک پین شد',
     notice_task_unpinned: 'پین تسک برداشته شد',
     notice_no_title: 'عنوان الزامیه',
