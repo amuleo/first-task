@@ -1,14 +1,17 @@
 /* ════════════════════════════════════════════════════════════
-   📋 پنل اصلی — v0.2.0
-   ✅ نمایش badge های داینامیک
-   ✅ نمایش دسته‌بندی اصلی
-   ✅ Lazy Loading + گروه‌بندی
+   📋 پنل اصلی تسک‌ها — v0.1.2
+   ✅ dropdown دسته‌بندی بالای لیست
+   ✅ دو تب (در انتظار / انجام شده)
+   ✅ Lazy Loading
+   ✅ رفع باگ پین (بروزرسانی سریع)
+   ✅ بدون گروه‌بندی
    ════════════════════════════════════════════════════════════ */
 
 import { ItemView, WorkspaceLeaf, setIcon } from 'obsidian';
 import type FirstTaskPlugin from '../main';
 import type { ExtractedTask } from '../types';
 import { t, applyDirection } from '../i18n';
+import { formatCount } from '../utils/formatUtils';
 import { CreateTaskModal } from './CreateTaskModal';
 import { TaskDetailsModal } from './TaskDetailsModal';
 
@@ -35,9 +38,13 @@ export class TaskPanelView extends ItemView {
 
     async onClose(): Promise<void> {}
 
-    refresh(): void { this.render(); }
+    refresh(): void {
+        this.render();
+    }
 
-    /* ─── رندر کامل ─── */
+    /* ═══════════════════════════════════════════════════════
+       رندر
+       ═══════════════════════════════════════════════════════ */
     private render(): void {
         const { contentEl } = this;
         const savedScroll = contentEl.scrollTop;
@@ -48,6 +55,7 @@ export class TaskPanelView extends ItemView {
         this.plugin.toastManager.setRTL(this.plugin.settings.language === 'fa');
 
         this.renderHeader(contentEl);
+        this.renderCategoryDropdown(contentEl);
         this.renderTabs(contentEl);
 
         if (this.plugin.settings.currentTab === 'pending') {
@@ -56,9 +64,12 @@ export class TaskPanelView extends ItemView {
             this.renderCompleted(contentEl);
         }
 
-        requestAnimationFrame(() => { contentEl.scrollTop = savedScroll; });
+        requestAnimationFrame(() => {
+            contentEl.scrollTop = savedScroll;
+        });
     }
 
+    /* ─── هدر ─── */
     private renderHeader(parent: HTMLElement): void {
         const lang = this.plugin.settings.language;
         const header = parent.createDiv({ cls: 'first-task-header' });
@@ -86,93 +97,89 @@ export class TaskPanelView extends ItemView {
         }
     }
 
+    /* ─── dropdown دسته‌بندی ─── */
+    private renderCategoryDropdown(parent: HTMLElement): void {
+        const lang = this.plugin.settings.language;
+        const cats = this.plugin.taskManager.getCategories();
+
+        const row = parent.createDiv({ cls: 'first-task-category-row' });
+        const select = row.createEl('select', { cls: 'dropdown first-task-category-select' });
+
+        select.createEl('option', {
+            value: '',
+            text: t(lang, 'panel_all_categories'),
+        });
+
+        for (const c of cats) {
+            const label = lang === 'fa' ? c.name_fa : c.name;
+            select.createEl('option', { value: c.id, text: label });
+        }
+
+        select.createEl('option', {
+            value: 'none',
+            text: t(lang, 'panel_no_category'),
+        });
+
+        select.value = this.plugin.settings.panelCategory || '';
+        select.onchange = async () => {
+            this.plugin.settings.panelCategory = select.value;
+            await this.plugin.saveSettings();
+            this.visibleCount = this.plugin.settings.tasksPerPage;
+            this.contentEl.scrollTop = 0;
+            this.render();
+        };
+    }
+
+    /* ─── تب‌ها ─── */
     private renderTabs(parent: HTMLElement): void {
         const lang = this.plugin.settings.language;
         const tabs = parent.createDiv({ cls: 'first-task-tabs' });
 
-        const mkTab = (id: 'pending' | 'completed', icon: string, label: string) => {
+        const currentCategory = this.plugin.settings.panelCategory || '';
+        const pendingCount = this.plugin.taskManager.getPendingByCategory(currentCategory).length;
+        const completedCount = this.plugin.taskManager.getCompletedByCategory(currentCategory).length;
+
+        const mkTab = (id: 'pending' | 'completed', icon: string, label: string, count: number) => {
             const btn = tabs.createEl('button', {
                 cls: 'first-task-tab' + (this.plugin.settings.currentTab === id ? ' is-active' : ''),
             });
             setIcon(btn.createSpan({ cls: 'first-task-tab-icon' }), icon);
-            btn.createSpan({ text: ' ' + label });
-            btn.onclick = () => {
+            btn.createSpan({ text: ` ${label} (${formatCount(count)})` });
+            btn.onclick = async () => {
                 if (this.plugin.settings.currentTab === id) return;
                 this.plugin.settings.currentTab = id;
-                this.plugin.saveSettings();
+                await this.plugin.saveSettings();
                 this.visibleCount = this.plugin.settings.tasksPerPage;
                 this.contentEl.scrollTop = 0;
                 this.render();
             };
         };
 
-        const pendingCount = this.plugin.taskManager.getPendingTasks().length;
-        const completedCount = this.plugin.taskManager.getCompletedTasks().length;
-
-        mkTab('pending', 'circle-dot', `${t(lang, 'tab_pending')} (${pendingCount})`);
-        mkTab('completed', 'check-circle', `${t(lang, 'tab_completed')} (${completedCount})`);
+        mkTab('pending', 'circle-dot', t(lang, 'tab_pending'), pendingCount);
+        mkTab('completed', 'check-circle', t(lang, 'tab_completed'), completedCount);
     }
 
+    /* ─── تب در انتظار ─── */
     private renderPending(parent: HTMLElement): void {
         const lang = this.plugin.settings.language;
         const body = parent.createDiv({ cls: 'first-task-body' });
-        const tasks = this.plugin.taskManager.getPendingTasks();
+
+        const category = this.plugin.settings.panelCategory || '';
+        const tasks = this.plugin.taskManager.getPendingByCategory(category);
 
         if (tasks.length === 0) {
             this.renderEmpty(body, t(lang, 'panel_empty'), t(lang, 'panel_empty_hint'));
             return;
         }
 
-        if (this.plugin.settings.groupByNote) {
-            this.renderGrouped(body, tasks, false);
-        } else {
-            this.renderSimpleList(body, tasks, false);
-        }
-    }
-
-    private renderCompleted(parent: HTMLElement): void {
-        const lang = this.plugin.settings.language;
-        const stats = this.plugin.taskManager.getStats();
-        const statsGrid = parent.createDiv({ cls: 'first-task-stats-grid' });
-
-        const mkCard = (label: string, value: number) => {
-            const card = statsGrid.createDiv({ cls: 'first-task-stat-card' });
-            card.createDiv({ cls: 'first-task-stat-value', text: String(value) });
-            card.createDiv({ cls: 'first-task-stat-label', text: label });
-        };
-        mkCard(t(lang, 'stats_today'), stats.today);
-        mkCard(t(lang, 'stats_yesterday'), stats.yesterday);
-        mkCard(t(lang, 'stats_this_week'), stats.this_week);
-        mkCard(t(lang, 'stats_last_month'), stats.last_month);
-        mkCard(t(lang, 'stats_this_year'), stats.this_year);
-        mkCard(t(lang, 'stats_total'), stats.total);
-
-        const body = parent.createDiv({ cls: 'first-task-body' });
-        const tasks = this.plugin.taskManager.getCompletedTasks();
-
-        if (tasks.length === 0) {
-            this.renderEmpty(body, t(lang, 'panel_empty_completed'), '');
-            return;
-        }
-
-        if (this.plugin.settings.groupByNote) {
-            this.renderGrouped(body, tasks, true);
-        } else {
-            this.renderSimpleList(body, tasks, true);
-        }
-    }
-
-    private renderSimpleList(parent: HTMLElement, tasks: ExtractedTask[], isCompleted: boolean): void {
-        const lang = this.plugin.settings.language;
         const visible = tasks.slice(0, this.visibleCount);
-
-        for (const task of visible) this.renderTaskCard(parent, task, isCompleted);
+        for (const task of visible) this.renderTaskCard(body, task, false);
 
         if (tasks.length > this.visibleCount) {
             const remaining = tasks.length - this.visibleCount;
-            const moreBtn = parent.createEl('button', {
+            const moreBtn = body.createEl('button', {
                 cls: 'first-task-show-more',
-                text: `${t(lang, 'panel_show_more')} (${remaining})`,
+                text: `${t(lang, 'panel_show_more')} (${formatCount(remaining)})`,
             });
             moreBtn.onclick = () => {
                 this.visibleCount += this.plugin.settings.tasksPerPage;
@@ -181,42 +188,42 @@ export class TaskPanelView extends ItemView {
         }
     }
 
-    private renderGrouped(parent: HTMLElement, tasks: ExtractedTask[], isCompleted: boolean): void {
+    /* ─── تب انجام شده ─── */
+    private renderCompleted(parent: HTMLElement): void {
         const lang = this.plugin.settings.language;
+        const stats = this.plugin.taskManager.getStats();
+        const statsGrid = parent.createDiv({ cls: 'first-task-stats-grid' });
 
-        const groups = new Map<string, ExtractedTask[]>();
-        for (const task of tasks) {
-            const key = task._source_file;
-            if (!groups.has(key)) groups.set(key, []);
-            groups.get(key)!.push(task);
+        const mkCard = (label: string, value: number) => {
+            const card = statsGrid.createDiv({ cls: 'first-task-stat-card' });
+            card.createDiv({ cls: 'first-task-stat-value', text: formatCount(value) });
+            card.createDiv({ cls: 'first-task-stat-label', text: label });
+        };
+
+        mkCard(t(lang, 'stats_today'), stats.today);
+        mkCard(t(lang, 'stats_yesterday'), stats.yesterday);
+        mkCard(t(lang, 'stats_this_week'), stats.this_week);
+        mkCard(t(lang, 'stats_last_month'), stats.last_month);
+        mkCard(t(lang, 'stats_this_year'), stats.this_year);
+        mkCard(t(lang, 'stats_total'), stats.total);
+
+        const body = parent.createDiv({ cls: 'first-task-body' });
+        const category = this.plugin.settings.panelCategory || '';
+        const tasks = this.plugin.taskManager.getCompletedByCategory(category);
+
+        if (tasks.length === 0) {
+            this.renderEmpty(body, t(lang, 'panel_empty_completed'), '');
+            return;
         }
 
-        const sortedGroups = Array.from(groups.entries())
-            .map(([key, tasks]) => ({ key, tasks }))
-            .sort((a, b) => b.tasks.length - a.tasks.length);
-
-        let totalRendered = 0;
-
-        for (const group of sortedGroups) {
-            if (totalRendered >= this.visibleCount) break;
-
-            const groupTitle = this.plugin.taskManager.getDisplayNoteName(group.key);
-            const groupHeader = parent.createDiv({ cls: 'first-task-group-header' });
-            groupHeader.createSpan({ cls: 'first-task-group-title', text: `📁 ${groupTitle} (${group.tasks.length})` });
-
-            const groupBody = parent.createDiv({ cls: 'first-task-group-body' });
-            const remainingVisible = this.visibleCount - totalRendered;
-            const tasksToShow = group.tasks.slice(0, remainingVisible);
-
-            for (const task of tasksToShow) this.renderTaskCard(groupBody, task, isCompleted);
-            totalRendered += tasksToShow.length;
-        }
+        const visible = tasks.slice(0, this.visibleCount);
+        for (const task of visible) this.renderTaskCard(body, task, true);
 
         if (tasks.length > this.visibleCount) {
             const remaining = tasks.length - this.visibleCount;
-            const moreBtn = parent.createEl('button', {
+            const moreBtn = body.createEl('button', {
                 cls: 'first-task-show-more',
-                text: `${t(lang, 'panel_show_more')} (${remaining})`,
+                text: `${t(lang, 'panel_show_more')} (${formatCount(remaining)})`,
             });
             moreBtn.onclick = () => {
                 this.visibleCount += this.plugin.settings.tasksPerPage;
@@ -231,6 +238,7 @@ export class TaskPanelView extends ItemView {
         const useJalali = this.plugin.settings.useJalaliDate;
         const pinnedClass = (task.pinned && !isCompleted) ? ' is-pinned' : '';
         const card = parent.createDiv({ cls: 'first-task-card' + pinnedClass });
+        card.dataset.taskId = task._id;
 
         /* ─── چک‌باکس ─── */
         const cbWrap = card.createDiv({ cls: 'first-task-card-checkbox' });
@@ -265,7 +273,6 @@ export class TaskPanelView extends ItemView {
         /* ─── متادیتا ─── */
         const meta = bodyCard.createDiv({ cls: 'first-task-card-meta' });
 
-        /* ─── تاریخ ─── */
         const dateDisplay = useJalali ? task.due_date_jalali : task.due_date_gregorian;
         if (dateDisplay) {
             const dateEl = meta.createSpan({ cls: 'first-task-card-date' });
@@ -273,17 +280,19 @@ export class TaskPanelView extends ItemView {
             dateEl.createSpan({ text: ' ' + dateDisplay });
         }
 
-        /* ─── دسته‌بندی اصلی ─── */
         if (task.category) {
             const catEl = meta.createSpan({ cls: 'first-task-card-cat' });
             setIcon(catEl.createSpan({ cls: 'first-task-icon' }), 'tag');
-            catEl.createSpan({ text: ' ' + this.plugin.taskManager.getCategoryDisplayName(task.category) });
+            catEl.createSpan({
+                text: ' ' + this.plugin.taskManager.getCategoryDisplayName(task.category),
+            });
         }
 
-        /* ─── نام نوت ─── */
         const noteEl = meta.createSpan({ cls: 'first-task-card-note' });
         setIcon(noteEl.createSpan({ cls: 'first-task-icon' }), 'file-text');
-        noteEl.createSpan({ text: ' ' + this.plugin.taskManager.getDisplayNoteName(task._source_file) });
+        noteEl.createSpan({
+            text: ' ' + this.plugin.taskManager.getDisplayNoteName(task._source_file),
+        });
 
         /* ─── badge های داینامیک ─── */
         if (!isCompleted) {
@@ -305,12 +314,14 @@ export class TaskPanelView extends ItemView {
         };
     }
 
+    /* ─── حالت خالی ─── */
     private renderEmpty(parent: HTMLElement, title: string, hint: string): void {
         const empty = parent.createDiv({ cls: 'first-task-empty' });
         empty.createEl('p', { text: title, cls: 'first-task-empty-title' });
         if (hint) empty.createEl('p', { text: hint, cls: 'first-task-empty-hint' });
     }
 
+    /* ─── Rescan ─── */
     private async handleRescan(): Promise<void> {
         const lang = this.plugin.settings.language;
         this.plugin.toastManager.show(t(lang, 'panel_reloading'), 'info', 1500);
