@@ -1,11 +1,5 @@
 /* ════════════════════════════════════════════════════════════
    🎨 استایل‌های First Task v0.1.2
-   ✅ Toast بالای صفحه + انیمیشن
-   ✅ دو تب + کارت آماری
-   ✅ Planner + کارت‌های رنگی کلیک‌پذیر
-   ✅ RTL کامل + دو زبانه
-   ✅ باکس‌های جزئیات + دکمه‌های داینامیک
-   ✅ Suggest هوشمند
    ════════════════════════════════════════════════════════════ */
 
 /* ═══════════════════════════════════════════════════════════
@@ -30,11 +24,9 @@
     visibility: visible !important;
     opacity: 1 !important;
 }
-
 .first-task-toast-container.first-task-toast-rtl {
     direction: rtl !important;
 }
-
 .first-task-toast {
     display: block !important;
     width: 100% !important;
@@ -55,24 +47,17 @@
     transform: translateY(-20px);
     transition: opacity 0.25s ease, transform 0.25s ease;
 }
-
-.first-task-toast.is-visible {
-    opacity: 1;
-    transform: translateY(0);
-}
-
+.first-task-toast.is-visible { opacity: 1; transform: translateY(0); }
 .first-task-toast.is-exiting {
     opacity: 0 !important;
     transform: translateY(-12px) scale(0.95) !important;
     transition: opacity 0.25s ease, transform 0.25s ease !important;
     pointer-events: none !important;
 }
-
 .first-task-toast-success { border-inline-start: 4px solid #2ecc71; }
 .first-task-toast-error   { border-inline-start: 4px solid #e74c3c; }
 .first-task-toast-warning { border-inline-start: 4px solid #f1c40f; }
 .first-task-toast-info    { border-inline-start: 4px solid var(--text-accent); }
-
 .first-task-toast:hover { background: var(--background-secondary-alt); }
 
 /* ═══════════════════════════════════════════════════════════
@@ -85,7 +70,6 @@
     height: 100%;
     overflow-y: auto;
 }
-
 .first-task-header { margin-bottom: 10px; }
 .first-task-header-top {
     display: flex;
@@ -101,7 +85,7 @@
 }
 .first-task-header-actions { display: flex; gap: 2px; }
 
-/* ───── dropdown دسته‌بندی ───── */
+/* ─── dropdown دسته‌بندی ─── */
 .first-task-category-row {
     display: flex;
     gap: 6px;
@@ -112,7 +96,7 @@
     width: 100%;
 }
 
-/* ───── تب‌ها ───── */
+/* ─── تب‌ها ─── */
 .first-task-tabs {
     display: flex;
     gap: 4px;
@@ -182,97 +166,52 @@
 }
 
 /* ═══════════════════════════════════════════════════════════
-   📅 Planner — کارت‌های کلیک‌پذیر
+   📅 Planner
    ═══════════════════════════════════════════════════════════ */
 .first-task-planner-stat-card {
     cursor: pointer;
     user-select: none;
-    border: 2px solid transparent;
 }
-
 .first-task-planner-stat-card:hover {
     transform: translateY(-1px);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
-
 .first-task-planner-stat-card.is-active {
     border-color: var(--interactive-accent);
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
 }
 
-/* رنگ‌بندی کارت‌ها */
-.first-task-planner-stat-card[data-card="past"] {
-    background: rgba(231, 76, 60, 0.1);
-}
-.first-task-planner-stat-card[data-card="past"].is-active {
-    background: rgba(231, 76, 60, 0.2);
-    border-color: #c0392b;
-}
+.first-task-planner-stat-card[data-card="past"] { background: rgba(231, 76, 60, 0.1); }
+.first-task-planner-stat-card[data-card="past"].is-active { background: rgba(231, 76, 60, 0.2); border-color: #c0392b; }
 .first-task-planner-stat-card[data-card="past"] .first-task-stat-value { color: #c0392b; }
 
-.first-task-planner-stat-card[data-card="today"] {
-    background: rgba(230, 126, 34, 0.1);
-}
-.first-task-planner-stat-card[data-card="today"].is-active {
-    background: rgba(230, 126, 34, 0.2);
-    border-color: #d35400;
-}
+.first-task-planner-stat-card[data-card="today"] { background: rgba(230, 126, 34, 0.1); }
+.first-task-planner-stat-card[data-card="today"].is-active { background: rgba(230, 126, 34, 0.2); border-color: #d35400; }
 .first-task-planner-stat-card[data-card="today"] .first-task-stat-value { color: #d35400; }
 
-.first-task-planner-stat-card[data-card="tomorrow"] {
-    background: rgba(52, 152, 219, 0.1);
-}
-.first-task-planner-stat-card[data-card="tomorrow"].is-active {
-    background: rgba(52, 152, 219, 0.2);
-    border-color: #2980b9;
-}
+.first-task-planner-stat-card[data-card="tomorrow"] { background: rgba(52, 152, 219, 0.1); }
+.first-task-planner-stat-card[data-card="tomorrow"].is-active { background: rgba(52, 152, 219, 0.2); border-color: #2980b9; }
 .first-task-planner-stat-card[data-card="tomorrow"] .first-task-stat-value { color: #2980b9; }
 
-.first-task-planner-stat-card[data-card="this_week"] {
-    background: rgba(41, 128, 185, 0.1);
-}
-.first-task-planner-stat-card[data-card="this_week"].is-active {
-    background: rgba(41, 128, 185, 0.2);
-    border-color: #1e5f8b;
-}
+.first-task-planner-stat-card[data-card="this_week"] { background: rgba(41, 128, 185, 0.1); }
+.first-task-planner-stat-card[data-card="this_week"].is-active { background: rgba(41, 128, 185, 0.2); border-color: #1e5f8b; }
 .first-task-planner-stat-card[data-card="this_week"] .first-task-stat-value { color: #1e5f8b; }
 
-.first-task-planner-stat-card[data-card="this_month"] {
-    background: rgba(46, 204, 113, 0.1);
-}
-.first-task-planner-stat-card[data-card="this_month"].is-active {
-    background: rgba(46, 204, 113, 0.2);
-    border-color: #27ae60;
-}
+.first-task-planner-stat-card[data-card="this_month"] { background: rgba(46, 204, 113, 0.1); }
+.first-task-planner-stat-card[data-card="this_month"].is-active { background: rgba(46, 204, 113, 0.2); border-color: #27ae60; }
 .first-task-planner-stat-card[data-card="this_month"] .first-task-stat-value { color: #27ae60; }
 
-.first-task-planner-stat-card[data-card="this_year"] {
-    background: rgba(39, 174, 96, 0.1);
-}
-.first-task-planner-stat-card[data-card="this_year"].is-active {
-    background: rgba(39, 174, 96, 0.2);
-    border-color: #1e8449;
-}
+.first-task-planner-stat-card[data-card="this_year"] { background: rgba(39, 174, 96, 0.1); }
+.first-task-planner-stat-card[data-card="this_year"].is-active { background: rgba(39, 174, 96, 0.2); border-color: #1e8449; }
 .first-task-planner-stat-card[data-card="this_year"] .first-task-stat-value { color: #1e8449; }
 
-.first-task-planner-stat-card[data-card="no_date"] {
-    background: rgba(149, 165, 166, 0.1);
-}
-.first-task-planner-stat-card[data-card="no_date"].is-active {
-    background: rgba(149, 165, 166, 0.2);
-    border-color: #7f8c8d;
-}
+.first-task-planner-stat-card[data-card="no_date"] { background: rgba(149, 165, 166, 0.1); }
+.first-task-planner-stat-card[data-card="no_date"].is-active { background: rgba(149, 165, 166, 0.2); border-color: #7f8c8d; }
 .first-task-planner-stat-card[data-card="no_date"] .first-task-stat-value { color: #7f8c8d; }
 
-.first-task-planner-stat-card[data-card="all"] {
-    background: var(--background-secondary);
-}
-.first-task-planner-stat-card[data-card="all"].is-active {
-    background: var(--background-secondary-alt);
-    border-color: var(--interactive-accent);
-}
+.first-task-planner-stat-card[data-card="all"] { background: var(--background-secondary); }
+.first-task-planner-stat-card[data-card="all"].is-active { background: var(--background-secondary-alt); border-color: var(--interactive-accent); }
 
-/* ردیف سوم Planner */
 .first-task-planner-stats-row-3 {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -280,7 +219,6 @@
     margin-bottom: 14px;
 }
 
-/* ─── عنوان لیست Planner ─── */
 .first-task-planner-tasks-header {
     margin: 16px 0 10px 0;
     padding-bottom: 8px;
@@ -308,7 +246,6 @@
     gap: 6px;
     flex: 1;
 }
-
 .first-task-card {
     display: flex;
     align-items: flex-start;
@@ -435,7 +372,6 @@
     padding-top: 16px;
     padding-bottom: 8px;
 }
-
 .first-task-modal-title {
     margin: 0 0 16px 0 !important;
     padding: 0 !important;
@@ -446,7 +382,7 @@
     line-height: 1.4;
 }
 
-/* ─── باکس‌های readonly (عنوان + توضیحات) ─── */
+/* ─── باکس‌های readonly ─── */
 .first-task-details-box {
     margin-bottom: 12px;
 }
@@ -469,7 +405,6 @@
     white-space: pre-wrap;
 }
 
-/* ─── منبع نوت ─── */
 .first-task-details-source {
     margin: 0 0 12px 0;
     padding: 8px 10px;
@@ -484,11 +419,8 @@
     border-bottom: 1px dashed var(--text-accent);
     cursor: pointer;
 }
-.first-task-source-link:hover {
-    border-bottom-style: solid;
-}
+.first-task-source-link:hover { border-bottom-style: solid; }
 
-/* ─── متادیتا ─── */
 .first-task-details-meta {
     display: flex;
     flex-direction: column;
@@ -519,13 +451,11 @@
     padding-top: 12px;
     border-top: 1px solid var(--background-modifier-border);
 }
-
 .first-task-action-row {
     display: flex;
     gap: 8px;
     width: 100%;
 }
-
 .first-task-action-btn {
     flex: 1 1 0;
     min-width: 0;
@@ -540,12 +470,10 @@
     overflow: hidden;
     text-overflow: ellipsis;
 }
-
 .first-task-action-btn-full {
     flex: 1 1 100%;
 }
 
-/* ─── دکمه‌های مودال ساخت ─── */
 .first-task-modal-buttons {
     display: flex;
     justify-content: flex-end;
@@ -556,7 +484,6 @@
     border-radius: 0 !important;
     flex-wrap: wrap;
 }
-
 .first-task-modal-buttons-stack {
     display: flex;
     flex-direction: column;
@@ -599,18 +526,12 @@
 /* ═══════════════════════════════════════════════════════════
    ⚙️ تنظیمات
    ═══════════════════════════════════════════════════════════ */
-.first-task-settings[dir="rtl"] {
-    direction: rtl;
-}
+.first-task-settings[dir="rtl"] { direction: rtl; }
 .first-task-settings[dir="rtl"] .setting-item-info,
 .first-task-settings[dir="rtl"] .setting-item-name,
-.first-task-settings[dir="rtl"] .setting-item-description {
-    text-align: right;
-}
+.first-task-settings[dir="rtl"] .setting-item-description { text-align: right; }
 .first-task-settings[dir="rtl"] .checkbox-container,
-.first-task-rtl .checkbox-container {
-    transform: scaleX(-1);
-}
+.first-task-rtl .checkbox-container { transform: scaleX(-1); }
 .first-task-settings[dir="rtl"] input[type="text"]:not([dir="ltr"]),
 .first-task-settings[dir="rtl"] textarea:not([dir="ltr"]) {
     direction: rtl;
@@ -662,9 +583,7 @@
    ═══════════════════════════════════════════════════════════ */
 .first-task-modal-content[dir="rtl"] .setting-item-info,
 .first-task-modal-content[dir="rtl"] .setting-item-name,
-.first-task-modal-content[dir="rtl"] .setting-item-description {
-    text-align: right;
-}
+.first-task-modal-content[dir="rtl"] .setting-item-description { text-align: right; }
 .first-task-modal-content[dir="rtl"] input[type="text"],
 .first-task-modal-content[dir="rtl"] textarea {
     direction: rtl;
@@ -684,12 +603,8 @@
     direction: rtl !important;
     text-align: right !important;
 }
-.first-task-modal-content[dir="rtl"] .first-task-suggest-item {
-    text-align: right;
-}
-.first-task-modal-content[dir="rtl"] .first-task-details-box-content {
-    text-align: right;
-}
+.first-task-modal-content[dir="rtl"] .first-task-suggest-item { text-align: right; }
+.first-task-modal-content[dir="rtl"] .first-task-details-box-content { text-align: right; }
 
 /* ═══════════════════════════════════════════════════════════
    📱 موبایل
@@ -714,9 +629,7 @@
     .first-task-modal-buttons {
         flex-direction: column-reverse;
     }
-    .first-task-modal-buttons button {
-        width: 100%;
-    }
+    .first-task-modal-buttons button { width: 100%; }
 
     .first-task-action-btn {
         font-size: 12px;
@@ -724,7 +637,6 @@
     }
 }
 
-/* تبلت */
 @media (min-width: 601px) and (max-width: 900px) {
     .first-task-toast-container {
         top: calc(max(14px, env(safe-area-inset-top)) + 24px) !important;
