@@ -4,6 +4,9 @@
 
 import type { Language } from '../types';
 
+/* ═══════════════════════════════════════════════════════
+   🇬🇧 English
+   ═══════════════════════════════════════════════════════ */
 const en = {
     plugin_name: 'First Task',
 
@@ -110,10 +113,6 @@ const en = {
     week_saturday: 'Saturday',
     week_sunday: 'Sunday',
     week_monday: 'Monday',
-    week_tuesday: 'Tuesday',
-    week_wednesday: 'Wednesday',
-    week_thursday: 'Thursday',
-    week_friday: 'Friday',
 
     settings_display: 'Display',
     settings_tasks_per_page: 'Tasks per page',
@@ -160,10 +159,17 @@ const en = {
     unspecified: 'Unspecified',
 };
 
+/* ═══════════════════════════════════════════════════════
+   🇮🇷 فارسی
+   ═══════════════════════════════════════════════════════ */
 const fa: typeof en = {
     plugin_name: 'تسک اول',
+
+    /* ─── تب‌ها ─── */
     tab_pending: 'تسک ها',
     tab_completed: 'انجام شده',
+
+    /* ─── پنل ─── */
     panel_title: 'تسک ها',
     panel_title_completed: 'تسک های انجام شده',
     panel_empty: 'همه‌ی تسک‌ها انجام شدن!',
@@ -176,6 +182,7 @@ const fa: typeof en = {
     panel_no_category: 'بدون دسته',
     panel_all_categories: 'همه دسته‌ها',
 
+    /* ─── آمار ─── */
     stats_today: 'امروز',
     stats_yesterday: 'دیروز',
     stats_this_week: 'این هفته',
@@ -183,16 +190,19 @@ const fa: typeof en = {
     stats_this_year: 'امسال',
     stats_total: 'کل',
 
+    /* ─── تسک ─── */
     task_pending: 'در انتظار',
     task_done: 'انجام شده',
     pinned_badge: 'پین شده',
 
+    /* ─── دسته‌بندی داینامیک ─── */
     category_today: 'امروز',
     category_tomorrow: 'فردا',
     category_this_week: 'این هفته',
     category_this_month: 'این ماه',
     category_this_year: 'امسال',
 
+    /* ─── پلنر ─── */
     planner_title: 'پلنر',
     planner_no_tasks: 'تسکی اینجا نیست',
     planner_stat_past: 'گذشته',
@@ -205,6 +215,7 @@ const fa: typeof en = {
     planner_stat_all: 'همه',
     planner_tasks_in: 'تسک‌های',
 
+    /* ─── مودال ساخت ─── */
     create_title: 'تسک جدید',
     field_title: 'عنوان',
     field_title_placeholder: 'چی کار کنم؟',
@@ -213,8 +224,9 @@ const fa: typeof en = {
     field_due_date: 'تاریخ انجام (اختیاری)',
     field_category: 'دسته‌بندی (اختیاری)',
     field_source_file: 'افزودن به نوت',
-    field_source_file_hint: 'تسک به صورت markdown به این نوت اضافه می‌شه',
+    field_source_file_hint: 'تسک به صورت مارک‌داون به این نوت اضافه می‌شه',
 
+    /* ─── مودال جزئیات ─── */
     details_title: 'جزئیات تسک',
     details_source: 'از نوت',
     details_status: 'وضعیت',
@@ -226,8 +238,10 @@ const fa: typeof en = {
     details_no_description: 'بدون توضیحات',
     details_dynamic_categories: 'دسته‌های زمانی',
 
+    /* ─── مودال ویرایش ─── */
     edit_title: 'ویرایش تسک',
 
+    /* ─── دکمه‌ها ─── */
     btn_cancel: 'لغو',
     btn_create: 'ایجاد',
     btn_edit: 'ویرایش',
@@ -238,12 +252,14 @@ const fa: typeof en = {
     btn_pin: 'پین کردن',
     btn_unpin: 'برداشتن پین',
 
+    /* ─── تأیید ─── */
     confirm_delete_body: 'این تسک حذف بشه؟ خط از نوت پاک می‌شه.',
 
+    /* ─── تنظیمات ─── */
     settings_title: 'تنظیمات تسک اول',
     settings_general: 'عمومی',
     settings_language: 'زبان',
-    settings_language_desc: 'زبان رابط کاربری پلاگین',
+    settings_language_desc: 'زبان رابط کاربری افزونه',
     settings_jalali: 'تاریخ شمسی',
     settings_jalali_desc: 'نمایش تاریخ‌ها به شمسی',
 
@@ -252,16 +268,12 @@ const fa: typeof en = {
     week_saturday: 'شنبه',
     week_sunday: 'یکشنبه',
     week_monday: 'دوشنبه',
-    week_tuesday: 'سه‌شنبه',
-    week_wednesday: 'چهارشنبه',
-    week_thursday: 'پنجشنبه',
-    week_friday: 'جمعه',
 
     settings_display: 'نمایش',
     settings_tasks_per_page: 'تعداد تسک در هر بار',
     settings_tasks_per_page_desc: 'هر بار چند تسک لود بشه',
 
-    settings_show_task_badges: 'نمایش badge های زمانی',
+    settings_show_task_badges: 'نمایش برچسب‌های زمانی روی تسک‌ها',
     settings_show_task_badges_desc: 'نمایش برچسب‌های «امروز»، «فردا» و... روی کارت تسک‌ها',
 
     settings_folders: 'پوشه‌ها',
@@ -269,8 +281,8 @@ const fa: typeof en = {
     settings_include_folders_desc: 'فقط این پوشه‌ها اسکن بشن (خالی = همه)',
     settings_exclude_folders: 'پوشه‌های نادیده',
     settings_exclude_folders_desc: 'این پوشه‌ها موقع اسکن نادیده گرفته بشن',
-    settings_only_markdown: 'فقط فایل‌های markdown',
-    settings_only_markdown_desc: 'فایل‌های غیر markdown نادیده گرفته بشن',
+    settings_only_markdown: 'فقط فایل‌های مارک‌داون',
+    settings_only_markdown_desc: 'فایل‌های غیر مارک‌داون نادیده گرفته بشن',
 
     settings_categories: 'دسته‌بندی',
     settings_enable_categories: 'فعال‌سازی دسته‌بندی',
@@ -285,6 +297,7 @@ const fa: typeof en = {
     settings_planner_cards_this_month: 'این ماه',
     settings_planner_cards_this_year: 'امسال',
 
+    /* ─── اعلان‌ها ─── */
     notice_task_created: 'تسک ساخته شد',
     notice_task_updated: 'تسک بروزرسانی شد',
     notice_task_completed: 'تسک انجام شد',
@@ -302,7 +315,7 @@ const fa: typeof en = {
 };
 
 /* ═══════════════════════════════════════════════════════════
-   توابع
+   توابع کمکی
    ═══════════════════════════════════════════════════════════ */
 
 const translations = { en, fa };
