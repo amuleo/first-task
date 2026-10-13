@@ -1,336 +1,399 @@
 /* ════════════════════════════════════════════════════════════
-   📋 پنل اصلی — v0.1.2
-   ✅ dropdown دسته‌بندی
+   🔎 مودال جزئیات + ویرایش — v0.1.2
+   ✅ باکس عنوان و توضیحات (readonly)
+   ✅ دکمه‌های داینامیک (ردیف + ستون)
+   ✅ نام نوت ۱۲ کاراکتر
    ✅ اعداد داینامیک
-   ✅ نمایش badge ها بر اساس تنظیمات کاربر
-   ✅ بدون گروه‌بندی
    ════════════════════════════════════════════════════════════ */
 
-import { ItemView, WorkspaceLeaf, setIcon } from 'obsidian';
+import { App, Modal, Setting } from 'obsidian';
 import type FirstTaskPlugin from '../main';
 import type { ExtractedTask } from '../types';
 import { t, applyDirection } from '../i18n';
-import { displayNumber, displayString } from '../utils/numberUtils';
-import { CreateTaskModal } from './CreateTaskModal';
-import { TaskDetailsModal } from './TaskDetailsModal';
+import { parseDateInput } from '../utils/jalaliDate';
+import { truncateNoteName } from '../utils/noteUtils';
+import { displayString } from '../utils/numberUtils';
 
-export const VIEW_TYPE_FIRST_TASK = 'first-task-panel';
+const NOTE_NAME_MAX = 12;
 
-export class TaskPanelView extends ItemView {
+export class TaskDetailsModal extends Modal {
     plugin: FirstTaskPlugin;
-    private visibleCount: number = 0;
+    task: ExtractedTask;
+    onDone: () => void;
+    private busy = false;
 
-    constructor(leaf: WorkspaceLeaf, plugin: FirstTaskPlugin) {
-        super(leaf);
+    private editing = false;
+    private editTitle = '';
+    private editDescription = '';
+    private editCategory = '';
+    private editDate = '';
+
+    constructor(app: App, plugin: FirstTaskPlugin, task: ExtractedTask, onDone: () => void) {
+        super(app);
         this.plugin = plugin;
+        this.task = task;
+        this.onDone = onDone;
     }
 
-    getViewType(): string { return VIEW_TYPE_FIRST_TASK; }
-    getDisplayText(): string { return t(this.plugin.settings.language, 'panel_title'); }
-    getIcon(): string { return 'check-square'; }
-
-    async onOpen(): Promise<void> {
-        this.visibleCount = this.plugin.settings.tasksPerPage;
-        this.plugin.toastManager.setRTL(this.plugin.settings.language === 'fa');
-        this.render();
-    }
-
-    async onClose(): Promise<void> {}
-
-    refresh(): void { this.render(); }
+    onOpen(): void { this.render(); }
 
     private render(): void {
         const { contentEl } = this;
-        const savedScroll = contentEl.scrollTop;
-
         contentEl.empty();
-        contentEl.addClass('first-task-panel');
-        applyDirection(contentEl, this.plugin.settings.language);
-        this.plugin.toastManager.setRTL(this.plugin.settings.language === 'fa');
+        contentEl.addClass('first-task-modal-content');
 
-        this.renderHeader(contentEl);
-        this.renderCategoryDropdown(contentEl);
-        this.renderTabs(contentEl);
-
-        if (this.plugin.settings.currentTab === 'pending') {
-            this.renderPending(contentEl);
-        } else {
-            this.renderCompleted(contentEl);
-        }
-
-        requestAnimationFrame(() => {
-            contentEl.scrollTop = savedScroll;
-        });
-    }
-
-    private renderHeader(parent: HTMLElement): void {
         const lang = this.plugin.settings.language;
-        const header = parent.createDiv({ cls: 'first-task-header' });
-        const topRow = header.createDiv({ cls: 'first-task-header-top' });
+        applyDirection(contentEl, lang);
 
-        topRow.createEl('h4', {
-            text: this.plugin.settings.currentTab === 'pending'
-                ? t(lang, 'panel_title')
-                : t(lang, 'panel_title_completed'),
-            cls: 'first-task-title',
-        });
-
-        const actions = topRow.createDiv({ cls: 'first-task-header-actions' });
-
-        const syncBtn = actions.createEl('button', { cls: 'clickable-icon' });
-        setIcon(syncBtn, 'refresh-cw');
-        syncBtn.setAttribute('aria-label', t(lang, 'panel_reload'));
-        syncBtn.onclick = () => this.handleRescan();
-
-        if (this.plugin.settings.currentTab === 'pending') {
-            const addBtn = actions.createEl('button', { cls: 'clickable-icon' });
-            setIcon(addBtn, 'plus');
-            addBtn.setAttribute('aria-label', t(lang, 'panel_new_task'));
-            addBtn.onclick = () => this.handleNewTask();
-        }
+        if (this.editing) this.renderEditMode(contentEl);
+        else this.renderViewMode(contentEl);
     }
 
-    /* ─── dropdown دسته‌بندی ─── */
-    private renderCategoryDropdown(parent: HTMLElement): void {
-        const lang = this.plugin.settings.language;
-        const cats = this.plugin.taskManager.getCategories();
-        const hasUncategorized = this.plugin.taskManager.hasTasksWithoutCategory();
-
-        const row = parent.createDiv({ cls: 'first-task-category-row' });
-        const select = row.createEl('select', { cls: 'dropdown first-task-category-select' });
-
-        /* ۱. همه */
-        select.createEl('option', {
-            value: '',
-            text: t(lang, 'panel_all_categories'),
-        });
-
-        /* ۲. بدون دسته (اگه وجود داره) */
-        if (hasUncategorized) {
-            select.createEl('option', {
-                value: 'none',
-                text: t(lang, 'panel_no_category'),
-            });
-        }
-
-        /* ۳. بقیه دسته‌ها */
-        for (const c of cats) {
-            const label = lang === 'fa' ? c.name_fa : c.name;
-            select.createEl('option', { value: c.id, text: label });
-        }
-
-        select.value = this.plugin.settings.panelCategory || '';
-        select.onchange = async () => {
-            this.plugin.settings.panelCategory = select.value;
-            await this.plugin.saveSettings();
-            this.visibleCount = this.plugin.settings.tasksPerPage;
-            this.contentEl.scrollTop = 0;
-            this.render();
-        };
-    }
-
-    /* ─── تب‌ها ─── */
-    private renderTabs(parent: HTMLElement): void {
-        const lang = this.plugin.settings.language;
-        const tabs = parent.createDiv({ cls: 'first-task-tabs' });
-
-        const currentCategory = this.plugin.settings.panelCategory || '';
-        const pendingCount = this.plugin.taskManager.getPendingByCategory(currentCategory).length;
-        const completedCount = this.plugin.taskManager.getCompletedByCategory(currentCategory).length;
-
-        const mkTab = (id: 'pending' | 'completed', icon: string, label: string, count: number) => {
-            const btn = tabs.createEl('button', {
-                cls: 'first-task-tab' + (this.plugin.settings.currentTab === id ? ' is-active' : ''),
-            });
-            setIcon(btn.createSpan({ cls: 'first-task-tab-icon' }), icon);
-            btn.createSpan({ text: ` ${label} (${displayNumber(count, lang)})` });
-            btn.onclick = async () => {
-                if (this.plugin.settings.currentTab === id) return;
-                this.plugin.settings.currentTab = id;
-                await this.plugin.saveSettings();
-                this.visibleCount = this.plugin.settings.tasksPerPage;
-                this.contentEl.scrollTop = 0;
-                this.render();
-            };
-        };
-
-        mkTab('pending', 'circle-dot', t(lang, 'tab_pending'), pendingCount);
-        mkTab('completed', 'check-circle', t(lang, 'tab_completed'), completedCount);
-    }
-
-    /* ─── تب در انتظار ─── */
-    private renderPending(parent: HTMLElement): void {
-        const lang = this.plugin.settings.language;
-        const body = parent.createDiv({ cls: 'first-task-body' });
-        const category = this.plugin.settings.panelCategory || '';
-        const tasks = this.plugin.taskManager.getPendingByCategory(category);
-
-        if (tasks.length === 0) {
-            this.renderEmpty(body, t(lang, 'panel_empty'), t(lang, 'panel_empty_hint'));
-            return;
-        }
-
-        const visible = tasks.slice(0, this.visibleCount);
-        for (const task of visible) this.renderTaskCard(body, task, false);
-
-        if (tasks.length > this.visibleCount) {
-            const remaining = tasks.length - this.visibleCount;
-            const moreBtn = body.createEl('button', {
-                cls: 'first-task-show-more',
-                text: `${t(lang, 'panel_show_more')} (${displayNumber(remaining, lang)})`,
-            });
-            moreBtn.onclick = () => {
-                this.visibleCount += this.plugin.settings.tasksPerPage;
-                this.render();
-            };
-        }
-    }
-
-    /* ─── تب انجام شده ─── */
-    private renderCompleted(parent: HTMLElement): void {
-        const lang = this.plugin.settings.language;
-        const stats = this.plugin.taskManager.getStats();
-        const statsGrid = parent.createDiv({ cls: 'first-task-stats-grid' });
-
-        const mkCard = (label: string, value: number) => {
-            const card = statsGrid.createDiv({ cls: 'first-task-stat-card' });
-            card.createDiv({ cls: 'first-task-stat-value', text: displayNumber(value, lang) });
-            card.createDiv({ cls: 'first-task-stat-label', text: label });
-        };
-
-        mkCard(t(lang, 'stats_today'), stats.today);
-        mkCard(t(lang, 'stats_yesterday'), stats.yesterday);
-        mkCard(t(lang, 'stats_this_week'), stats.this_week);
-        mkCard(t(lang, 'stats_last_month'), stats.last_month);
-        mkCard(t(lang, 'stats_this_year'), stats.this_year);
-        mkCard(t(lang, 'stats_total'), stats.total);
-
-        const body = parent.createDiv({ cls: 'first-task-body' });
-        const category = this.plugin.settings.panelCategory || '';
-        const tasks = this.plugin.taskManager.getCompletedByCategory(category);
-
-        if (tasks.length === 0) {
-            this.renderEmpty(body, t(lang, 'panel_empty_completed'), '');
-            return;
-        }
-
-        const visible = tasks.slice(0, this.visibleCount);
-        for (const task of visible) this.renderTaskCard(body, task, true);
-
-        if (tasks.length > this.visibleCount) {
-            const remaining = tasks.length - this.visibleCount;
-            const moreBtn = body.createEl('button', {
-                cls: 'first-task-show-more',
-                text: `${t(lang, 'panel_show_more')} (${displayNumber(remaining, lang)})`,
-            });
-            moreBtn.onclick = () => {
-                this.visibleCount += this.plugin.settings.tasksPerPage;
-                this.render();
-            };
-        }
-    }
-
-    /* ─── کارت تسک ─── */
-    private renderTaskCard(parent: HTMLElement, task: ExtractedTask, isCompleted: boolean): void {
+    /* ═══════════════════════════════════════════════════════
+       حالت نمایش
+       ═══════════════════════════════════════════════════════ */
+    private renderViewMode(parent: HTMLElement): void {
         const lang = this.plugin.settings.language;
         const useJalali = this.plugin.settings.useJalaliDate;
-        const pinnedClass = (task.pinned && !isCompleted) ? ' is-pinned' : '';
-        const card = parent.createDiv({ cls: 'first-task-card' + pinnedClass });
-        card.dataset.taskId = task._id;
 
-        const cbWrap = card.createDiv({ cls: 'first-task-card-checkbox' });
-        const cb = cbWrap.createEl('input', { type: 'checkbox' });
-        cb.checked = isCompleted;
-        cb.onclick = async (e) => {
-            e.stopPropagation();
-            cb.disabled = true;
-            const ok = await this.plugin.taskManager.toggleComplete(task._id);
-            if (ok) {
-                this.plugin.toastManager.show(
-                    t(lang, isCompleted ? 'notice_task_restored' : 'notice_task_completed'),
-                    'success'
-                );
-                this.render();
-            } else {
-                cb.disabled = false;
-                cb.checked = isCompleted;
-            }
-        };
+        /* ─── نام نوت مبدأ ─── */
+        if (this.plugin.settings.showNoteInModal) {
+            const noteName = this.task._source_file.split('/').pop() || this.task._source_file;
+            const truncated = truncateNoteName(noteName, NOTE_NAME_MAX);
 
-        const bodyCard = card.createDiv({ cls: 'first-task-card-body' });
-
-        const titleRow = bodyCard.createDiv({ cls: 'first-task-card-title-row' });
-        if (task.pinned && !isCompleted) {
-            const pinIcon = titleRow.createSpan({ cls: 'first-task-pin-icon' });
-            setIcon(pinIcon, 'pin');
-        }
-        titleRow.createDiv({ cls: 'first-task-card-title', text: task.title });
-
-        const meta = bodyCard.createDiv({ cls: 'first-task-card-meta' });
-
-        const dateDisplay = useJalali ? task.due_date_jalali : task.due_date_gregorian;
-        if (dateDisplay) {
-            const dateEl = meta.createSpan({ cls: 'first-task-card-date' });
-            setIcon(dateEl.createSpan({ cls: 'first-task-icon' }), 'calendar');
-            dateEl.createSpan({ text: ' ' + displayString(dateDisplay, lang) });
+            const sourceRow = parent.createDiv({ cls: 'first-task-details-source' });
+            sourceRow.createSpan({ text: '📝 ' + t(lang, 'details_source') + ': ' });
+            const link = sourceRow.createEl('a', {
+                text: truncated,
+                cls: 'first-task-source-link',
+                href: '#',
+            });
+            link.title = this.task._source_file;
+            link.onclick = (e) => {
+                e.preventDefault();
+                this.openSourceNote();
+            };
         }
 
-        if (task.category) {
-            const catEl = meta.createSpan({ cls: 'first-task-card-cat' });
-            setIcon(catEl.createSpan({ cls: 'first-task-icon' }), 'tag');
-            catEl.createSpan({
-                text: ' ' + this.plugin.taskManager.getCategoryDisplayName(task.category),
+        /* ─── باکس عنوان (readonly) ─── */
+        const titleBox = parent.createDiv({ cls: 'first-task-details-box' });
+        titleBox.createDiv({ cls: 'first-task-details-box-label', text: t(lang, 'field_title') });
+        const titleContent = titleBox.createDiv({ cls: 'first-task-details-box-content' });
+        titleContent.setText(this.task.title);
+
+        /* ─── باکس توضیحات (readonly) ─── */
+        const descBox = parent.createDiv({ cls: 'first-task-details-box' });
+        descBox.createDiv({ cls: 'first-task-details-box-label', text: t(lang, 'field_description') });
+        const descContent = descBox.createDiv({ cls: 'first-task-details-box-content' });
+        descContent.setText(this.task.description || t(lang, 'details_no_description'));
+
+        /* ─── متادیتا ─── */
+        const meta = parent.createDiv({ cls: 'first-task-details-meta' });
+
+        meta.createEl('div', {
+            text: `${t(lang, 'details_status')}: ${this.task.completed ? t(lang, 'task_done') : t(lang, 'task_pending')}`,
+        });
+
+        const createdDisplay = useJalali ? this.task.created_jalali : this.task.created_gregorian;
+        if (createdDisplay) {
+            meta.createEl('div', {
+                text: `${t(lang, 'details_created')}: ${displayString(createdDisplay, lang)}`,
             });
         }
 
-        const noteEl = meta.createSpan({ cls: 'first-task-card-note' });
-        setIcon(noteEl.createSpan({ cls: 'first-task-icon' }), 'file-text');
-        noteEl.createSpan({
-            text: ' ' + this.plugin.taskManager.getDisplayNoteName(task._source_file),
-        });
+        const dueDisplay = useJalali ? this.task.due_date_jalali : this.task.due_date_gregorian;
+        if (dueDisplay) {
+            meta.createEl('div', {
+                text: `${t(lang, 'details_due_date')}: ${displayString(dueDisplay, lang)}`,
+            });
+        }
 
-        /* ─── badge های داینامیک (فقط اگه کاربر بخواد) ─── */
-        if (!isCompleted && this.plugin.settings.showTaskBadges) {
-            const dynCats = this.plugin.taskManager.getTaskDynamicCategories(task);
-            if (dynCats.length > 0) {
-                const badgesRow = bodyCard.createDiv({ cls: 'first-task-card-badges' });
-                for (const c of dynCats) {
-                    const badge = badgesRow.createSpan({
-                        cls: `first-task-dynamic-badge first-task-dynamic-${c}`,
-                    });
-                    badge.setText(t(lang, `category_${c}` as any));
-                }
+        const completedDisplay = useJalali ? this.task.completed_jalali : this.task.completed_gregorian;
+        if (completedDisplay) {
+            meta.createEl('div', {
+                text: `${t(lang, 'details_completed')}: ${displayString(completedDisplay, lang)}`,
+            });
+        }
+
+        if (this.task.category) {
+            const catName = this.plugin.taskManager.getCategoryDisplayName(this.task.category);
+            meta.createEl('div', {
+                text: `${t(lang, 'details_category')}: ${catName}`,
+            });
+        }
+
+        /* ─── دسته‌های داینامیک ─── */
+        const dynCats = this.plugin.taskManager.getTaskDynamicCategories(this.task);
+        if (dynCats.length > 0) {
+            const dynRow = meta.createDiv({ cls: 'first-task-details-dynamic' });
+            dynRow.createSpan({ text: t(lang, 'details_dynamic_categories') + ': ' });
+            for (const c of dynCats) {
+                const badge = dynRow.createSpan({
+                    cls: `first-task-dynamic-badge first-task-dynamic-${c}`,
+                });
+                badge.setText(t(lang, `category_${c}` as any));
             }
         }
 
-        bodyCard.onclick = () => {
-            new TaskDetailsModal(this.app, this.plugin, task, () => this.render()).open();
-        };
+        this.renderButtons(parent);
     }
 
-    private renderEmpty(parent: HTMLElement, title: string, hint: string): void {
-        const empty = parent.createDiv({ cls: 'first-task-empty' });
-        empty.createEl('p', { text: title, cls: 'first-task-empty-title' });
-        if (hint) empty.createEl('p', { text: hint, cls: 'first-task-empty-hint' });
-    }
-
-    private async handleRescan(): Promise<void> {
+    /* ═══════════════════════════════════════════════════════
+       دکمه‌های داینامیک
+       ─ در انتظار:
+           [ویرایش] [پین/آنپین] [حذف]
+           [       انجام شد       ]
+       ─ انجام شده:
+           [ویرایش] [حذف]
+           [    برگرداندن    ]
+       ═══════════════════════════════════════════════════════ */
+    private renderButtons(parent: HTMLElement): void {
         const lang = this.plugin.settings.language;
-        this.plugin.toastManager.show(t(lang, 'panel_reloading'), 'info', 1500);
-        try {
-            await this.plugin.taskManager.rescanAll();
-            this.visibleCount = this.plugin.settings.tasksPerPage;
-            this.plugin.toastManager.show(t(lang, 'notice_rescan_ok'), 'success');
+        const container = parent.createDiv({ cls: 'first-task-action-container' });
+
+        if (!this.task.completed) {
+            const topRow = container.createDiv({ cls: 'first-task-action-row' });
+
+            const editBtn = topRow.createEl('button', {
+                text: t(lang, 'btn_edit'),
+                cls: 'first-task-action-btn',
+            });
+            editBtn.onclick = () => this.startEdit();
+
+            const pinBtn = topRow.createEl('button', {
+                text: this.task.pinned ? t(lang, 'btn_unpin') : t(lang, 'btn_pin'),
+                cls: 'first-task-action-btn',
+            });
+            pinBtn.onclick = () => this.handleTogglePin();
+
+            const delBtn = topRow.createEl('button', {
+                text: t(lang, 'btn_delete'),
+                cls: 'first-task-action-btn mod-warning',
+            });
+            delBtn.onclick = () => this.handleDelete();
+
+            const bottomRow = container.createDiv({ cls: 'first-task-action-row' });
+            const doneBtn = bottomRow.createEl('button', {
+                text: t(lang, 'btn_mark_done'),
+                cls: 'first-task-action-btn mod-cta first-task-action-btn-full',
+            });
+            doneBtn.onclick = () => this.handleToggleComplete();
+        } else {
+            const topRow = container.createDiv({ cls: 'first-task-action-row' });
+
+            const editBtn = topRow.createEl('button', {
+                text: t(lang, 'btn_edit'),
+                cls: 'first-task-action-btn',
+            });
+            editBtn.onclick = () => this.startEdit();
+
+            const delBtn = topRow.createEl('button', {
+                text: t(lang, 'btn_delete'),
+                cls: 'first-task-action-btn mod-warning',
+            });
+            delBtn.onclick = () => this.handleDelete();
+
+            const bottomRow = container.createDiv({ cls: 'first-task-action-row' });
+            const restoreBtn = bottomRow.createEl('button', {
+                text: t(lang, 'btn_mark_pending'),
+                cls: 'first-task-action-btn mod-cta first-task-action-btn-full',
+            });
+            restoreBtn.onclick = () => this.handleToggleComplete();
+        }
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       حالت ویرایش
+       ═══════════════════════════════════════════════════════ */
+    private startEdit(): void {
+        const useJalali = this.plugin.settings.useJalaliDate;
+        this.editing = true;
+        this.editTitle = this.task.title;
+        this.editDescription = this.task.description;
+        this.editCategory = this.task.category;
+        this.editDate = useJalali ? this.task.due_date_jalali : this.task.due_date_gregorian;
+        this.render();
+    }
+
+    private renderEditMode(parent: HTMLElement): void {
+        const lang = this.plugin.settings.language;
+        const useJalali = this.plugin.settings.useJalaliDate;
+
+        parent.createEl('h3', {
+            text: t(lang, 'edit_title'),
+            cls: 'first-task-modal-title',
+        });
+
+        new Setting(parent)
+            .setName(t(lang, 'field_title'))
+            .addText(text => {
+                text.setValue(this.editTitle);
+                text.onChange(v => { this.editTitle = v; });
+            });
+
+        new Setting(parent)
+            .setName(t(lang, 'field_description'))
+            .addTextArea(ta => {
+                ta.setValue(this.editDescription);
+                ta.inputEl.rows = 4;
+                ta.inputEl.style.width = '100%';
+                ta.onChange(v => { this.editDescription = v; });
+            });
+
+        new Setting(parent)
+            .setName(t(lang, 'field_due_date'))
+            .addText(text => {
+                text.setValue(displayString(this.editDate, lang));
+                text.inputEl.dir = 'ltr';
+                text.setPlaceholder(useJalali ? '1405/07/25' : '2026-10-15');
+                text.onChange(v => { this.editDate = v; });
+            });
+
+        if (this.plugin.settings.enableCategories) {
+            const cats = this.plugin.taskManager.getCategories();
+            new Setting(parent)
+                .setName(t(lang, 'field_category'))
+                .addDropdown(dd => {
+                    dd.addOption('', t(lang, 'panel_no_category'));
+                    for (const c of cats) {
+                        const label = lang === 'fa' ? c.name_fa : c.name;
+                        dd.addOption(c.id, label);
+                    }
+                    dd.setValue(this.editCategory);
+                    dd.onChange(v => { this.editCategory = v; });
+                });
+        }
+
+        const actions = parent.createDiv({ cls: 'first-task-modal-buttons' });
+        const cancelBtn = actions.createEl('button', { text: t(lang, 'btn_cancel') });
+        cancelBtn.onclick = () => {
+            this.editing = false;
             this.render();
-        } catch (e: any) {
+        };
+        const saveBtn = actions.createEl('button', {
+            text: t(lang, 'btn_save'),
+            cls: 'mod-cta',
+        });
+        saveBtn.onclick = () => this.handleSave();
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       اکشن‌ها
+       ═══════════════════════════════════════════════════════ */
+    private async handleTogglePin(): Promise<void> {
+        if (this.busy) return;
+        this.busy = true;
+
+        const lang = this.plugin.settings.language;
+        const res = await this.plugin.taskManager.togglePin(this.task._id);
+
+        if (res.ok) {
             this.plugin.toastManager.show(
-                t(lang, 'notice_rescan_failed', { error: e?.message || 'unknown' }),
+                t(lang, res.pinned ? 'notice_task_pinned' : 'notice_task_unpinned'),
+                'success'
+            );
+            this.onDone();
+            this.close();
+        } else {
+            this.busy = false;
+        }
+    }
+
+    private async handleToggleComplete(): Promise<void> {
+        if (this.busy) return;
+        this.busy = true;
+
+        const lang = this.plugin.settings.language;
+        const wasCompleted = this.task.completed;
+        const ok = await this.plugin.taskManager.toggleComplete(this.task._id);
+
+        if (ok) {
+            this.plugin.toastManager.show(
+                t(lang, wasCompleted ? 'notice_task_restored' : 'notice_task_completed'),
+                'success'
+            );
+            this.onDone();
+            this.close();
+        } else {
+            this.busy = false;
+        }
+    }
+
+    private async handleSave(): Promise<void> {
+        if (this.busy) return;
+        const lang = this.plugin.settings.language;
+        const useJalali = this.plugin.settings.useJalaliDate;
+
+        if (!this.editTitle.trim()) {
+            this.plugin.toastManager.show(t(lang, 'notice_no_title'), 'warning');
+            return;
+        }
+
+        let dueJalali = '';
+        let dueGregorian = '';
+        let dueTs = 0;
+
+        if (this.editDate.trim()) {
+            const parsed = parseDateInput(this.editDate, useJalali);
+            if (!parsed) {
+                this.plugin.toastManager.show(t(lang, 'notice_invalid_date'), 'warning');
+                return;
+            }
+            dueJalali = parsed.jalali;
+            dueGregorian = parsed.gregorian;
+            dueTs = parsed.ts;
+        }
+
+        this.busy = true;
+
+        const ok = await this.plugin.taskManager.updateTaskFull(this.task._id, {
+            title: this.editTitle.trim(),
+            description: this.editDescription.trim(),
+            category: this.editCategory,
+            dueDateJalali: dueJalali,
+            dueDateGregorian: dueGregorian,
+            dueDateTs: dueTs,
+        });
+
+        if (ok) {
+            this.plugin.toastManager.show(t(lang, 'notice_task_updated'), 'success');
+            this.onDone();
+            this.close();
+        } else {
+            this.busy = false;
+            this.plugin.toastManager.show(
+                lang === 'fa' ? 'ویرایش ناموفق' : 'Update failed',
                 'error'
             );
         }
     }
 
-    private handleNewTask(): void {
-        new CreateTaskModal(this.app, this.plugin, () => this.render()).open();
+    private async handleDelete(): Promise<void> {
+        if (this.busy) return;
+        const lang = this.plugin.settings.language;
+
+        if (!window.confirm(t(lang, 'confirm_delete_body'))) return;
+
+        this.busy = true;
+        const ok = await this.plugin.taskManager.deleteTask(this.task._id);
+
+        if (ok) {
+            this.plugin.toastManager.show(t(lang, 'notice_task_deleted'), 'success');
+            this.onDone();
+            this.close();
+        } else {
+            this.busy = false;
+        }
     }
+
+    private async openSourceNote(): Promise<void> {
+        try {
+            await this.plugin.app.workspace.openLinkText(this.task._source_file, '');
+            this.close();
+        } catch (e) {
+            console.warn('[First Task] Could not open note:', e);
+        }
+    }
+
+    onClose(): void { this.contentEl.empty(); }
 }
