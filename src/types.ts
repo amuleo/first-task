@@ -2,7 +2,6 @@
    📦 تایپ‌های First Task v0.1.2
    ════════════════════════════════════════════════════════════ */
 
-/* ───── تسک استخراج‌شده ───── */
 export interface ExtractedTask {
     title: string;
     completed: boolean;
@@ -21,9 +20,9 @@ export interface ExtractedTask {
     _id: string;
     _source_file: string;
     _source_line: number;
+    _occurrence: number;   /* 🆕 شماره تکرار عنوان توی فایل */
 }
 
-/* ───── ورودی ایندکس ───── */
 export interface TaskIndexEntry {
     description: string;
     category: string;
@@ -54,7 +53,6 @@ export const DEFAULT_ENTRY: TaskIndexEntry = {
     completed_ts: 0,
 };
 
-/* ───── فایل‌های کش ───── */
 export interface TaskIndexFile {
     version: number;
     last_updated: number;
@@ -72,7 +70,6 @@ export interface FileCacheFile {
     files: Record<string, FileCacheEntry>;
 }
 
-/* ───── دسته‌بندی ───── */
 export interface CategoryDef {
     id: string;
     name: string;
@@ -99,7 +96,6 @@ export const DEFAULT_CATEGORIES: CategoriesFile = {
     ],
 };
 
-/* ───── آمار ───── */
 export interface CompletedStats {
     today: number;
     yesterday: number;
@@ -120,7 +116,6 @@ export interface CategoryStats {
     all: number;
 }
 
-/* ───── تنظیمات ───── */
 export interface DynamicCategorySettings {
     tomorrow: boolean;
     this_week: boolean;
@@ -131,7 +126,7 @@ export interface DynamicCategorySettings {
 export type Language = 'en' | 'fa';
 export type TabType = 'pending' | 'completed';
 export type PlannerCard = 'past' | 'today' | 'tomorrow' | 'this_week' | 'this_month' | 'this_year' | 'no_date' | 'all';
-export type WeekStartDay = 0 | 1 | 2 | 3 | 4 | 5 | 6;  /* 0=Sunday, 6=Saturday */
+export type WeekStartDay = 0 | 1 | 6;  /* 0=Sunday, 1=Monday, 6=Saturday */
 
 export interface PlannerCardsVisibility {
     past: boolean;
@@ -164,7 +159,7 @@ export const DEFAULT_SETTINGS: FirstTaskSettings = {
     language: 'en',
     useJalaliDate: false,
     tasksPerPage: 20,
-    weekStartDay: 6,              /* شنبه */
+    weekStartDay: 6,
     includeFolders: [],
     excludeFolders: ['.obsidian', 'FirstTask', '.trash'],
     onlyMarkdown: true,
