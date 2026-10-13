@@ -1,8 +1,8 @@
 /* ════════════════════════════════════════════════════════════
    ➕ مودال ساخت تسک — v0.1.2
-   ✅ Suggest هوشمند نوت (active + mtime + محدودیت پوشه)
-   ✅ Suggest هوشمند تاریخ
-   ✅ اعداد داینامیک
+   ✅ NoteSuggest هوشمند (active + mtime + محدودیت پوشه)
+   ✅ DateSuggest پیشرفته
+   ✅ اعداد فارسی داینامیک روی انتخاب‌ها
    ════════════════════════════════════════════════════════════ */
 
 import {
@@ -16,9 +16,9 @@ import { displayString } from '../utils/numberUtils';
 import { DateSuggest } from './DateSuggest';
 
 /* ═══════════════════════════════════════════════════════
-   🎯 Suggest هوشمند نوت
+   🎯 NoteSuggest هوشمند
    ✅ نوت فعلی اول
-   ✅ اگه یه پوشه بیشتر از ۱۰ نوت داره → فقط ۷ تای آخر
+   ✅ اگه پوشه‌ای > ۱۰ نوت داره → فقط ۷ تای آخر
    ═══════════════════════════════════════════════════════ */
 class NoteSuggest extends AbstractInputSuggest<TFile> {
     private plugin: FirstTaskPlugin;
@@ -50,45 +50,34 @@ class NoteSuggest extends AbstractInputSuggest<TFile> {
         }
 
         /* ─── فیلتر: اگه پوشه‌ای > ۱۰ نوت داره، فقط ۷ تای آخر ─── */
-        const filtered: TFile[] = [];
-        for (const [folder, folderFiles] of byFolder.entries()) {
-            /* مرتب بر اساس mtime */
+        const processed: TFile[] = [];
+        for (const [, folderFiles] of byFolder.entries()) {
             const sorted = [...folderFiles].sort((a, b) => b.stat.mtime - a.stat.mtime);
 
             if (sorted.length > 10) {
-                /* فقط ۷ تای آخر — مگر اینکه فایل active باشه */
-                for (const f of sorted) {
-                    if (f.path === activePath) {
-                        filtered.push(f);
-                    } else if (filtered.length < 7 + (activePath ? 1 : 0)) {
-                        if (sorted.indexOf(f) < 7) filtered.push(f);
-                    }
+                /* ۷ تای آخر + active در صورت وجود */
+                const toShow = sorted.slice(0, 7);
+                const active = sorted.find(f => f.path === activePath);
+                if (active && !toShow.find(f => f.path === active.path)) {
+                    toShow.unshift(active);
                 }
-                /* پاکسازی تکراری */
-                const seen = new Set<string>();
-                const unique = filtered.filter(f => {
-                    if (seen.has(f.path)) return false;
-                    seen.add(f.path);
-                    return true;
-                });
-                filtered.length = 0;
-                filtered.push(...unique);
+                processed.push(...toShow);
             } else {
-                filtered.push(...sorted);
+                processed.push(...sorted);
             }
         }
 
         /* ─── مرتب‌سازی نهایی: active اول، بعد mtime ─── */
-        const sorted = filtered.sort((a, b) => {
+        const finalSorted = processed.sort((a, b) => {
             if (a.path === activePath) return -1;
             if (b.path === activePath) return 1;
             return b.stat.mtime - a.stat.mtime;
         });
 
         /* ─── فیلتر بر اساس query ─── */
-        let result = sorted;
+        let result = finalSorted;
         if (lowerQuery) {
-            result = sorted.filter(f => f.path.toLowerCase().includes(lowerQuery));
+            result = finalSorted.filter(f => f.path.toLowerCase().includes(lowerQuery));
         }
 
         return result.slice(0, 20);
@@ -119,7 +108,7 @@ class NoteSuggest extends AbstractInputSuggest<TFile> {
 }
 
 /* ═══════════════════════════════════════════════════════
-   ➕ مودال
+   ➕ مودال ساخت تسک
    ═══════════════════════════════════════════════════════ */
 export class CreateTaskModal extends Modal {
     plugin: FirstTaskPlugin;
@@ -133,6 +122,9 @@ export class CreateTaskModal extends Modal {
     private fileInputEl: HTMLInputElement | null = null;
     private sourceFile: string = '';
 
+    /* ─── تاریخ واقعی (همیشه میلادی-ISO داخلی) ─── */
+    private dateValue: string = '';
+
     constructor(app: App, plugin: FirstTaskPlugin, onDone: () => void) {
         super(app);
         this.plugin = plugin;
@@ -145,6 +137,7 @@ export class CreateTaskModal extends Modal {
         contentEl.addClass('first-task-modal-content');
 
         const lang = this.plugin.settings.language;
+        const useJalali = this.plugin.settings.useJalaliDate;
         applyDirection(contentEl, lang);
 
         contentEl.createEl('h3', {
@@ -171,21 +164,31 @@ export class CreateTaskModal extends Modal {
                 ta.inputEl.style.width = '100%';
             });
 
-        /* ─── تاریخ با Suggest ─── */
-        const dateSetting = new Setting(contentEl).setName(t(lang, 'field_due_date'));
-        dateSetting.addText(text => {
-            this.dateComponent = text;
-            const useJalali = this.plugin.settings.useJalaliDate;
-            const today = getTodayDateInput(useJalali);
-            text.setValue(displayString(today, lang));
-            text.inputEl.dir = 'ltr';
-            text.setPlaceholder(useJalali ? '1405/07/25' : '2026-10-15');
+        /* ─── تاریخ با DateSuggest ─── */
+        const todayDisplay = getTodayDateInput(useJalali);
+        this.dateValue = todayDisplay;
 
-            /* 🆕 Date Suggest */
-            new DateSuggest(this.app, text.inputEl, this.plugin, (dateStr) => {
-                text.setValue(displayString(dateStr, lang));
+        new Setting(contentEl)
+            .setName(t(lang, 'field_due_date'))
+            .addText(text => {
+                this.dateComponent = text;
+                text.setValue(displayString(todayDisplay, lang));
+                text.inputEl.dir = 'ltr';
+                text.setPlaceholder(useJalali ? '1405/07/25' : '2026-10-15');
+
+                /* 🆕 Date Suggest */
+                new DateSuggest(this.app, text.inputEl, this.plugin, (dateStr) => {
+                    /* dateStr همیشه با اعداد انگلیسیه */
+                    this.dateValue = dateStr;
+                    text.setValue(displayString(dateStr, lang));
+                });
+
+                /* ─── کاربر خودش تایپ می‌کنه ─── */
+                text.onChange(v => {
+                    /* ذخیره مقدار خام (با اعداد فارسی یا انگلیسی) */
+                    this.dateValue = v.trim();
+                });
             });
-        });
 
         /* ─── دسته‌بندی ─── */
         if (this.plugin.settings.enableCategories) {
@@ -207,22 +210,21 @@ export class CreateTaskModal extends Modal {
         const files = this.plugin.taskManager.getScannableFiles();
         this.sourceFile = this.getSmartDefaultFile(files);
 
-        const sourceSetting = new Setting(contentEl)
+        new Setting(contentEl)
             .setName(t(lang, 'field_source_file'))
-            .setDesc(t(lang, 'field_source_file_hint'));
+            .setDesc(t(lang, 'field_source_file_hint'))
+            .addText(text => {
+                this.fileInputEl = text.inputEl;
+                text.setValue(this.sourceFile);
+                text.inputEl.style.width = '100%';
 
-        sourceSetting.addText(text => {
-            this.fileInputEl = text.inputEl;
-            text.setValue(this.sourceFile);
-            text.inputEl.style.width = '100%';
+                new NoteSuggest(this.app, text.inputEl, this.plugin, (file) => {
+                    this.sourceFile = file.path;
+                    text.setValue(file.path);
+                });
 
-            new NoteSuggest(this.app, text.inputEl, this.plugin, (file) => {
-                this.sourceFile = file.path;
-                text.setValue(file.path);
+                text.onChange(v => { this.sourceFile = v.trim(); });
             });
-
-            text.onChange(v => { this.sourceFile = v.trim(); });
-        });
 
         /* ─── دکمه‌ها ─── */
         const btnRow = contentEl.createDiv({ cls: 'first-task-modal-buttons-stack' });
@@ -237,36 +239,49 @@ export class CreateTaskModal extends Modal {
         save.onclick = () => this.submit();
     }
 
+    /* ═══════════════════════════════════════════════════════
+       🎯 انتخاب نوت پیش‌فرض هوشمند
+       ═══════════════════════════════════════════════════════ */
     private getSmartDefaultFile(files: TFile[]): string {
         if (files.length === 0) return '';
 
+        /* ۱. نوت فعلی */
         const activeFile = this.app.workspace.getActiveFile();
         if (activeFile && activeFile.extension === 'md') {
             const exists = files.find(f => f.path === activeFile.path);
             if (exists) return activeFile.path;
         }
 
+        /* ۲. آخرین نوت باز شده */
         const lastOpen = this.app.workspace.getLastOpenFiles();
         for (const path of lastOpen) {
             const found = files.find(f => f.path === path);
             if (found) return found.path;
         }
 
+        /* ۳. inbox.md */
         const inbox = files.find(f => /(^|\/)inbox\.md$/i.test(f.path));
         if (inbox) return inbox.path;
 
+        /* ۴. جدیدترین */
         const sorted = [...files].sort((a, b) => b.stat.mtime - a.stat.mtime);
         return sorted[0]?.path || '';
     }
 
+    /* ═══════════════════════════════════════════════════════
+       ارسال
+       ═══════════════════════════════════════════════════════ */
     private async submit(): Promise<void> {
         if (this.submitting) return;
         const lang = this.plugin.settings.language;
+        const useJalali = this.plugin.settings.useJalaliDate;
 
         const title = (this.titleComponent?.inputEl.value ?? '').trim();
         const description = (this.descriptionComponent?.inputEl.value ?? '').trim();
-        const dateInput = (this.dateComponent?.inputEl.value ?? '').trim();
         const category = this.categoryComponent?.getValue() ?? '';
+
+        /* ─── تاریخ: همیشه از dateValue استفاده کن ─── */
+        const dateInput = (this.dateValue || (this.dateComponent?.inputEl.value ?? '')).trim();
 
         if (!title) {
             this.plugin.toastManager.show(t(lang, 'notice_no_title'), 'warning');
@@ -279,12 +294,13 @@ export class CreateTaskModal extends Modal {
             return;
         }
 
+        /* ─── پارس تاریخ ─── */
         let dueJalali = '';
         let dueGregorian = '';
         let dueTs = 0;
 
         if (dateInput) {
-            const parsed = parseDateInput(dateInput, this.plugin.settings.useJalaliDate);
+            const parsed = parseDateInput(dateInput, useJalali);
             if (!parsed) {
                 this.plugin.toastManager.show(t(lang, 'notice_invalid_date'), 'warning');
                 return;
