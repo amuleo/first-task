@@ -157,6 +157,11 @@ const en = {
     bulk_select_all: 'Select all',
     bulk_clear_selection: 'Clear',
 
+    bulk_field_completed: 'Change status',
+    bulk_completed_value: 'Status',
+    bulk_completed_on: 'Mark as done',
+    bulk_completed_off: 'Restore',
+
     bulk_field_category: 'Change category',
     bulk_field_date: 'Change due date',
     bulk_field_pin: 'Change pin status',
@@ -338,6 +343,11 @@ const fa: typeof en = {
     bulk_apply: 'اعمال',
     bulk_select_all: 'انتخاب همه',
     bulk_clear_selection: 'پاک کردن',
+
+    bulk_field_completed: 'تغییر وضعیت',
+    bulk_completed_value: 'وضعیت',
+    bulk_completed_on: 'انجام شد',
+    bulk_completed_off: 'برگرداندن',
 
     bulk_field_category: 'تغییر دسته‌بندی',
     bulk_field_date: 'تغییر تاریخ انجام',
