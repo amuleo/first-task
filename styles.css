@@ -1,5 +1,8 @@
 /* ════════════════════════════════════════════════════════════
-   🎨 استایل‌های First Task v0.1.2
+   🎨 First Task — Style Sheet v0.1.2
+   ✅ Standard, clean, RTL-friendly
+   ✅ Toggle flip in RTL (settings + modals)
+   ✅ No broken layout
    ════════════════════════════════════════════════════════════ */
 
 /* ═══════════════════════════════════════════════════════════
@@ -24,9 +27,11 @@
     visibility: visible !important;
     opacity: 1 !important;
 }
+
 .first-task-toast-container.first-task-toast-rtl {
     direction: rtl !important;
 }
+
 .first-task-toast {
     display: block !important;
     width: 100% !important;
@@ -47,13 +52,19 @@
     transform: translateY(-20px);
     transition: opacity 0.25s ease, transform 0.25s ease;
 }
-.first-task-toast.is-visible { opacity: 1; transform: translateY(0); }
+
+.first-task-toast.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
 .first-task-toast.is-exiting {
     opacity: 0 !important;
     transform: translateY(-12px) scale(0.95) !important;
     transition: opacity 0.25s ease, transform 0.25s ease !important;
     pointer-events: none !important;
 }
+
 .first-task-toast-success { border-inline-start: 4px solid #2ecc71; }
 .first-task-toast-error   { border-inline-start: 4px solid #e74c3c; }
 .first-task-toast-warning { border-inline-start: 4px solid #f1c40f; }
@@ -61,7 +72,7 @@
 .first-task-toast:hover { background: var(--background-secondary-alt); }
 
 /* ═══════════════════════════════════════════════════════════
-   📋 پنل
+   📋 Panel
    ═══════════════════════════════════════════════════════════ */
 .first-task-panel {
     padding: 10px 12px;
@@ -70,33 +81,38 @@
     height: 100%;
     overflow-y: auto;
 }
+
 .first-task-header { margin-bottom: 10px; }
+
 .first-task-header-top {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 8px;
 }
+
 .first-task-title {
     margin: 0;
     font-size: var(--font-ui-medium);
     font-weight: 700;
     color: var(--text-normal);
 }
+
 .first-task-header-actions { display: flex; gap: 2px; }
 
-/* ─── dropdown دسته‌بندی ─── */
+/* ─── Category dropdown ─── */
 .first-task-category-row {
     display: flex;
     gap: 6px;
     margin-bottom: 10px;
 }
+
 .first-task-category-select {
     flex: 1;
     width: 100%;
 }
 
-/* ─── تب‌ها ─── */
+/* ─── Tabs ─── */
 .first-task-tabs {
     display: flex;
     gap: 4px;
@@ -105,6 +121,7 @@
     background: var(--background-secondary);
     border-radius: 8px;
 }
+
 .first-task-tab {
     flex: 1;
     display: flex;
@@ -122,17 +139,20 @@
     transition: all 0.15s ease;
     box-shadow: none;
 }
+
 .first-task-tab:hover { color: var(--text-normal); }
+
 .first-task-tab.is-active {
     background: var(--background-primary);
     color: var(--text-accent);
     font-weight: 600;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
+
 .first-task-tab-icon svg { width: 14px; height: 14px; }
 
 /* ═══════════════════════════════════════════════════════════
-   📊 کارت‌های آماری
+   📊 Stats cards
    ═══════════════════════════════════════════════════════════ */
 .first-task-stats-grid {
     display: grid;
@@ -140,6 +160,7 @@
     gap: 6px;
     margin-bottom: 8px;
 }
+
 .first-task-stat-card {
     display: flex;
     flex-direction: column;
@@ -151,6 +172,7 @@
     border-radius: 8px;
     transition: all 0.15s ease;
 }
+
 .first-task-stat-value {
     font-size: 20px;
     font-weight: 700;
@@ -158,6 +180,7 @@
     line-height: 1.1;
     font-variant-numeric: tabular-nums;
 }
+
 .first-task-stat-label {
     font-size: 10.5px;
     color: var(--text-muted);
@@ -166,16 +189,18 @@
 }
 
 /* ═══════════════════════════════════════════════════════════
-   📅 Planner
+   📅 Planner cards
    ═══════════════════════════════════════════════════════════ */
 .first-task-planner-stat-card {
     cursor: pointer;
     user-select: none;
 }
+
 .first-task-planner-stat-card:hover {
     transform: translateY(-1px);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
+
 .first-task-planner-stat-card.is-active {
     border-color: var(--interactive-accent);
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
@@ -227,18 +252,20 @@
     align-items: center;
     gap: 6px;
 }
+
 .first-task-planner-tasks-title {
     font-size: var(--font-ui-small);
     font-weight: 600;
     color: var(--text-muted);
 }
+
 .first-task-planner-tasks-count {
     font-size: var(--font-ui-smaller);
     color: var(--text-faint);
 }
 
 /* ═══════════════════════════════════════════════════════════
-   📋 لیست تسک‌ها
+   📋 Task list
    ═══════════════════════════════════════════════════════════ */
 .first-task-body {
     display: flex;
@@ -246,6 +273,7 @@
     gap: 6px;
     flex: 1;
 }
+
 .first-task-card {
     display: flex;
     align-items: flex-start;
@@ -257,16 +285,17 @@
     cursor: pointer;
     transition: border-color 0.15s ease, background 0.15s ease;
 }
+
 .first-task-card:hover {
     border-color: var(--interactive-accent);
     background: var(--background-secondary-alt);
 }
+
 .first-task-card.is-pinned {
     border-inline-start: 3px solid var(--interactive-accent);
     background: var(--background-secondary-alt);
 }
 
-/* 🆕 حالت انتخاب */
 .first-task-card.is-selected {
     border-color: var(--interactive-accent) !important;
     background: var(--background-modifier-active-hover) !important;
@@ -279,20 +308,25 @@
     padding-top: 2px;
     flex-shrink: 0;
 }
+
 .first-task-card-body { flex: 1; min-width: 0; }
+
 .first-task-card-title-row {
     display: flex;
     align-items: center;
     gap: 6px;
     margin-bottom: 4px;
 }
+
 .first-task-pin-icon {
     display: inline-flex;
     align-items: center;
     color: var(--text-accent);
     flex-shrink: 0;
 }
+
 .first-task-pin-icon svg { width: 13px; height: 13px; }
+
 .first-task-card-title {
     font-size: var(--font-ui-small);
     font-weight: 500;
@@ -300,6 +334,7 @@
     word-wrap: break-word;
     line-height: 1.4;
 }
+
 .first-task-card-meta {
     display: flex;
     flex-wrap: wrap;
@@ -307,6 +342,7 @@
     font-size: var(--font-ui-smaller);
     color: var(--text-muted);
 }
+
 .first-task-card-date,
 .first-task-card-cat,
 .first-task-card-note {
@@ -314,15 +350,17 @@
     align-items: center;
     gap: 3px;
 }
+
 .first-task-icon svg { width: 12px; height: 12px; }
 
-/* ─── badge های داینامیک ─── */
+/* ─── Dynamic badges ─── */
 .first-task-card-badges {
     display: flex;
     flex-wrap: wrap;
     gap: 4px;
     margin-top: 6px;
 }
+
 .first-task-dynamic-badge {
     display: inline-flex;
     align-items: center;
@@ -333,29 +371,32 @@
     line-height: 1.4;
     white-space: nowrap;
 }
+
 .first-task-dynamic-today { background-color: rgba(46, 204, 113, 0.18); color: #27ae60; }
 .first-task-dynamic-tomorrow { background-color: rgba(52, 152, 219, 0.18); color: #2980b9; }
 .first-task-dynamic-this_week { background-color: rgba(155, 89, 182, 0.18); color: #8e44ad; }
 .first-task-dynamic-this_month { background-color: rgba(241, 196, 15, 0.18); color: #d4ac0d; }
 .first-task-dynamic-this_year { background-color: rgba(230, 126, 34, 0.18); color: #d35400; }
 
-/* ─── حالت خالی ─── */
+/* ─── Empty state ─── */
 .first-task-empty {
     text-align: center;
     padding: 40px 20px;
     color: var(--text-muted);
 }
+
 .first-task-empty-title {
     font-size: var(--font-ui-medium);
     font-weight: 500;
     margin-bottom: 4px;
 }
+
 .first-task-empty-hint {
     font-size: var(--font-ui-smaller);
     opacity: 0.8;
 }
 
-/* ─── دکمه نمایش بیشتر ─── */
+/* ─── Show more ─── */
 .first-task-show-more {
     padding: 9px;
     margin-top: 4px;
@@ -367,6 +408,7 @@
     font-size: var(--font-ui-smaller);
     transition: all 0.15s ease;
 }
+
 .first-task-show-more:hover {
     border-color: var(--interactive-accent);
     color: var(--text-accent);
@@ -374,7 +416,7 @@
 }
 
 /* ═══════════════════════════════════════════════════════════
-   🆕 نوار انتخاب گروهی
+   🆕 Selection bar (bulk operations)
    ═══════════════════════════════════════════════════════════ */
 .first-task-selection-bar {
     display: flex;
@@ -390,17 +432,20 @@
     bottom: 0;
     z-index: 10;
 }
+
 .first-task-selection-count {
     font-size: var(--font-ui-small);
     font-weight: 600;
     color: var(--text-normal);
     white-space: nowrap;
 }
+
 .first-task-selection-actions {
     display: flex;
     gap: 6px;
     flex-wrap: wrap;
 }
+
 .first-task-selection-btn {
     display: inline-flex;
     align-items: center;
@@ -415,46 +460,41 @@
     background: var(--background-primary);
     color: var(--text-normal);
 }
+
 .first-task-selection-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
 }
+
 .first-task-selection-btn:not(:disabled):hover {
     background: var(--background-secondary-alt);
 }
+
 .first-task-selection-btn.mod-cta:not(:disabled) {
     background: var(--interactive-accent);
     color: var(--text-on-accent);
     border-color: var(--interactive-accent);
 }
+
 .first-task-selection-btn.mod-warning:not(:disabled) {
     background: var(--color-red, #e74c3c);
     color: white;
     border-color: var(--color-red, #e74c3c);
 }
+
 .first-task-selection-icon svg {
     width: 13px;
     height: 13px;
 }
 
-/* ─── خلاصه توی مودال ویرایش گروهی ─── */
-.first-task-bulk-summary {
-    padding: 8px 12px;
-    margin-bottom: 12px;
-    background: var(--background-secondary);
-    border-radius: 6px;
-    font-size: var(--font-ui-smaller);
-    color: var(--text-muted);
-    text-align: center;
-}
-
 /* ═══════════════════════════════════════════════════════════
-   🪟 مودال‌ها
+   🪟 Modals
    ═══════════════════════════════════════════════════════════ */
 .first-task-modal-content {
-    padding-top: 16px;
+    padding-top: 12px;
     padding-bottom: 8px;
 }
+
 .first-task-modal-title {
     margin: 0 0 16px 0 !important;
     padding: 0 !important;
@@ -465,16 +505,18 @@
     line-height: 1.4;
 }
 
-/* ─── باکس‌های readonly ─── */
+/* ─── Readonly boxes ─── */
 .first-task-details-box {
     margin-bottom: 12px;
 }
+
 .first-task-details-box-label {
     font-size: var(--font-ui-smaller);
     font-weight: 600;
     color: var(--text-muted);
     margin-bottom: 4px;
 }
+
 .first-task-details-box-content {
     padding: 8px 12px;
     background: var(--background-secondary);
@@ -496,12 +538,14 @@
     font-size: var(--font-ui-smaller);
     color: var(--text-muted);
 }
+
 .first-task-source-link {
     color: var(--text-accent) !important;
     text-decoration: none;
     border-bottom: 1px dashed var(--text-accent);
     cursor: pointer;
 }
+
 .first-task-source-link:hover { border-bottom-style: solid; }
 
 .first-task-details-meta {
@@ -515,6 +559,7 @@
     background: var(--background-secondary);
     border-radius: 6px;
 }
+
 .first-task-details-dynamic {
     display: flex;
     flex-wrap: wrap;
@@ -523,8 +568,19 @@
     margin-top: 4px;
 }
 
+/* ─── Bulk edit summary ─── */
+.first-task-bulk-summary {
+    padding: 8px 12px;
+    margin-bottom: 12px;
+    background: var(--background-secondary);
+    border-radius: 6px;
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+    text-align: center;
+}
+
 /* ═══════════════════════════════════════════════════════════
-   🎯 دکمه‌های داینامیک
+   🎯 Action buttons (dynamic row/column)
    ═══════════════════════════════════════════════════════════ */
 .first-task-action-container {
     display: flex;
@@ -534,11 +590,13 @@
     padding-top: 12px;
     border-top: 1px solid var(--background-modifier-border);
 }
+
 .first-task-action-row {
     display: flex;
     gap: 8px;
     width: 100%;
 }
+
 .first-task-action-btn {
     flex: 1 1 0;
     min-width: 0;
@@ -553,10 +611,12 @@
     overflow: hidden;
     text-overflow: ellipsis;
 }
+
 .first-task-action-btn-full {
     flex: 1 1 100%;
 }
 
+/* ─── Modal buttons ─── */
 .first-task-modal-buttons {
     display: flex;
     justify-content: flex-end;
@@ -567,6 +627,7 @@
     border-radius: 0 !important;
     flex-wrap: wrap;
 }
+
 .first-task-modal-buttons-stack {
     display: flex;
     flex-direction: column;
@@ -576,6 +637,7 @@
     border-top: 1px solid var(--background-modifier-border);
     border-radius: 0 !important;
 }
+
 .first-task-modal-buttons-stack button {
     width: 100% !important;
     justify-content: center;
@@ -591,15 +653,18 @@
     gap: 2px;
     padding: 4px 0;
 }
+
 .first-task-suggest-name {
     font-size: var(--font-ui-small);
     font-weight: 500;
     color: var(--text-normal);
 }
+
 .first-task-suggest-active-dot {
     color: var(--interactive-accent);
     font-weight: 900;
 }
+
 .first-task-suggest-path {
     font-size: var(--font-ui-smaller);
     color: var(--text-muted);
@@ -607,24 +672,43 @@
 }
 
 /* ═══════════════════════════════════════════════════════════
-   ⚙️ تنظیمات
+   ⚙️ Settings — RTL rules (toggle flip, inputs, dropdowns)
    ═══════════════════════════════════════════════════════════ */
+
+/* ─── Toggle flip in RTL (Settings) ─── */
+.first-task-settings[dir="rtl"] .checkbox-container,
+.first-task-rtl .checkbox-container {
+    transform: scaleX(-1) !important;
+}
+
+/* ─── Toggle flip in RTL (Modals) ─── */
+.first-task-modal-content[dir="rtl"] .checkbox-container {
+    transform: scaleX(-1) !important;
+}
+
+/* ─── Direction & text-align ─── */
 .first-task-settings[dir="rtl"] { direction: rtl; }
+
 .first-task-settings[dir="rtl"] .setting-item-info,
 .first-task-settings[dir="rtl"] .setting-item-name,
-.first-task-settings[dir="rtl"] .setting-item-description { text-align: right; }
-.first-task-settings[dir="rtl"] .checkbox-container,
-.first-task-rtl .checkbox-container { transform: scaleX(-1); }
+.first-task-settings[dir="rtl"] .setting-item-description {
+    text-align: right;
+}
+
+/* ─── Text inputs ─── */
 .first-task-settings[dir="rtl"] input[type="text"]:not([dir="ltr"]),
 .first-task-settings[dir="rtl"] textarea:not([dir="ltr"]) {
     direction: rtl;
     text-align: right;
 }
+
 .first-task-settings input[dir="ltr"],
 .first-task-settings textarea[dir="ltr"] {
     direction: ltr !important;
     text-align: left !important;
 }
+
+/* ─── Dropdowns ─── */
 .first-task-settings[dir="rtl"] select.dropdown {
     direction: rtl !important;
     text-align: right !important;
@@ -632,6 +716,13 @@
     padding-left: 28px !important;
     background-position: left 8px center !important;
 }
+
+.first-task-settings[dir="rtl"] select.dropdown option {
+    direction: rtl !important;
+    text-align: right !important;
+}
+
+/* ─── mod-cta buttons ─── */
 .first-task-settings button.mod-cta,
 .first-task-settings button.mod-cta:focus {
     background-color: var(--interactive-accent) !important;
@@ -639,9 +730,12 @@
     border-color: var(--interactive-accent) !important;
     opacity: 1 !important;
 }
+
 .first-task-settings button.mod-cta:hover {
     background-color: var(--interactive-accent-hover) !important;
 }
+
+/* ─── Setting headings ─── */
 .first-task-settings .setting-item-heading,
 .first-task-settings .setting-item-heading .setting-item-info,
 .first-task-settings .setting-item-heading .setting-item-name {
@@ -651,30 +745,39 @@
     border-radius: 0 !important;
     background: transparent !important;
 }
+
 .first-task-settings .setting-item-heading {
     border-bottom: 1px solid var(--background-modifier-border) !important;
     padding: 12px 0 8px 0 !important;
     margin-bottom: 10px !important;
 }
+
 .first-task-settings .setting-item-heading + .setting-item {
     border-top: none !important;
     padding-top: 10px !important;
 }
 
 /* ═══════════════════════════════════════════════════════════
-   🔥 RTL مودال‌ها
+   🔥 Modal — RTL rules
    ═══════════════════════════════════════════════════════════ */
 .first-task-modal-content[dir="rtl"] .setting-item-info,
 .first-task-modal-content[dir="rtl"] .setting-item-name,
-.first-task-modal-content[dir="rtl"] .setting-item-description { text-align: right; }
+.first-task-modal-content[dir="rtl"] .setting-item-description {
+    text-align: right;
+}
+
 .first-task-modal-content[dir="rtl"] input[type="text"],
 .first-task-modal-content[dir="rtl"] textarea {
     direction: rtl;
     text-align: right;
 }
+
+/* Modal buttons: right in LTR, left in RTL */
 .first-task-modal-content[dir="rtl"] .first-task-modal-buttons {
     justify-content: flex-start !important;
 }
+
+/* Modal dropdowns */
 .first-task-modal-content[dir="rtl"] select.dropdown {
     direction: rtl !important;
     text-align: right !important;
@@ -682,15 +785,24 @@
     padding-left: 28px !important;
     background-position: left 8px center !important;
 }
+
 .first-task-modal-content[dir="rtl"] select.dropdown option {
     direction: rtl !important;
     text-align: right !important;
 }
-.first-task-modal-content[dir="rtl"] .first-task-suggest-item { text-align: right; }
-.first-task-modal-content[dir="rtl"] .first-task-details-box-content { text-align: right; }
+
+/* Suggest item */
+.first-task-modal-content[dir="rtl"] .first-task-suggest-item {
+    text-align: right;
+}
+
+/* Details box */
+.first-task-modal-content[dir="rtl"] .first-task-details-box-content {
+    text-align: right;
+}
 
 /* ═══════════════════════════════════════════════════════════
-   📱 موبایل
+   📱 Mobile
    ═══════════════════════════════════════════════════════════ */
 @media (max-width: 600px) {
     .first-task-panel { padding: 8px 10px; }
@@ -707,6 +819,7 @@
         max-width: none !important;
         padding: 0 10px !important;
     }
+
     .first-task-toast { padding: 10px 14px; font-size: 12px; }
 
     .first-task-modal-buttons {
@@ -719,7 +832,7 @@
         padding: 7px 10px;
     }
 
-    /* 🆕 نوار انتخاب روی موبایل */
+    /* Selection bar on mobile */
     .first-task-selection-bar {
         flex-direction: column;
         align-items: stretch;
