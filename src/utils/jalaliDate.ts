@@ -1,25 +1,74 @@
 /* ════════════════════════════════════════════════════════════
-   📅 تبدیل تاریخ + محاسبات دقیق (Jalali + Gregorian)
-   ✅ هفته / ماه / سال دقیق با پشتیبانی از weekStartDay
+   📅 تاریخ شمسی — v0.1.2 (الگوریتم دقیق khusrav/jalaali)
+   ✅ کبیسه‌های دقیق (اسفند ۲۹ یا ۳۰)
+   ✅ ۶ ماه اول ۳۱ روز، ۵ ماه ۳۰ روز
+   ✅ پیش‌بینی تا سال ۳۱۷۷
    ════════════════════════════════════════════════════════════ */
 
 import { normalizeNumbers } from './numberUtils';
 import type { WeekStartDay } from '../types';
 
-/* ─── تعداد روزهای ماه‌های شمسی ─── */
-const JALALI_MONTH_DAYS = [31, 31, 31, 31, 31, 31, 30, 30, 30, 30, 30, 29];
+/* ═══════════════════════════════════════════════════════════
+   الگوریتم دقیق کبیسه (از jalaali-js)
+   ═══════════════════════════════════════════════════════════ */
 
-/* ─── کبیسه شمسی ─── */
-export function isJalaliLeapYear(jy: number): boolean {
-    const mod = jy % 33;
-    return [1, 5, 9, 13, 17, 22, 26, 30].includes(mod);
+const BREAKS = [
+    -61, 9, 38, 199, 426, 686, 756, 818, 1111, 1181, 1210,
+    1635, 2060, 2097, 2192, 2262, 2324, 2394, 2456, 3178
+];
+
+interface JalCal {
+    leap: number;
+    gy: number;
+    march: number;
 }
 
-export function getJalaliMonthDays(jy: number, jm: number): number {
-    if (jm === 12) {
-        return isJalaliLeapYear(jy) ? 30 : 29;
+function jalCal(jy: number): JalCal {
+    const bl = BREAKS.length;
+    const gy = jy + 621;
+    let leapJ = -14;
+    let jp = BREAKS[0];
+    let jm = 0;
+    let jump = 0;
+
+    if (jy < jp || jy >= BREAKS[bl - 1]) {
+        /* خارج از بازه — fallback به الگوریتم ساده */
+        return { leap: -1, gy, march: 20 };
     }
-    return JALALI_MONTH_DAYS[jm - 1];
+
+    for (let i = 1; i < bl; i++) {
+        jm = BREAKS[i];
+        jump = jm - jp;
+        if (jy < jm) break;
+        leapJ = leapJ + Math.floor(jump / 33) * 8 + Math.floor((jump % 33) / 4);
+        jp = jm;
+    }
+    let n = jy - jp;
+
+    leapJ = leapJ + Math.floor(n / 33) * 8 + Math.floor(((n % 33) + 3) / 4);
+    if (jump % 33 === 4 && jump - n === 4) leapJ += 1;
+
+    const leapG = Math.floor(gy / 4) - Math.floor((Math.floor(gy / 100) + 1) * 3 / 4) - 150;
+    const march = 20 + leapJ - leapG;
+
+    if (jump - n < 6) n = n - jump + Math.floor((jump + 4) / 33) * 33;
+    let leap = ((n + 1) % 33 - 1) % 4;
+    if (leap === -1) leap = 4;
+
+    return { leap, gy, march };
+}
+
+/* ─── آیا سال شمسی کبیسه‌ست؟ ─── */
+export function isJalaliLeapYear(jy: number): boolean {
+    return jalCal(jy).leap === 0;
+}
+
+/* ─── تعداد روزهای یه ماه شمسی ─── */
+export function getJalaliMonthDays(jy: number, jm: number): number {
+    if (jm <= 6) return 31;
+    if (jm <= 11) return 30;
+    /* اسفند */
+    return isJalaliLeapYear(jy) ? 30 : 29;
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -202,10 +251,9 @@ export function startOfYesterday(ts: number): number {
     return startOfDaysAgo(ts, 1);
 }
 
-/* ─── شروع / پایان هفته بر اساس weekStartDay ─── */
 export function startOfWeek(ts: number, weekStartDay: WeekStartDay): number {
     const d = new Date(ts);
-    const currentDay = d.getDay();          /* 0=Sunday, ..., 6=Saturday */
+    const currentDay = d.getDay();
     const diff = (currentDay - weekStartDay + 7) % 7;
     d.setDate(d.getDate() - diff);
     d.setHours(0, 0, 0, 0);
@@ -220,7 +268,6 @@ export function endOfWeek(ts: number, weekStartDay: WeekStartDay): number {
     return d.getTime();
 }
 
-/* ─── ماه میلادی ─── */
 export function startOfGregorianMonth(ts: number): number {
     const d = new Date(ts);
     d.setDate(1);
@@ -235,7 +282,6 @@ export function endOfGregorianMonth(ts: number): number {
     return d.getTime();
 }
 
-/* ─── ماه شمسی ─── */
 export function startOfJalaliMonth(ts: number): number {
     const d = new Date(ts);
     const [jy, jm] = toJalali(d.getFullYear(), d.getMonth() + 1, d.getDate());
@@ -251,7 +297,6 @@ export function endOfJalaliMonth(ts: number): number {
     return new Date(gy, gm - 1, gd, 23, 59, 59, 999).getTime();
 }
 
-/* ─── سال میلادی ─── */
 export function startOfGregorianYear(ts: number): number {
     const d = new Date(ts);
     d.setMonth(0, 1);
@@ -266,7 +311,6 @@ export function endOfGregorianYear(ts: number): number {
     return d.getTime();
 }
 
-/* ─── سال شمسی ─── */
 export function startOfJalaliYear(ts: number): number {
     const d = new Date(ts);
     const [jy] = toJalali(d.getFullYear(), d.getMonth() + 1, d.getDate());
@@ -277,13 +321,13 @@ export function startOfJalaliYear(ts: number): number {
 export function endOfJalaliYear(ts: number): number {
     const d = new Date(ts);
     const [jy] = toJalali(d.getFullYear(), d.getMonth() + 1, d.getDate());
-    const lastDay = isJalaliLeapYear(jy) ? 30 : 29;
+    const lastDay = getJalaliMonthDays(jy, 12);
     const [gy, gm, gd] = toGregorian(jy, 12, lastDay);
     return new Date(gy, gm - 1, gd, 23, 59, 59, 999).getTime();
 }
 
 /* ═══════════════════════════════════════════════════════════
-   🎯 بررسی بازه‌ها (کاملاً دقیق)
+   بررسی بازه‌ها
    ═══════════════════════════════════════════════════════════ */
 
 export function isPastTs(ts: number): boolean {
@@ -323,7 +367,7 @@ export function isThisYearTs(ts: number, useJalali: boolean): boolean {
     return ts >= start && ts <= end;
 }
 
-/* ─── شروع ماه/سال قبل (برای آمار) ─── */
+/* ─── شروع ماه/سال قبل ─── */
 export function getJalaliYearStart(ts: number): number {
     return startOfJalaliYear(ts);
 }
