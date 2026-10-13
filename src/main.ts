@@ -1,5 +1,8 @@
 /* ════════════════════════════════════════════════════════════
    🚀 نقطه ورود — v0.1.2
+   ✅ دو پنل: Tasks + Planner
+   ✅ Notifier real-time
+   ✅ Auto sync
    ════════════════════════════════════════════════════════════ */
 
 import { Plugin, WorkspaceLeaf } from 'obsidian';
@@ -30,9 +33,11 @@ export default class FirstTaskPlugin extends Plugin {
     async onload(): Promise<void> {
         await this.loadSettings();
 
+        /* ─── Toast ─── */
         this.toastManager = new ToastManager();
         this.toastManager.setRTL(this.settings.language === 'fa');
 
+        /* ─── Managers ─── */
         this.indexManager = new IndexManager(this.app);
         this.categoriesManager = new CategoriesManager(this.app);
         this.scanner = new VaultScanner(this.app, () => this.settings);
@@ -46,22 +51,27 @@ export default class FirstTaskPlugin extends Plugin {
             () => this.settings
         );
 
+        /* ─── راه‌اندازی اولیه ─── */
         this.taskManager.initialize().then(() => {
             this.refreshPanel();
         }).catch(e => {
             console.warn('[First Task] Initialization failed:', e);
         });
 
+        /* ─── Notifier ─── */
         this.notifier = new Notifier(
             this.app,
+            /* onFileChanged */
             async (file) => {
                 await this.taskManager.rescanFile(file);
                 this.refreshPanel();
             },
+            /* onFileDeleted */
             (path) => {
                 this.taskManager.removeTasksForFile(path);
                 this.refreshPanel();
             },
+            /* onFileRenamed */
             async (oldPath, file) => {
                 this.taskManager.removeTasksForFile(oldPath);
                 await this.taskManager.rescanFile(file);
@@ -70,6 +80,7 @@ export default class FirstTaskPlugin extends Plugin {
         );
         this.notifier.start();
 
+        /* ─── Views ─── */
         this.registerView(
             VIEW_TYPE_FIRST_TASK,
             (leaf) => new TaskPanelView(leaf, this)
@@ -80,6 +91,7 @@ export default class FirstTaskPlugin extends Plugin {
             (leaf) => new PlannerView(leaf, this)
         );
 
+        /* ─── Ribbon icons ─── */
         this.addRibbonIcon('check-square', 'First Task', () => {
             this.activateView();
         });
@@ -88,8 +100,10 @@ export default class FirstTaskPlugin extends Plugin {
             this.activatePlannerView();
         });
 
+        /* ─── Settings tab ─── */
         this.addSettingTab(new FirstTaskSettingsTab(this.app, this));
 
+        /* ─── Commands ─── */
         this.registerCommands();
     }
 
@@ -98,6 +112,9 @@ export default class FirstTaskPlugin extends Plugin {
         if (this.toastManager) this.toastManager.destroy();
     }
 
+    /* ═══════════════════════════════════════════════════════
+       کامندها
+       ═══════════════════════════════════════════════════════ */
     private registerCommands(): void {
         this.addCommand({
             id: 'open-panel',
@@ -139,6 +156,9 @@ export default class FirstTaskPlugin extends Plugin {
         });
     }
 
+    /* ═══════════════════════════════════════════════════════
+       باز کردن پنل‌ها
+       ═══════════════════════════════════════════════════════ */
     async activateView(): Promise<void> {
         const { workspace } = this.app;
         let leaf: WorkspaceLeaf | null = null;
@@ -167,6 +187,9 @@ export default class FirstTaskPlugin extends Plugin {
         if (leaf) workspace.revealLeaf(leaf);
     }
 
+    /* ═══════════════════════════════════════════════════════
+       رفرش همه پنل‌ها
+       ═══════════════════════════════════════════════════════ */
     refreshPanel(): void {
         const mainLeaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_FIRST_TASK);
         for (const leaf of mainLeaves) {
@@ -189,6 +212,9 @@ export default class FirstTaskPlugin extends Plugin {
         }
     }
 
+    /* ═══════════════════════════════════════════════════════
+       تنظیمات
+       ═══════════════════════════════════════════════════════ */
     async loadSettings(): Promise<void> {
         try {
             const data = await this.loadData();
