@@ -2,8 +2,8 @@
    📋 پنل اصلی — v0.1.2
    ✅ dropdown دسته‌بندی
    ✅ اعداد داینامیک
-   ✅ نمایش badge ها بر اساس تنظیمات کاربر
-   ✅ بدون گروه‌بندی
+   ✅ نمایش badge ها (اختیاری)
+   ✅ حالت انتخاب گروهی + حذف/ویرایش گروهی
    ════════════════════════════════════════════════════════════ */
 
 import { ItemView, WorkspaceLeaf, setIcon } from 'obsidian';
@@ -13,12 +13,17 @@ import { t, applyDirection } from '../i18n';
 import { displayNumber, displayString } from '../utils/numberUtils';
 import { CreateTaskModal } from './CreateTaskModal';
 import { TaskDetailsModal } from './TaskDetailsModal';
+import { BulkEditModal } from './BulkEditModal';
 
 export const VIEW_TYPE_FIRST_TASK = 'first-task-panel';
 
 export class TaskPanelView extends ItemView {
     plugin: FirstTaskPlugin;
     private visibleCount: number = 0;
+
+    /* 🆕 حالت انتخاب گروهی */
+    private selectionMode: boolean = false;
+    private selectedIds: Set<string> = new Set();
 
     constructor(leaf: WorkspaceLeaf, plugin: FirstTaskPlugin) {
         super(leaf);
@@ -39,6 +44,9 @@ export class TaskPanelView extends ItemView {
 
     refresh(): void { this.render(); }
 
+    /* ═══════════════════════════════════════════════════════
+       رندر
+       ═══════════════════════════════════════════════════════ */
     private render(): void {
         const { contentEl } = this;
         const savedScroll = contentEl.scrollTop;
@@ -58,11 +66,17 @@ export class TaskPanelView extends ItemView {
             this.renderCompleted(contentEl);
         }
 
+        /* 🆕 نوار انتخاب (پایین) */
+        if (this.selectionMode) {
+            this.renderSelectionBar(contentEl);
+        }
+
         requestAnimationFrame(() => {
             contentEl.scrollTop = savedScroll;
         });
     }
 
+    /* ─── هدر ─── */
     private renderHeader(parent: HTMLElement): void {
         const lang = this.plugin.settings.language;
         const header = parent.createDiv({ cls: 'first-task-header' });
@@ -77,12 +91,22 @@ export class TaskPanelView extends ItemView {
 
         const actions = topRow.createDiv({ cls: 'first-task-header-actions' });
 
+        /* اسکن مجدد */
         const syncBtn = actions.createEl('button', { cls: 'clickable-icon' });
         setIcon(syncBtn, 'refresh-cw');
         syncBtn.setAttribute('aria-label', t(lang, 'panel_reload'));
         syncBtn.onclick = () => this.handleRescan();
 
-        if (this.plugin.settings.currentTab === 'pending') {
+        /* 🆕 دکمه انتخاب گروهی */
+        if (!this.selectionMode) {
+            const selectBtn = actions.createEl('button', { cls: 'clickable-icon' });
+            setIcon(selectBtn, 'check-square');
+            selectBtn.setAttribute('aria-label', t(lang, 'bulk_select'));
+            selectBtn.onclick = () => this.enterSelectionMode();
+        }
+
+        /* دکمه تسک جدید (فقط توی تب در انتظار و حالت غیرانتخاب) */
+        if (this.plugin.settings.currentTab === 'pending' && !this.selectionMode) {
             const addBtn = actions.createEl('button', { cls: 'clickable-icon' });
             setIcon(addBtn, 'plus');
             addBtn.setAttribute('aria-label', t(lang, 'panel_new_task'));
@@ -99,13 +123,11 @@ export class TaskPanelView extends ItemView {
         const row = parent.createDiv({ cls: 'first-task-category-row' });
         const select = row.createEl('select', { cls: 'dropdown first-task-category-select' });
 
-        /* ۱. همه */
         select.createEl('option', {
             value: '',
             text: t(lang, 'panel_all_categories'),
         });
 
-        /* ۲. بدون دسته (اگه وجود داره) */
         if (hasUncategorized) {
             select.createEl('option', {
                 value: 'none',
@@ -113,7 +135,6 @@ export class TaskPanelView extends ItemView {
             });
         }
 
-        /* ۳. بقیه دسته‌ها */
         for (const c of cats) {
             const label = lang === 'fa' ? c.name_fa : c.name;
             select.createEl('option', { value: c.id, text: label });
@@ -146,6 +167,8 @@ export class TaskPanelView extends ItemView {
             btn.createSpan({ text: ` ${label} (${displayNumber(count, lang)})` });
             btn.onclick = async () => {
                 if (this.plugin.settings.currentTab === id) return;
+                this.selectionMode = false;
+                this.selectedIds.clear();
                 this.plugin.settings.currentTab = id;
                 await this.plugin.saveSettings();
                 this.visibleCount = this.plugin.settings.tasksPerPage;
@@ -230,32 +253,138 @@ export class TaskPanelView extends ItemView {
         }
     }
 
-    /* ─── کارت تسک ─── */
+    /* ═══════════════════════════════════════════════════════
+       🆕 نوار انتخاب (پایین پنل)
+       ═══════════════════════════════════════════════════════ */
+    private renderSelectionBar(parent: HTMLElement): void {
+        const lang = this.plugin.settings.language;
+        const bar = parent.createDiv({ cls: 'first-task-selection-bar' });
+
+        const countEl = bar.createDiv({ cls: 'first-task-selection-count' });
+        countEl.setText(t(lang, 'bulk_selected_count', { count: displayNumber(this.selectedIds.size, lang) }));
+
+        const actions = bar.createDiv({ cls: 'first-task-selection-actions' });
+
+        /* حذف */
+        const delBtn = actions.createEl('button', {
+            cls: 'first-task-selection-btn mod-warning',
+        });
+        setIcon(delBtn.createSpan({ cls: 'first-task-selection-icon' }), 'trash-2');
+        delBtn.createSpan({ text: ' ' + t(lang, 'bulk_delete') });
+        delBtn.disabled = this.selectedIds.size === 0;
+        delBtn.onclick = () => this.handleBulkDelete();
+
+        /* ویرایش */
+        const editBtn = actions.createEl('button', {
+            cls: 'first-task-selection-btn mod-cta',
+        });
+        setIcon(editBtn.createSpan({ cls: 'first-task-selection-icon' }), 'edit');
+        editBtn.createSpan({ text: ' ' + t(lang, 'bulk_edit') });
+        editBtn.disabled = this.selectedIds.size === 0;
+        editBtn.onclick = () => this.handleBulkEdit();
+
+        /* انصراف */
+        const cancelBtn = actions.createEl('button', {
+            cls: 'first-task-selection-btn',
+        });
+        cancelBtn.setText(t(lang, 'bulk_cancel'));
+        cancelBtn.onclick = () => this.exitSelectionMode();
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       🆕 مدیریت حالت انتخاب
+       ═══════════════════════════════════════════════════════ */
+    private enterSelectionMode(): void {
+        this.selectionMode = true;
+        this.selectedIds.clear();
+        this.render();
+    }
+
+    private exitSelectionMode(): void {
+        this.selectionMode = false;
+        this.selectedIds.clear();
+        this.render();
+    }
+
+    private toggleTaskSelection(taskId: string): void {
+        if (this.selectedIds.has(taskId)) {
+            this.selectedIds.delete(taskId);
+        } else {
+            this.selectedIds.add(taskId);
+        }
+        this.render();
+    }
+
+    /* ─── حذف گروهی ─── */
+    private async handleBulkDelete(): Promise<void> {
+        const lang = this.plugin.settings.language;
+        const count = this.selectedIds.size;
+        if (count === 0) return;
+
+        const confirmMsg = t(lang, 'bulk_delete_confirm', { count: displayNumber(count, lang) });
+        if (!window.confirm(confirmMsg)) return;
+
+        const ids = Array.from(this.selectedIds);
+        const ok = await this.plugin.taskManager.bulkDelete(ids);
+
+        if (ok) {
+            this.plugin.toastManager.show(t(lang, 'notice_bulk_deleted'), 'success');
+            this.exitSelectionMode();
+        }
+    }
+
+    /* ─── ویرایش گروهی ─── */
+    private handleBulkEdit(): void {
+        if (this.selectedIds.size === 0) return;
+
+        const ids = Array.from(this.selectedIds);
+        new BulkEditModal(this.app, this.plugin, ids, () => {
+            this.exitSelectionMode();
+        }).open();
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       کارت تسک
+       ═══════════════════════════════════════════════════════ */
     private renderTaskCard(parent: HTMLElement, task: ExtractedTask, isCompleted: boolean): void {
         const lang = this.plugin.settings.language;
         const useJalali = this.plugin.settings.useJalaliDate;
         const pinnedClass = (task.pinned && !isCompleted) ? ' is-pinned' : '';
-        const card = parent.createDiv({ cls: 'first-task-card' + pinnedClass });
+        const isSelected = this.selectedIds.has(task._id);
+        const selectedClass = isSelected ? ' is-selected' : '';
+
+        const card = parent.createDiv({ cls: 'first-task-card' + pinnedClass + selectedClass });
         card.dataset.taskId = task._id;
 
         const cbWrap = card.createDiv({ cls: 'first-task-card-checkbox' });
-        const cb = cbWrap.createEl('input', { type: 'checkbox' });
-        cb.checked = isCompleted;
-        cb.onclick = async (e) => {
-            e.stopPropagation();
-            cb.disabled = true;
-            const ok = await this.plugin.taskManager.toggleComplete(task._id);
-            if (ok) {
-                this.plugin.toastManager.show(
-                    t(lang, isCompleted ? 'notice_task_restored' : 'notice_task_completed'),
-                    'success'
-                );
-                this.render();
-            } else {
-                cb.disabled = false;
-                cb.checked = isCompleted;
-            }
-        };
+
+        /* 🆕 توی حالت انتخاب → چک‌باکس انتخاب */
+        if (this.selectionMode) {
+            const selCb = cbWrap.createEl('input', { type: 'checkbox' });
+            selCb.checked = isSelected;
+            selCb.onclick = (e) => {
+                e.stopPropagation();
+                this.toggleTaskSelection(task._id);
+            };
+        } else {
+            const cb = cbWrap.createEl('input', { type: 'checkbox' });
+            cb.checked = isCompleted;
+            cb.onclick = async (e) => {
+                e.stopPropagation();
+                cb.disabled = true;
+                const ok = await this.plugin.taskManager.toggleComplete(task._id);
+                if (ok) {
+                    this.plugin.toastManager.show(
+                        t(lang, isCompleted ? 'notice_task_restored' : 'notice_task_completed'),
+                        'success'
+                    );
+                    this.render();
+                } else {
+                    cb.disabled = false;
+                    cb.checked = isCompleted;
+                }
+            };
+        }
 
         const bodyCard = card.createDiv({ cls: 'first-task-card-body' });
 
@@ -289,7 +418,7 @@ export class TaskPanelView extends ItemView {
             text: ' ' + this.plugin.taskManager.getDisplayNoteName(task._source_file),
         });
 
-        /* ─── badge های داینامیک (فقط اگه کاربر بخواد) ─── */
+        /* badge های داینامیک (اختیاری) */
         if (!isCompleted && this.plugin.settings.showTaskBadges) {
             const dynCats = this.plugin.taskManager.getTaskDynamicCategories(task);
             if (dynCats.length > 0) {
@@ -303,17 +432,24 @@ export class TaskPanelView extends ItemView {
             }
         }
 
+        /* کلیک روی کارت */
         bodyCard.onclick = () => {
-            new TaskDetailsModal(this.app, this.plugin, task, () => this.render()).open();
+            if (this.selectionMode) {
+                this.toggleTaskSelection(task._id);
+            } else {
+                new TaskDetailsModal(this.app, this.plugin, task, () => this.render()).open();
+            }
         };
     }
 
+    /* ─── حالت خالی ─── */
     private renderEmpty(parent: HTMLElement, title: string, hint: string): void {
         const empty = parent.createDiv({ cls: 'first-task-empty' });
         empty.createEl('p', { text: title, cls: 'first-task-empty-title' });
         if (hint) empty.createEl('p', { text: hint, cls: 'first-task-empty-hint' });
     }
 
+    /* ─── Rescan ─── */
     private async handleRescan(): Promise<void> {
         const lang = this.plugin.settings.language;
         this.plugin.toastManager.show(t(lang, 'panel_reloading'), 'info', 1500);
