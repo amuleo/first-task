@@ -67,7 +67,7 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
                     this.plugin.refreshPanel();
                 }));
 
-        /* ─── شروع هفته ─── */
+        /* ─── شروع هفته (۳ گزینه) ─── */
         new Setting(containerEl)
             .setName(t(lang, 'settings_week_start'))
             .setDesc(t(lang, 'settings_week_start_desc'))
@@ -75,10 +75,6 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
                 dd.addOption('6', t(lang, 'week_saturday'));
                 dd.addOption('0', t(lang, 'week_sunday'));
                 dd.addOption('1', t(lang, 'week_monday'));
-                dd.addOption('2', t(lang, 'week_tuesday'));
-                dd.addOption('3', t(lang, 'week_wednesday'));
-                dd.addOption('4', t(lang, 'week_thursday'));
-                dd.addOption('5', t(lang, 'week_friday'));
                 dd.setValue(String(this.plugin.settings.weekStartDay));
                 dd.onChange(async (v) => {
                     this.plugin.settings.weekStartDay = parseInt(v) as WeekStartDay;
@@ -180,7 +176,10 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
             .setDesc(t(lang, 'settings_planner_cards_desc'))
             .setHeading();
 
-        const mkCardToggle = (key: 'past' | 'today' | 'tomorrow' | 'this_week' | 'this_month' | 'this_year', labelKey: string) => {
+        const mkCardToggle = (
+            key: 'past' | 'today' | 'tomorrow' | 'this_week' | 'this_month' | 'this_year',
+            labelKey: string
+        ) => {
             new Setting(containerEl)
                 .setName(t(lang, labelKey as any))
                 .addToggle(tg => tg
