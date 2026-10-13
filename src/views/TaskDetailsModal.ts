@@ -1,9 +1,9 @@
 /* ════════════════════════════════════════════════════════════
    🔎 مودال جزئیات + ویرایش — v0.1.2
    ✅ باکس عنوان و توضیحات (readonly)
-   ✅ دکمه‌های داینامیک (ردیف + ستون)
+   ✅ دکمه‌های داینامیک
    ✅ نام نوت ۱۲ کاراکتر
-   ✅ اعداد داینامیک
+   ✅ همیشه نمایش نام نوت (بدون تنظیم)
    ════════════════════════════════════════════════════════════ */
 
 import { App, Modal, Setting } from 'obsidian';
@@ -56,24 +56,22 @@ export class TaskDetailsModal extends Modal {
         const lang = this.plugin.settings.language;
         const useJalali = this.plugin.settings.useJalaliDate;
 
-        /* ─── نام نوت مبدأ ─── */
-        if (this.plugin.settings.showNoteInModal) {
-            const noteName = this.task._source_file.split('/').pop() || this.task._source_file;
-            const truncated = truncateNoteName(noteName, NOTE_NAME_MAX);
+        /* ─── نام نوت مبدأ (همیشه نمایش داده می‌شه) ─── */
+        const noteName = this.task._source_file.split('/').pop() || this.task._source_file;
+        const truncated = truncateNoteName(noteName, NOTE_NAME_MAX);
 
-            const sourceRow = parent.createDiv({ cls: 'first-task-details-source' });
-            sourceRow.createSpan({ text: '📝 ' + t(lang, 'details_source') + ': ' });
-            const link = sourceRow.createEl('a', {
-                text: truncated,
-                cls: 'first-task-source-link',
-                href: '#',
-            });
-            link.title = this.task._source_file;
-            link.onclick = (e) => {
-                e.preventDefault();
-                this.openSourceNote();
-            };
-        }
+        const sourceRow = parent.createDiv({ cls: 'first-task-details-source' });
+        sourceRow.createSpan({ text: '📝 ' + t(lang, 'details_source') + ': ' });
+        const link = sourceRow.createEl('a', {
+            text: truncated,
+            cls: 'first-task-source-link',
+            href: '#',
+        });
+        link.title = this.task._source_file;
+        link.onclick = (e) => {
+            e.preventDefault();
+            this.openSourceNote();
+        };
 
         /* ─── باکس عنوان (readonly) ─── */
         const titleBox = parent.createDiv({ cls: 'first-task-details-box' });
@@ -140,12 +138,6 @@ export class TaskDetailsModal extends Modal {
 
     /* ═══════════════════════════════════════════════════════
        دکمه‌های داینامیک
-       ─ در انتظار:
-           [ویرایش] [پین/آنپین] [حذف]
-           [       انجام شد       ]
-       ─ انجام شده:
-           [ویرایش] [حذف]
-           [    برگرداندن    ]
        ═══════════════════════════════════════════════════════ */
     private renderButtons(parent: HTMLElement): void {
         const lang = this.plugin.settings.language;
