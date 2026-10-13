@@ -1,21 +1,24 @@
 /* ════════════════════════════════════════════════════════════
-   🔍 استخراج‌کننده تسک از markdown — نسخه ساده‌شده
-   ✅ فقط عنوان + وضعیت انجام (تاریخ توی markdown نیست)
+   🔍 استخراج‌کننده تسک — v0.1.2
+   ✅ پشتیبانی از عنوان تکراری (occurrence)
+   ✅ ID یکتا برای هر تسک
    ════════════════════════════════════════════════════════════ */
 
 import type { ExtractedTask } from '../types';
 import { generateTaskId } from '../utils/hash';
 
-/* الگوی استخراج تسک */
 const TASK_REGEX = /^\s*[-*+]\s+\[([ xX])\]\s+(.+?)\s*$/;
 
 export class TaskExtractor {
-    /* ─── استخراج تسک‌ها از محتوا ─── */
+    /* ═══════════════════════════════════════════════════════
+       استخراج تسک‌ها (با شمارش occurrence)
+       ═══════════════════════════════════════════════════════ */
     extractFromContent(content: string, sourceFile: string): ExtractedTask[] {
         if (!content) return [];
 
         const tasks: ExtractedTask[] = [];
         const lines = content.split('\n');
+        const occurrenceMap = new Map<string, number>();
 
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
@@ -28,12 +31,15 @@ export class TaskExtractor {
             const title = match[2].trim();
             if (!title) continue;
 
-            const id = generateTaskId(sourceFile, title);
+            /* 🆕 شماره تکرار این عنوان توی فایل */
+            const occurrence = occurrenceMap.get(title) || 0;
+            occurrenceMap.set(title, occurrence + 1);
+
+            const id = generateTaskId(sourceFile, title, occurrence);
 
             tasks.push({
                 title,
                 completed,
-                /* ─── اینا از ایندکس پر می‌شن ─── */
                 description: '',
                 category: '',
                 pinned: false,
@@ -46,30 +52,39 @@ export class TaskExtractor {
                 completed_jalali: '',
                 completed_gregorian: '',
                 completed_ts: 0,
-                /* ─── متادیتا ─── */
                 _id: id,
                 _source_file: sourceFile,
                 _source_line: i,
+                _occurrence: occurrence,
             });
         }
 
         return tasks;
     }
 
-    /* ─── پیدا کردن ID تسک توی محتوا ─── */
+    /* ═══════════════════════════════════════════════════════
+       پیدا کردن شماره خط بر اساس ID (با occurrence)
+       ═══════════════════════════════════════════════════════ */
     findTaskLine(content: string, sourceFile: string, targetId: string): number {
         const lines = content.split('\n');
+        const occurrenceMap = new Map<string, number>();
+
         for (let i = 0; i < lines.length; i++) {
             const match = TASK_REGEX.exec(lines[i]);
             if (!match) continue;
             const title = match[2].trim();
-            const id = generateTaskId(sourceFile, title);
+            const occurrence = occurrenceMap.get(title) || 0;
+            occurrenceMap.set(title, occurrence + 1);
+
+            const id = generateTaskId(sourceFile, title, occurrence);
             if (id === targetId) return i;
         }
         return -1;
     }
 
-    /* ─── تغییر وضعیت انجام ─── */
+    /* ═══════════════════════════════════════════════════════
+       تغییر وضعیت انجام
+       ═══════════════════════════════════════════════════════ */
     toggleTaskInContent(
         content: string,
         sourceFile: string,
@@ -90,7 +105,9 @@ export class TaskExtractor {
         return lines.join('\n');
     }
 
-    /* ─── افزودن تسک جدید ─── */
+    /* ═══════════════════════════════════════════════════════
+       افزودن تسک جدید
+       ═══════════════════════════════════════════════════════ */
     addTaskToContent(content: string, title: string): { content: string; line: number } {
         const lines = content.split('\n');
         const newTask = `- [ ] ${title}`;
@@ -108,7 +125,9 @@ export class TaskExtractor {
         return { content: lines.join('\n'), line: lines.length - 1 };
     }
 
-    /* ─── حذف تسک ─── */
+    /* ═══════════════════════════════════════════════════════
+       حذف تسک
+       ═══════════════════════════════════════════════════════ */
     removeTaskFromContent(
         content: string,
         sourceFile: string,
