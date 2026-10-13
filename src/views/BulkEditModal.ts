@@ -1,7 +1,7 @@
 /* ════════════════════════════════════════════════════════════
-   ✏️ Bulk Edit Modal — ویرایش گروهی
-   ✅ دسته‌بندی، تاریخ، پین، انتقال به نوت
-   ✅ هر فیلد یه toggle جدا
+   ✏️ Bulk Edit Modal — v0.1.2
+   ✅ وضعیت انجام / دسته‌بندی / تاریخ / پین / نوت
+   ✅ اعداد فارسی داینامیک
    ════════════════════════════════════════════════════════════ */
 
 import {
@@ -11,7 +11,7 @@ import type FirstTaskPlugin from '../main';
 import type { BulkUpdates } from '../types';
 import { t, applyDirection } from '../i18n';
 import { parseDateInput } from '../utils/jalaliDate';
-import { displayString } from '../utils/numberUtils';
+import { displayNumber, displayString } from '../utils/numberUtils';
 import { DateSuggest } from './DateSuggest';
 
 /* ═══════════════════════════════════════════════════════
@@ -88,6 +88,8 @@ export class BulkEditModal extends Modal {
         this.onDone = onDone;
 
         this.updates = {
+            applyCompleted: false,      /* 🆕 */
+            completed: true,            /* 🆕 */
             applyCategory: false,
             category: '',
             applyDate: false,
@@ -116,10 +118,33 @@ export class BulkEditModal extends Modal {
             cls: 'first-task-modal-title',
         });
 
-        /* ─── خلاصه ─── */
+        /* ─── خلاصه (با اعداد داینامیک) ─── */
         const count = this.taskIds.length;
         const summary = contentEl.createDiv({ cls: 'first-task-bulk-summary' });
-        summary.setText(t(lang, 'bulk_selected_count', { count: String(count) }));
+        summary.setText(t(lang, 'bulk_selected_count', {
+            count: displayNumber(count, lang),
+        }));
+
+        /* ═══════ وضعیت انجام 🆕 ═══════ */
+        new Setting(contentEl)
+            .setName(t(lang, 'bulk_field_completed'))
+            .addToggle(tg => tg
+                .setValue(this.updates.applyCompleted)
+                .onChange(v => {
+                    this.updates.applyCompleted = v;
+                    this.render();
+                }));
+
+        if (this.updates.applyCompleted) {
+            new Setting(contentEl)
+                .setName(t(lang, 'bulk_completed_value'))
+                .addDropdown(dd => {
+                    dd.addOption('true', t(lang, 'bulk_completed_on'));
+                    dd.addOption('false', t(lang, 'bulk_completed_off'));
+                    dd.setValue(this.updates.completed ? 'true' : 'false');
+                    dd.onChange(v => { this.updates.completed = v === 'true'; });
+                });
+        }
 
         /* ═══════ دسته‌بندی ═══════ */
         if (this.plugin.settings.enableCategories) {
@@ -259,6 +284,7 @@ export class BulkEditModal extends Modal {
         const lang = this.plugin.settings.language;
 
         const anyActive =
+            this.updates.applyCompleted ||
             this.updates.applyCategory ||
             this.updates.applyDate ||
             this.updates.applyPin ||
