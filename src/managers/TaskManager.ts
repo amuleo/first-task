@@ -3,6 +3,7 @@
    ✅ رفع باگ آمار (تسک‌های [x] بدون completed_ts)
    ✅ Bulk complete/restore
    ✅ Auto-fill created time
+   ✅ ۳ کارت جدید: هفته / ماه / سال آینده
    ════════════════════════════════════════════════════════════ */
 
 import { App, TFile } from 'obsidian';
@@ -24,6 +25,12 @@ import { hashContent, generateTaskId } from '../utils/hash';
 import { getDisplayNoteName } from '../utils/noteUtils';
 import {
     isPastTs, isTodayTs, isTomorrowTs, isThisWeekTs, isThisMonthTs, isThisYearTs,
+    isNextWeekTs, isNextMonthTs, isNextYearTs,
+    startOfNextWeek, endOfNextWeek,
+    startOfNextJalaliMonth, endOfNextJalaliMonth,
+    startOfNextGregorianMonth, endOfNextGregorianMonth,
+    startOfNextJalaliYear, endOfNextJalaliYear,
+    startOfNextGregorianYear, endOfNextGregorianYear,
     startOfDay, startOfYesterday, startOfDaysAgo,
     getJalaliYearStart, getJalaliPrevMonthStart,
     getGregorianYearStart, getGregorianPrevMonthStart,
@@ -353,7 +360,7 @@ export class TaskManager {
     }
 
     /* ═══════════════════════════════════════════════════════
-       Planner
+       Planner — v0.1.2 (۹ کارت + بدون تاریخ + همه)
        ═══════════════════════════════════════════════════════ */
     filterByCard(tasks: ExtractedTask[], card: PlannerCard): ExtractedTask[] {
         const useJalali = this.settings.useJalaliDate;
@@ -376,14 +383,29 @@ export class TaskManager {
                     .filter(t => isThisWeekTs(t.due_date_ts, weekStart) && !isPastTs(t.due_date_ts))
                     .sort(this.sortTasks);
 
+            case 'next_week':
+                return tasks
+                    .filter(t => isNextWeekTs(t.due_date_ts, weekStart))
+                    .sort(this.sortTasks);
+
             case 'this_month':
                 return tasks
                     .filter(t => isThisMonthTs(t.due_date_ts, useJalali) && !isPastTs(t.due_date_ts))
                     .sort(this.sortTasks);
 
+            case 'next_month':
+                return tasks
+                    .filter(t => isNextMonthTs(t.due_date_ts, useJalali))
+                    .sort(this.sortTasks);
+
             case 'this_year':
                 return tasks
                     .filter(t => isThisYearTs(t.due_date_ts, useJalali) && !isPastTs(t.due_date_ts))
+                    .sort(this.sortTasks);
+
+            case 'next_year':
+                return tasks
+                    .filter(t => isNextYearTs(t.due_date_ts, useJalali))
                     .sort(this.sortTasks);
 
             case 'no_date':
@@ -406,6 +428,7 @@ export class TaskManager {
         return this.getPendingByCategory(categoryId);
     }
 
+    /* 🆕 getCategoryStats — با ۳ کارت جدید */
     getCategoryStats(categoryId: string): CategoryStats {
         const tasks = this.getTasksByCategory(categoryId);
         return {
@@ -413,8 +436,11 @@ export class TaskManager {
             today: this.filterByCard(tasks, 'today').length,
             tomorrow: this.filterByCard(tasks, 'tomorrow').length,
             this_week: this.filterByCard(tasks, 'this_week').length,
+            next_week: this.filterByCard(tasks, 'next_week').length,
             this_month: this.filterByCard(tasks, 'this_month').length,
+            next_month: this.filterByCard(tasks, 'next_month').length,
             this_year: this.filterByCard(tasks, 'this_year').length,
+            next_year: this.filterByCard(tasks, 'next_year').length,
             no_date: this.filterByCard(tasks, 'no_date').length,
             all: tasks.length,
         };
