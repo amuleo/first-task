@@ -1,7 +1,7 @@
 /* ════════════════════════════════════════════════════════════
-   ➕ مودال ساخت تسک جدید — v0.1.2
-   ✅ Suggest هوشمند (active + mtime)
-   ✅ تاریخ پیش‌فرض = امروز
+   ➕ مودال ساخت تسک — v0.1.2
+   ✅ Suggest هوشمند نوت (active + mtime + محدودیت پوشه)
+   ✅ Suggest هوشمند تاریخ
    ✅ اعداد داینامیک
    ════════════════════════════════════════════════════════════ */
 
@@ -13,9 +13,12 @@ import type FirstTaskPlugin from '../main';
 import { t, applyDirection } from '../i18n';
 import { parseDateInput, getTodayDateInput } from '../utils/jalaliDate';
 import { displayString } from '../utils/numberUtils';
+import { DateSuggest } from './DateSuggest';
 
 /* ═══════════════════════════════════════════════════════
-   🎯 Suggest هوشمند
+   🎯 Suggest هوشمند نوت
+   ✅ نوت فعلی اول
+   ✅ اگه یه پوشه بیشتر از ۱۰ نوت داره → فقط ۷ تای آخر
    ═══════════════════════════════════════════════════════ */
 class NoteSuggest extends AbstractInputSuggest<TFile> {
     private plugin: FirstTaskPlugin;
@@ -38,18 +41,57 @@ class NoteSuggest extends AbstractInputSuggest<TFile> {
         const activeFile = this.app.workspace.getActiveFile();
         const activePath = activeFile?.path || '';
 
-        /* ─── مرتب: active اول، بعد mtime ─── */
-        const sorted = [...files].sort((a, b) => {
+        /* ─── گروه‌بندی بر اساس پوشه ─── */
+        const byFolder = new Map<string, TFile[]>();
+        for (const f of files) {
+            const folder = f.parent?.path || '/';
+            if (!byFolder.has(folder)) byFolder.set(folder, []);
+            byFolder.get(folder)!.push(f);
+        }
+
+        /* ─── فیلتر: اگه پوشه‌ای > ۱۰ نوت داره، فقط ۷ تای آخر ─── */
+        const filtered: TFile[] = [];
+        for (const [folder, folderFiles] of byFolder.entries()) {
+            /* مرتب بر اساس mtime */
+            const sorted = [...folderFiles].sort((a, b) => b.stat.mtime - a.stat.mtime);
+
+            if (sorted.length > 10) {
+                /* فقط ۷ تای آخر — مگر اینکه فایل active باشه */
+                for (const f of sorted) {
+                    if (f.path === activePath) {
+                        filtered.push(f);
+                    } else if (filtered.length < 7 + (activePath ? 1 : 0)) {
+                        if (sorted.indexOf(f) < 7) filtered.push(f);
+                    }
+                }
+                /* پاکسازی تکراری */
+                const seen = new Set<string>();
+                const unique = filtered.filter(f => {
+                    if (seen.has(f.path)) return false;
+                    seen.add(f.path);
+                    return true;
+                });
+                filtered.length = 0;
+                filtered.push(...unique);
+            } else {
+                filtered.push(...sorted);
+            }
+        }
+
+        /* ─── مرتب‌سازی نهایی: active اول، بعد mtime ─── */
+        const sorted = filtered.sort((a, b) => {
             if (a.path === activePath) return -1;
             if (b.path === activePath) return 1;
             return b.stat.mtime - a.stat.mtime;
         });
 
-        let filtered = sorted;
+        /* ─── فیلتر بر اساس query ─── */
+        let result = sorted;
         if (lowerQuery) {
-            filtered = sorted.filter(f => f.path.toLowerCase().includes(lowerQuery));
+            result = sorted.filter(f => f.path.toLowerCase().includes(lowerQuery));
         }
-        return filtered.slice(0, 20);
+
+        return result.slice(0, 20);
     }
 
     renderSuggestion(file: TFile, el: HTMLElement): void {
@@ -129,17 +171,21 @@ export class CreateTaskModal extends Modal {
                 ta.inputEl.style.width = '100%';
             });
 
-        /* ─── تاریخ (پیش‌فرض امروز) ─── */
-        new Setting(contentEl)
-            .setName(t(lang, 'field_due_date'))
-            .addText(text => {
-                this.dateComponent = text;
-                const useJalali = this.plugin.settings.useJalaliDate;
-                const today = getTodayDateInput(useJalali);
-                text.setValue(displayString(today, lang));
-                text.inputEl.dir = 'ltr';
-                text.setPlaceholder(useJalali ? '1405/07/25' : '2026-10-15');
+        /* ─── تاریخ با Suggest ─── */
+        const dateSetting = new Setting(contentEl).setName(t(lang, 'field_due_date'));
+        dateSetting.addText(text => {
+            this.dateComponent = text;
+            const useJalali = this.plugin.settings.useJalaliDate;
+            const today = getTodayDateInput(useJalali);
+            text.setValue(displayString(today, lang));
+            text.inputEl.dir = 'ltr';
+            text.setPlaceholder(useJalali ? '1405/07/25' : '2026-10-15');
+
+            /* 🆕 Date Suggest */
+            new DateSuggest(this.app, text.inputEl, this.plugin, (dateStr) => {
+                text.setValue(displayString(dateStr, lang));
             });
+        });
 
         /* ─── دسته‌بندی ─── */
         if (this.plugin.settings.enableCategories) {
@@ -157,7 +203,7 @@ export class CreateTaskModal extends Modal {
                 });
         }
 
-        /* ─── فایل مبدأ با Suggest ─── */
+        /* ─── فایل مبدأ ─── */
         const files = this.plugin.taskManager.getScannableFiles();
         this.sourceFile = this.getSmartDefaultFile(files);
 
@@ -191,31 +237,24 @@ export class CreateTaskModal extends Modal {
         save.onclick = () => this.submit();
     }
 
-    /* ═══════════════════════════════════════════════════════
-       🎯 انتخاب نوت پیش‌فرض هوشمند
-       ═══════════════════════════════════════════════════════ */
     private getSmartDefaultFile(files: TFile[]): string {
         if (files.length === 0) return '';
 
-        /* ۱. نوت فعلی */
         const activeFile = this.app.workspace.getActiveFile();
         if (activeFile && activeFile.extension === 'md') {
             const exists = files.find(f => f.path === activeFile.path);
             if (exists) return activeFile.path;
         }
 
-        /* ۲. آخرین نوت فعال */
         const lastOpen = this.app.workspace.getLastOpenFiles();
         for (const path of lastOpen) {
             const found = files.find(f => f.path === path);
             if (found) return found.path;
         }
 
-        /* ۳. inbox.md */
         const inbox = files.find(f => /(^|\/)inbox\.md$/i.test(f.path));
         if (inbox) return inbox.path;
 
-        /* ۴. جدیدترین */
         const sorted = [...files].sort((a, b) => b.stat.mtime - a.stat.mtime);
         return sorted[0]?.path || '';
     }
@@ -258,13 +297,8 @@ export class CreateTaskModal extends Modal {
         this.submitting = true;
 
         const ok = await this.plugin.taskManager.createTask(
-            title,
-            sourceFile,
-            description,
-            category,
-            dueJalali,
-            dueGregorian,
-            dueTs
+            title, sourceFile, description, category,
+            dueJalali, dueGregorian, dueTs
         );
 
         if (ok) {
