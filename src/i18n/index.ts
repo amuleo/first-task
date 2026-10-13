@@ -121,6 +121,9 @@ const en = {
     settings_show_task_badges: 'Show time badges on tasks',
     settings_show_task_badges_desc: 'Display Today, Tomorrow, etc. badges on task cards',
 
+    settings_auto_fill_created: 'Auto-fill creation date',
+    settings_auto_fill_created_desc: 'Set current time as creation date for tasks without one',
+
     settings_folders: 'Folders',
     settings_include_folders: 'Include folders',
     settings_include_folders_desc: 'Only scan these folders (leave empty for all)',
@@ -141,6 +144,30 @@ const en = {
     settings_planner_cards_this_week: 'This week',
     settings_planner_cards_this_month: 'This month',
     settings_planner_cards_this_year: 'This year',
+
+    /* ─── Bulk operations ─── */
+    bulk_select: 'Select',
+    bulk_cancel: 'Cancel',
+    bulk_selected_count: '{count} selected',
+    bulk_delete: 'Delete',
+    bulk_edit: 'Edit',
+    bulk_delete_confirm: 'Delete {count} tasks?',
+    bulk_edit_title: 'Bulk edit',
+    bulk_apply: 'Apply',
+    bulk_select_all: 'Select all',
+    bulk_clear_selection: 'Clear',
+
+    bulk_field_category: 'Change category',
+    bulk_field_date: 'Change due date',
+    bulk_field_pin: 'Change pin status',
+    bulk_field_note: 'Move to another note',
+    bulk_pin_value: 'Pin status',
+    bulk_pin_on: 'Pin',
+    bulk_pin_off: 'Unpin',
+    bulk_field_note_hint: 'Selected tasks will be moved to this note',
+
+    notice_bulk_deleted: 'Tasks deleted',
+    notice_bulk_updated: 'Tasks updated',
 
     /* ─── Notices ─── */
     notice_task_created: 'Task created',
@@ -276,6 +303,9 @@ const fa: typeof en = {
     settings_show_task_badges: 'نمایش برچسب‌های زمانی روی تسک‌ها',
     settings_show_task_badges_desc: 'نمایش برچسب‌های «امروز»، «فردا» و... روی کارت تسک‌ها',
 
+    settings_auto_fill_created: 'پر کردن خودکار تاریخ ساخت',
+    settings_auto_fill_created_desc: 'برای تسک‌های بدون تاریخ، زمان فعلی رو به عنوان تاریخ ساخت بذار',
+
     settings_folders: 'پوشه‌ها',
     settings_include_folders: 'پوشه‌های شامل',
     settings_include_folders_desc: 'فقط این پوشه‌ها اسکن بشن (خالی = همه)',
@@ -296,6 +326,30 @@ const fa: typeof en = {
     settings_planner_cards_this_week: 'این هفته',
     settings_planner_cards_this_month: 'این ماه',
     settings_planner_cards_this_year: 'امسال',
+
+    /* ─── عملیات گروهی ─── */
+    bulk_select: 'انتخاب',
+    bulk_cancel: 'انصراف',
+    bulk_selected_count: '{count} تسک انتخاب شده',
+    bulk_delete: 'حذف',
+    bulk_edit: 'ویرایش',
+    bulk_delete_confirm: '{count} تسک حذف بشن؟',
+    bulk_edit_title: 'ویرایش گروهی',
+    bulk_apply: 'اعمال',
+    bulk_select_all: 'انتخاب همه',
+    bulk_clear_selection: 'پاک کردن',
+
+    bulk_field_category: 'تغییر دسته‌بندی',
+    bulk_field_date: 'تغییر تاریخ انجام',
+    bulk_field_pin: 'تغییر وضعیت پین',
+    bulk_field_note: 'انتقال به نوت دیگر',
+    bulk_pin_value: 'وضعیت پین',
+    bulk_pin_on: 'پین',
+    bulk_pin_off: 'برداشتن پین',
+    bulk_field_note_hint: 'تسک‌های انتخاب‌شده به این نوت منتقل می‌شن',
+
+    notice_bulk_deleted: 'تسک‌ها حذف شدن',
+    notice_bulk_updated: 'تسک‌ها بروزرسانی شدن',
 
     /* ─── اعلان‌ها ─── */
     notice_task_created: 'تسک ساخته شد',
