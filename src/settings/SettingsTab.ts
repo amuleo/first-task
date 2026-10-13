@@ -1,12 +1,13 @@
 /* ════════════════════════════════════════════════════════════
-   ⚙️ تب تنظیمات First Task — v0.1.2
-   ✅ حذف groupByNote (چون حذف شد)
-   ✅ حذف showNoteInModal (چون همیشه نمایش داده می‌شه)
+   ⚙️ تب تنظیمات — v0.1.2
+   ✅ شروع هفته (شنبه/یکشنبه/دوشنبه)
+   ✅ نمایش badge ها (پیش‌فرض خاموش)
+   ✅ کارت‌های پلنر (قابل تنظیم)
    ════════════════════════════════════════════════════════════ */
 
 import { App, PluginSettingTab, Setting } from 'obsidian';
 import type FirstTaskPlugin from '../main';
-import type { Language } from '../types';
+import type { Language, WeekStartDay } from '../types';
 import { t, applyDirection } from '../i18n';
 
 export class FirstTaskSettingsTab extends PluginSettingTab {
@@ -18,7 +19,6 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
         this.plugin = plugin;
     }
 
-    /* رفرش با تأخیر کوچیک */
     private scheduleRefresh(): void {
         if (this.refreshTimer !== null) {
             window.clearTimeout(this.refreshTimer);
@@ -67,6 +67,26 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
                     this.plugin.refreshPanel();
                 }));
 
+        /* ─── شروع هفته ─── */
+        new Setting(containerEl)
+            .setName(t(lang, 'settings_week_start'))
+            .setDesc(t(lang, 'settings_week_start_desc'))
+            .addDropdown(dd => {
+                dd.addOption('6', t(lang, 'week_saturday'));
+                dd.addOption('0', t(lang, 'week_sunday'));
+                dd.addOption('1', t(lang, 'week_monday'));
+                dd.addOption('2', t(lang, 'week_tuesday'));
+                dd.addOption('3', t(lang, 'week_wednesday'));
+                dd.addOption('4', t(lang, 'week_thursday'));
+                dd.addOption('5', t(lang, 'week_friday'));
+                dd.setValue(String(this.plugin.settings.weekStartDay));
+                dd.onChange(async (v) => {
+                    this.plugin.settings.weekStartDay = parseInt(v) as WeekStartDay;
+                    await this.plugin.saveSettings();
+                    this.plugin.refreshPanel();
+                });
+            });
+
         /* ═══════ نمایش ═══════ */
         new Setting(containerEl).setName(t(lang, 'settings_display')).setHeading();
 
@@ -75,9 +95,7 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
             .setDesc(t(lang, 'settings_tasks_per_page_desc'))
             .addDropdown(dd => {
                 const options = [10, 20, 30, 50, 100];
-                for (const n of options) {
-                    dd.addOption(String(n), String(n));
-                }
+                for (const n of options) dd.addOption(String(n), String(n));
                 let current = this.plugin.settings.tasksPerPage;
                 if (!options.includes(current)) current = 20;
                 dd.setValue(String(current));
@@ -87,6 +105,17 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
                     this.plugin.refreshPanel();
                 });
             });
+
+        new Setting(containerEl)
+            .setName(t(lang, 'settings_show_task_badges'))
+            .setDesc(t(lang, 'settings_show_task_badges_desc'))
+            .addToggle(tg => tg
+                .setValue(this.plugin.settings.showTaskBadges)
+                .onChange(async (v) => {
+                    this.plugin.settings.showTaskBadges = v;
+                    await this.plugin.saveSettings();
+                    this.plugin.refreshPanel();
+                }));
 
         /* ═══════ پوشه‌ها ═══════ */
         new Setting(containerEl).setName(t(lang, 'settings_folders')).setHeading();
@@ -145,54 +174,32 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
                     this.plugin.refreshPanel();
                 }));
 
-        /* ─── دسته‌بندی‌های داینامیک ─── */
+        /* ═══════ کارت‌های پلنر ═══════ */
         new Setting(containerEl)
-            .setName(t(lang, 'settings_dynamic_categories'))
-            .setDesc(t(lang, 'settings_dynamic_categories_desc'))
+            .setName(t(lang, 'settings_planner_cards'))
+            .setDesc(t(lang, 'settings_planner_cards_desc'))
             .setHeading();
 
-        new Setting(containerEl)
-            .setName(t(lang, 'settings_dynamic_tomorrow'))
-            .addToggle(tg => tg
-                .setValue(this.plugin.settings.dynamicCategories.tomorrow)
-                .onChange(async (v) => {
-                    this.plugin.settings.dynamicCategories.tomorrow = v;
-                    await this.plugin.saveSettings();
-                    this.plugin.refreshPanel();
-                }));
+        const mkCardToggle = (key: 'past' | 'today' | 'tomorrow' | 'this_week' | 'this_month' | 'this_year', labelKey: string) => {
+            new Setting(containerEl)
+                .setName(t(lang, labelKey as any))
+                .addToggle(tg => tg
+                    .setValue(this.plugin.settings.plannerCards[key])
+                    .onChange(async (v) => {
+                        this.plugin.settings.plannerCards[key] = v;
+                        await this.plugin.saveSettings();
+                        this.plugin.refreshPanel();
+                    }));
+        };
 
-        new Setting(containerEl)
-            .setName(t(lang, 'settings_dynamic_this_week'))
-            .addToggle(tg => tg
-                .setValue(this.plugin.settings.dynamicCategories.this_week)
-                .onChange(async (v) => {
-                    this.plugin.settings.dynamicCategories.this_week = v;
-                    await this.plugin.saveSettings();
-                    this.plugin.refreshPanel();
-                }));
-
-        new Setting(containerEl)
-            .setName(t(lang, 'settings_dynamic_this_month'))
-            .addToggle(tg => tg
-                .setValue(this.plugin.settings.dynamicCategories.this_month)
-                .onChange(async (v) => {
-                    this.plugin.settings.dynamicCategories.this_month = v;
-                    await this.plugin.saveSettings();
-                    this.plugin.refreshPanel();
-                }));
-
-        new Setting(containerEl)
-            .setName(t(lang, 'settings_dynamic_this_year'))
-            .addToggle(tg => tg
-                .setValue(this.plugin.settings.dynamicCategories.this_year)
-                .onChange(async (v) => {
-                    this.plugin.settings.dynamicCategories.this_year = v;
-                    await this.plugin.saveSettings();
-                    this.plugin.refreshPanel();
-                }));
+        mkCardToggle('past', 'settings_planner_cards_past');
+        mkCardToggle('today', 'settings_planner_cards_today');
+        mkCardToggle('tomorrow', 'settings_planner_cards_tomorrow');
+        mkCardToggle('this_week', 'settings_planner_cards_this_week');
+        mkCardToggle('this_month', 'settings_planner_cards_this_month');
+        mkCardToggle('this_year', 'settings_planner_cards_this_year');
     }
 
-    /* تبدیل لیست پوشه‌ها */
     private parseFolders(input: string): string[] {
         return input
             .split(',')
