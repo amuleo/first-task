@@ -1,8 +1,10 @@
 /* ════════════════════════════════════════════════════════════
    🔎 مودال جزئیات + ویرایش — v0.1.2
+   ✅ باکس عنوان و توضیحات (readonly)
+   ✅ دکمه‌های داینامیک (ردیف + ستون)
+   ✅ نام نوت ۱۲ کاراکتر
    ✅ DateSuggest + NoteSuggest توی حالت ویرایش
-   ✅ باکس عنوان و توضیحات
-   ✅ دکمه‌های داینامیک
+   ✅ اعداد داینامیک
    ════════════════════════════════════════════════════════════ */
 
 import {
@@ -19,7 +21,7 @@ import { DateSuggest } from './DateSuggest';
 const NOTE_NAME_MAX = 12;
 
 /* ═══════════════════════════════════════════════════════
-   🎯 NoteSuggest داخلی
+   🎯 NoteSuggest
    ═══════════════════════════════════════════════════════ */
 class NoteSuggest extends AbstractInputSuggest<TFile> {
     private plugin: FirstTaskPlugin;
@@ -93,6 +95,7 @@ export class TaskDetailsModal extends Modal {
     private editDescription = '';
     private editCategory = '';
     private editDate = '';
+    private editSourceFile = '';
 
     constructor(app: App, plugin: FirstTaskPlugin, task: ExtractedTask, onDone: () => void) {
         super(app);
@@ -270,6 +273,7 @@ export class TaskDetailsModal extends Modal {
         this.editDescription = this.task.description;
         this.editCategory = this.task.category;
         this.editDate = useJalali ? this.task.due_date_jalali : this.task.due_date_gregorian;
+        this.editSourceFile = this.task._source_file;
         this.render();
     }
 
@@ -300,20 +304,21 @@ export class TaskDetailsModal extends Modal {
                 ta.onChange(v => { this.editDescription = v; });
             });
 
-        /* ─── تاریخ با Suggest ─── */
+        /* ─── تاریخ با DateSuggest ─── */
         new Setting(parent)
             .setName(t(lang, 'field_due_date'))
             .addText(text => {
                 text.setValue(displayString(this.editDate, lang));
                 text.inputEl.dir = 'ltr';
                 text.setPlaceholder(useJalali ? '1405/07/25' : '2026-10-15');
-                text.onChange(v => { this.editDate = v; });
 
                 /* 🆕 Date Suggest */
                 new DateSuggest(this.app, text.inputEl, this.plugin, (dateStr) => {
-                    text.setValue(displayString(dateStr, lang));
                     this.editDate = dateStr;
+                    text.setValue(displayString(dateStr, lang));
                 });
+
+                text.onChange(v => { this.editDate = v; });
             });
 
         /* ─── دسته‌بندی ─── */
@@ -332,18 +337,20 @@ export class TaskDetailsModal extends Modal {
                 });
         }
 
-        /* ─── نوت مبدأ با Suggest ─── */
+        /* ─── نوت مبدأ با NoteSuggest ─── */
         new Setting(parent)
             .setName(t(lang, 'field_source_file'))
             .setDesc(t(lang, 'field_source_file_hint'))
             .addText(text => {
-                text.setValue(this.task._source_file);
+                text.setValue(this.editSourceFile);
                 text.inputEl.style.width = '100%';
 
-                /* 🆕 Note Suggest */
                 new NoteSuggest(this.app, text.inputEl, this.plugin, (file) => {
+                    this.editSourceFile = file.path;
                     text.setValue(file.path);
                 });
+
+                text.onChange(v => { this.editSourceFile = v.trim(); });
             });
 
         /* ─── دکمه‌ها ─── */
