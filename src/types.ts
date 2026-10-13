@@ -137,16 +137,23 @@ export interface PlannerCardsVisibility {
     this_year: boolean;
 }
 
-/* 🆕 Bulk edit updates */
+/* 🆕 Bulk updates */
 export interface BulkUpdates {
+    /* وضعیت انجام */
+    applyCompleted: boolean;      /* 🆕 */
+    completed: boolean;           /* 🆕 */
+    /* دسته‌بندی */
     applyCategory: boolean;
     category: string;
+    /* تاریخ */
     applyDate: boolean;
     dueDateJalali: string;
     dueDateGregorian: string;
     dueDateTs: number;
+    /* پین */
     applyPin: boolean;
     pinned: boolean;
+    /* انتقال به نوت */
     applyNote: boolean;
     targetFile: string;
 }
@@ -161,7 +168,7 @@ export interface FirstTaskSettings {
     onlyMarkdown: boolean;
     enableCategories: boolean;
     showTaskBadges: boolean;
-    autoFillCreatedTime: boolean;   /* 🆕 */
+    autoFillCreatedTime: boolean;
     dynamicCategories: DynamicCategorySettings;
     plannerCards: PlannerCardsVisibility;
     currentTab: TabType;
@@ -180,7 +187,7 @@ export const DEFAULT_SETTINGS: FirstTaskSettings = {
     onlyMarkdown: true,
     enableCategories: true,
     showTaskBadges: false,
-    autoFillCreatedTime: true,   /* 🆕 پیش‌فرض روشن */
+    autoFillCreatedTime: true,
     dynamicCategories: {
         tomorrow: true,
         this_week: true,
