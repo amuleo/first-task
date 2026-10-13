@@ -1,43 +1,43 @@
 /* ════════════════════════════════════════════════════════════
-   🚀 نقطه ورود — v0.1.2
-   ✅ دو پنل: Tasks + Planner
-   ✅ Notifier real-time
-   ✅ Auto sync
+   🚀 First Task Plugin — v0.1.3
+   ✅ Notifier فقط بعد از initialize کامل شروع می‌شه
+   ✅ flush روی unload
    ════════════════════════════════════════════════════════════ */
 
 import { Plugin, WorkspaceLeaf } from 'obsidian';
-import { DEFAULT_SETTINGS, FirstTaskSettings } from './types';
+import {
+    DEFAULT_SETTINGS,
+    FirstTaskSettings,
+} from './types';
+import { TaskManager } from './managers/TaskManager';
+import { VaultScanner } from './managers/VaultScanner';
+import { TaskExtractor } from './managers/TaskExtractor';
+import { IndexManager } from './managers/IndexManager';
+import { CategoriesManager } from './managers/CategoriesManager';
+import { Notifier } from './managers/Notifier';
+import { ToastManager } from './managers/ToastManager';
 import { FirstTaskSettingsTab } from './settings/SettingsTab';
 import { TaskPanelView, VIEW_TYPE_FIRST_TASK } from './views/TaskPanelView';
 import { PlannerView, VIEW_TYPE_PLANNER } from './views/PlannerView';
-import { IndexManager } from './managers/IndexManager';
-import { CategoriesManager } from './managers/CategoriesManager';
-import { VaultScanner } from './managers/VaultScanner';
-import { TaskExtractor } from './managers/TaskExtractor';
-import { TaskManager } from './managers/TaskManager';
-import { Notifier } from './managers/Notifier';
-import { ToastManager } from './managers/ToastManager';
+import { CreateTaskModal } from './views/CreateTaskModal';
 import { t } from './i18n';
 
 export default class FirstTaskPlugin extends Plugin {
     settings: FirstTaskSettings;
     taskManager: TaskManager;
-    toastManager: ToastManager;
     indexManager: IndexManager;
     categoriesManager: CategoriesManager;
-
-    private scanner: VaultScanner;
-    private extractor: TaskExtractor;
-    private notifier: Notifier;
+    scanner: VaultScanner;
+    extractor: TaskExtractor;
+    notifier: Notifier;
+    toastManager: ToastManager;
 
     async onload(): Promise<void> {
         await this.loadSettings();
 
-        /* ─── Toast ─── */
         this.toastManager = new ToastManager();
         this.toastManager.setRTL(this.settings.language === 'fa');
 
-        /* ─── Managers ─── */
         this.indexManager = new IndexManager(this.app);
         this.categoriesManager = new CategoriesManager(this.app);
         this.scanner = new VaultScanner(this.app, () => this.settings);
@@ -51,71 +51,85 @@ export default class FirstTaskPlugin extends Plugin {
             () => this.settings
         );
 
-        /* ─── راه‌اندازی اولیه ─── */
-        this.taskManager.initialize().then(() => {
-            this.refreshPanel();
-        }).catch(e => {
-            console.warn('[First Task] Initialization failed:', e);
-        });
+        /* ═══════════════════════════════════════════════════
+           🆕 اول initialize، بعد Notifier
+           این ترتیب حیاتیه! اگه Notifier قبل از آماده شدن
+           TaskManager شروع کنه، cleanupOrphans با یه لیست
+           ناقص صدا زده می‌شه و متادیتای همه پاک می‌شه.
+           ═══════════════════════════════════════════════════ */
+        this.taskManager
+            .initialize()
+            .then(() => {
+                this.refreshPanel();
 
-        /* ─── Notifier ─── */
-        this.notifier = new Notifier(
-            this.app,
-            /* onFileChanged */
-            async (file) => {
-                await this.taskManager.rescanFile(file);
-                this.refreshPanel();
-            },
-            /* onFileDeleted */
-            (path) => {
-                this.taskManager.removeTasksForFile(path);
-                this.refreshPanel();
-            },
-            /* onFileRenamed */
-            async (oldPath, file) => {
-                this.taskManager.removeTasksForFile(oldPath);
-                await this.taskManager.rescanFile(file);
-                this.refreshPanel();
-            }
-        );
-        this.notifier.start();
+                /* 🆕 حالا که TaskManager آماده‌ست، Notifier رو شروع کن */
+                this.notifier = new Notifier(
+                    this.app,
+                    /* onFileChanged */
+                    async (file) => {
+                        await this.taskManager.rescanFile(file);
+                        this.refreshPanel();
+                    },
+                    /* onFileDeleted */
+                    (path) => {
+                        this.taskManager.removeTasksForFile(path);
+                        this.refreshPanel();
+                    },
+                    /* onFileRenamed */
+                    async (oldPath, file) => {
+                        this.taskManager.removeTasksForFile(oldPath);
+                        await this.taskManager.rescanFile(file);
+                        this.refreshPanel();
+                    }
+                );
+                this.notifier.start();
+            })
+            .catch((e) => {
+                console.warn('[First Task] Initialization failed:', e);
+            });
 
-        /* ─── Views ─── */
         this.registerView(
             VIEW_TYPE_FIRST_TASK,
             (leaf) => new TaskPanelView(leaf, this)
         );
-
         this.registerView(
             VIEW_TYPE_PLANNER,
             (leaf) => new PlannerView(leaf, this)
         );
 
-        /* ─── Ribbon icons ─── */
         this.addRibbonIcon('check-square', 'First Task', () => {
             this.activateView();
         });
-
         this.addRibbonIcon('calendar-days', 'Planner', () => {
             this.activatePlannerView();
         });
 
-        /* ─── Settings tab ─── */
         this.addSettingTab(new FirstTaskSettingsTab(this.app, this));
 
-        /* ─── Commands ─── */
         this.registerCommands();
     }
 
     async onunload(): Promise<void> {
+        /* ─── توقف Notifier ─── */
         if (this.notifier) this.notifier.stop();
+
+        /* 🆕 flush نهایی — ذخیره‌ی همه چیز قبل از بستن */
+        try {
+            if (this.indexManager) {
+                await this.indexManager.saveIndex();
+                await this.indexManager.saveFileCache();
+            }
+        } catch (e) {
+            console.warn('[First Task] Failed to flush on unload:', e);
+        }
+
         if (this.toastManager) this.toastManager.destroy();
     }
 
     /* ═══════════════════════════════════════════════════════
        کامندها
        ═══════════════════════════════════════════════════════ */
-    private registerCommands(): void {
+    registerCommands(): void {
         this.addCommand({
             id: 'open-panel',
             name: 'Open task panel',
@@ -146,11 +160,14 @@ export default class FirstTaskPlugin extends Plugin {
             name: 'Create new task',
             callback: async () => {
                 await this.activateView();
-                const { CreateTaskModal } = await import('./views/CreateTaskModal');
-                const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE_FIRST_TASK)[0];
+                const leaf = this.app.workspace.getLeavesOfType(
+                    VIEW_TYPE_FIRST_TASK
+                )[0];
                 if (leaf) {
                     const view = leaf.view as TaskPanelView;
-                    new CreateTaskModal(this.app, this, () => view.refresh()).open();
+                    new CreateTaskModal(this.app, this, () =>
+                        view.refresh()
+                    ).open();
                 }
             },
         });
@@ -162,13 +179,16 @@ export default class FirstTaskPlugin extends Plugin {
     async activateView(): Promise<void> {
         const { workspace } = this.app;
         let leaf: WorkspaceLeaf | null = null;
-        const leaves = workspace.getLeavesOfType(VIEW_TYPE_FIRST_TASK);
 
+        const leaves = workspace.getLeavesOfType(VIEW_TYPE_FIRST_TASK);
         if (leaves.length > 0) {
             leaf = leaves[0];
         } else {
             leaf = workspace.getRightLeaf(false);
-            await leaf?.setViewState({ type: VIEW_TYPE_FIRST_TASK, active: true });
+            await leaf?.setViewState({
+                type: VIEW_TYPE_FIRST_TASK,
+                active: true,
+            });
         }
         if (leaf) workspace.revealLeaf(leaf);
     }
@@ -176,13 +196,16 @@ export default class FirstTaskPlugin extends Plugin {
     async activatePlannerView(): Promise<void> {
         const { workspace } = this.app;
         let leaf: WorkspaceLeaf | null = null;
-        const leaves = workspace.getLeavesOfType(VIEW_TYPE_PLANNER);
 
+        const leaves = workspace.getLeavesOfType(VIEW_TYPE_PLANNER);
         if (leaves.length > 0) {
             leaf = leaves[0];
         } else {
             leaf = workspace.getRightLeaf(false);
-            await leaf?.setViewState({ type: VIEW_TYPE_PLANNER, active: true });
+            await leaf?.setViewState({
+                type: VIEW_TYPE_PLANNER,
+                active: true,
+            });
         }
         if (leaf) workspace.revealLeaf(leaf);
     }
@@ -193,9 +216,11 @@ export default class FirstTaskPlugin extends Plugin {
     refreshPanel(): void {
         const mainLeaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_FIRST_TASK);
         for (const leaf of mainLeaves) {
-            const view = leaf.view;
-            if (view && typeof (view as any).refresh === 'function') {
-                try { (view as TaskPanelView).refresh(); } catch (e) {
+            const view = leaf.view as any;
+            if (view && typeof view.refresh === 'function') {
+                try {
+                    view.refresh();
+                } catch (e) {
                     console.warn('[First Task] Main panel refresh failed:', e);
                 }
             }
@@ -203,9 +228,11 @@ export default class FirstTaskPlugin extends Plugin {
 
         const plannerLeaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_PLANNER);
         for (const leaf of plannerLeaves) {
-            const view = leaf.view;
-            if (view && typeof (view as any).refresh === 'function') {
-                try { (view as PlannerView).refresh(); } catch (e) {
+            const view = leaf.view as any;
+            if (view && typeof view.refresh === 'function') {
+                try {
+                    view.refresh();
+                } catch (e) {
                     console.warn('[First Task] Planner refresh failed:', e);
                 }
             }
@@ -219,12 +246,15 @@ export default class FirstTaskPlugin extends Plugin {
         try {
             const data = await this.loadData();
             this.settings = Object.assign({}, DEFAULT_SETTINGS, data || {});
+
             this.settings.dynamicCategories = Object.assign(
-                {}, DEFAULT_SETTINGS.dynamicCategories,
+                {},
+                DEFAULT_SETTINGS.dynamicCategories,
                 data?.dynamicCategories || {}
             );
             this.settings.plannerCards = Object.assign(
-                {}, DEFAULT_SETTINGS.plannerCards,
+                {},
+                DEFAULT_SETTINGS.plannerCards,
                 data?.plannerCards || {}
             );
         } catch (e) {
