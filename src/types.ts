@@ -1,233 +1,274 @@
 /* ════════════════════════════════════════════════════════════
-   📦 تایپ‌های First Task v0.1.3
-   ✅ _title و _source_file برای بازیابی خودکار متادیتا
+   🚀 First Task Plugin — v0.1.3
+   ✅ Notifier فقط بعد از initialize کامل شروع می‌شه
+   ✅ flush روی unload
    ════════════════════════════════════════════════════════════ */
 
-export interface ExtractedTask {
-    title: string;
-    completed: boolean;
-    description: string;
-    category: string;
-    pinned: boolean;
-    due_date_jalali: string;
-    due_date_gregorian: string;
-    due_date_ts: number;
-    created_jalali: string;
-    created_gregorian: string;
-    created_ts: number;
-    completed_jalali: string;
-    completed_gregorian: string;
-    completed_ts: number;
-    _id: string;
-    _source_file: string;
-    _source_line: number;
-    _occurrence: number;
+import { Plugin, WorkspaceLeaf } from 'obsidian';
+import {
+    DEFAULT_SETTINGS,
+    FirstTaskSettings,
+} from './types';
+import { TaskManager } from './managers/TaskManager';
+import { VaultScanner } from './managers/VaultScanner';
+import { TaskExtractor } from './managers/TaskExtractor';
+import { IndexManager } from './managers/IndexManager';
+import { CategoriesManager } from './managers/CategoriesManager';
+import { Notifier } from './managers/Notifier';
+import { ToastManager } from './managers/ToastManager';
+import { FirstTaskSettingsTab } from './settings/SettingsTab';
+import { TaskPanelView, VIEW_TYPE_FIRST_TASK } from './views/TaskPanelView';
+import { PlannerView, VIEW_TYPE_PLANNER } from './views/PlannerView';
+import { CreateTaskModal } from './views/CreateTaskModal';
+import { t } from './i18n';
+
+export default class FirstTaskPlugin extends Plugin {
+    settings: FirstTaskSettings;
+    taskManager: TaskManager;
+    indexManager: IndexManager;
+    categoriesManager: CategoriesManager;
+    scanner: VaultScanner;
+    extractor: TaskExtractor;
+    notifier: Notifier;
+    toastManager: ToastManager;
+
+    async onload(): Promise<void> {
+        await this.loadSettings();
+
+        this.toastManager = new ToastManager();
+        this.toastManager.setRTL(this.settings.language === 'fa');
+
+        this.indexManager = new IndexManager(this.app);
+        this.categoriesManager = new CategoriesManager(this.app);
+        this.scanner = new VaultScanner(this.app, () => this.settings);
+        this.extractor = new TaskExtractor();
+        this.taskManager = new TaskManager(
+            this.app,
+            this.scanner,
+            this.extractor,
+            this.indexManager,
+            this.categoriesManager,
+            () => this.settings
+        );
+
+        /* ═══════════════════════════════════════════════════
+           🆕 اول initialize، بعد Notifier
+           این ترتیب حیاتیه! اگه Notifier قبل از آماده شدن
+           TaskManager شروع کنه، cleanupOrphans با یه لیست
+           ناقص صدا زده می‌شه و متادیتای همه پاک می‌شه.
+           ═══════════════════════════════════════════════════ */
+        this.taskManager
+            .initialize()
+            .then(() => {
+                this.refreshPanel();
+
+                /* 🆕 حالا که TaskManager آماده‌ست، Notifier رو شروع کن */
+                this.notifier = new Notifier(
+                    this.app,
+                    /* onFileChanged */
+                    async (file) => {
+                        await this.taskManager.rescanFile(file);
+                        this.refreshPanel();
+                    },
+                    /* onFileDeleted */
+                    (path) => {
+                        this.taskManager.removeTasksForFile(path);
+                        this.refreshPanel();
+                    },
+                    /* onFileRenamed */
+                    async (oldPath, file) => {
+                        this.taskManager.removeTasksForFile(oldPath);
+                        await this.taskManager.rescanFile(file);
+                        this.refreshPanel();
+                    }
+                );
+                this.notifier.start();
+            })
+            .catch((e) => {
+                console.warn('[First Task] Initialization failed:', e);
+            });
+
+        this.registerView(
+            VIEW_TYPE_FIRST_TASK,
+            (leaf) => new TaskPanelView(leaf, this)
+        );
+        this.registerView(
+            VIEW_TYPE_PLANNER,
+            (leaf) => new PlannerView(leaf, this)
+        );
+
+        this.addRibbonIcon('check-square', 'First Task', () => {
+            this.activateView();
+        });
+        this.addRibbonIcon('calendar-days', 'Planner', () => {
+            this.activatePlannerView();
+        });
+
+        this.addSettingTab(new FirstTaskSettingsTab(this.app, this));
+
+        this.registerCommands();
+    }
+
+    async onunload(): Promise<void> {
+        /* ─── توقف Notifier ─── */
+        if (this.notifier) this.notifier.stop();
+
+        /* 🆕 flush نهایی — ذخیره‌ی همه چیز قبل از بستن */
+        try {
+            if (this.indexManager) {
+                await this.indexManager.saveIndex();
+                await this.indexManager.saveFileCache();
+            }
+        } catch (e) {
+            console.warn('[First Task] Failed to flush on unload:', e);
+        }
+
+        if (this.toastManager) this.toastManager.destroy();
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       کامندها
+       ═══════════════════════════════════════════════════════ */
+    registerCommands(): void {
+        this.addCommand({
+            id: 'open-panel',
+            name: 'Open task panel',
+            callback: () => this.activateView(),
+        });
+
+        this.addCommand({
+            id: 'open-planner',
+            name: 'Open planner',
+            callback: () => this.activatePlannerView(),
+        });
+
+        this.addCommand({
+            id: 'rescan-vault',
+            name: 'Rescan vault for tasks',
+            callback: async () => {
+                await this.taskManager.rescanAll();
+                this.refreshPanel();
+                this.toastManager.show(
+                    t(this.settings.language, 'notice_rescan_ok'),
+                    'success'
+                );
+            },
+        });
+
+        this.addCommand({
+            id: 'new-task',
+            name: 'Create new task',
+            callback: async () => {
+                await this.activateView();
+                const leaf = this.app.workspace.getLeavesOfType(
+                    VIEW_TYPE_FIRST_TASK
+                )[0];
+                if (leaf) {
+                    const view = leaf.view as TaskPanelView;
+                    new CreateTaskModal(this.app, this, () =>
+                        view.refresh()
+                    ).open();
+                }
+            },
+        });
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       باز کردن پنل‌ها
+       ═══════════════════════════════════════════════════════ */
+    async activateView(): Promise<void> {
+        const { workspace } = this.app;
+        let leaf: WorkspaceLeaf | null = null;
+
+        const leaves = workspace.getLeavesOfType(VIEW_TYPE_FIRST_TASK);
+        if (leaves.length > 0) {
+            leaf = leaves[0];
+        } else {
+            leaf = workspace.getRightLeaf(false);
+            await leaf?.setViewState({
+                type: VIEW_TYPE_FIRST_TASK,
+                active: true,
+            });
+        }
+        if (leaf) workspace.revealLeaf(leaf);
+    }
+
+    async activatePlannerView(): Promise<void> {
+        const { workspace } = this.app;
+        let leaf: WorkspaceLeaf | null = null;
+
+        const leaves = workspace.getLeavesOfType(VIEW_TYPE_PLANNER);
+        if (leaves.length > 0) {
+            leaf = leaves[0];
+        } else {
+            leaf = workspace.getRightLeaf(false);
+            await leaf?.setViewState({
+                type: VIEW_TYPE_PLANNER,
+                active: true,
+            });
+        }
+        if (leaf) workspace.revealLeaf(leaf);
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       رفرش همه پنل‌ها
+       ═══════════════════════════════════════════════════════ */
+    refreshPanel(): void {
+        const mainLeaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_FIRST_TASK);
+        for (const leaf of mainLeaves) {
+            const view = leaf.view as any;
+            if (view && typeof view.refresh === 'function') {
+                try {
+                    view.refresh();
+                } catch (e) {
+                    console.warn('[First Task] Main panel refresh failed:', e);
+                }
+            }
+        }
+
+        const plannerLeaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_PLANNER);
+        for (const leaf of plannerLeaves) {
+            const view = leaf.view as any;
+            if (view && typeof view.refresh === 'function') {
+                try {
+                    view.refresh();
+                } catch (e) {
+                    console.warn('[First Task] Planner refresh failed:', e);
+                }
+            }
+        }
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       تنظیمات
+       ═══════════════════════════════════════════════════════ */
+    async loadSettings(): Promise<void> {
+        try {
+            const data = await this.loadData();
+            this.settings = Object.assign({}, DEFAULT_SETTINGS, data || {});
+
+            this.settings.dynamicCategories = Object.assign(
+                {},
+                DEFAULT_SETTINGS.dynamicCategories,
+                data?.dynamicCategories || {}
+            );
+            this.settings.plannerCards = Object.assign(
+                {},
+                DEFAULT_SETTINGS.plannerCards,
+                data?.plannerCards || {}
+            );
+        } catch (e) {
+            console.debug('[First Task] No settings file, using defaults');
+            this.settings = Object.assign({}, DEFAULT_SETTINGS);
+        }
+    }
+
+    async saveSettings(): Promise<void> {
+        try {
+            await this.saveData(this.settings);
+            this.toastManager.setRTL(this.settings.language === 'fa');
+        } catch (e) {
+            console.warn('[First Task] Failed to save settings:', e);
+        }
+    }
 }
-
-/* 🆕 _title و _source_file برای بازیابی خودکار متادیتا */
-export interface TaskIndexEntry {
-    _title: string;
-    _source_file: string;
-    _last_seen_ts?: number;
-    description: string;
-    category: string;
-    pinned: boolean;
-    due_date_jalali: string;
-    due_date_gregorian: string;
-    due_date_ts: number;
-    created_jalali: string;
-    created_gregorian: string;
-    created_ts: number;
-    completed_jalali: string;
-    completed_gregorian: string;
-    completed_ts: number;
-}
-
-export const DEFAULT_ENTRY: TaskIndexEntry = {
-    _title: '',
-    _source_file: '',
-    _last_seen_ts: 0,
-    description: '',
-    category: '',
-    pinned: false,
-    due_date_jalali: '',
-    due_date_gregorian: '',
-    due_date_ts: 0,
-    created_jalali: '',
-    created_gregorian: '',
-    created_ts: 0,
-    completed_jalali: '',
-    completed_gregorian: '',
-    completed_ts: 0,
-};
-
-export interface TaskIndexFile {
-    version: number;
-    last_updated: number;
-    tasks: Record<string, TaskIndexEntry>;
-}
-
-export interface FileCacheEntry {
-    mtime: number;
-    size: number;
-    hash: string;
-}
-
-export interface FileCacheFile {
-    version: number;
-    files: Record<string, FileCacheEntry>;
-}
-
-export interface CategoryDef {
-    id: string;
-    name: string;
-    name_fa: string;
-}
-
-export interface CategoriesFile {
-    version: number;
-    categories: CategoryDef[];
-}
-
-export const DEFAULT_CATEGORIES: CategoriesFile = {
-    version: 1,
-    categories: [
-        { id: 'work',      name: 'Work',      name_fa: 'کاری' },
-        { id: 'study',     name: 'Study',     name_fa: 'درسی' },
-        { id: 'daily',     name: 'Daily',     name_fa: 'روزمره' },
-        { id: 'personal',  name: 'Personal',  name_fa: 'شخصی' },
-        { id: 'shopping',  name: 'Shopping',  name_fa: 'خرید' },
-        { id: 'finance',   name: 'Finance',   name_fa: 'مالی' },
-        { id: 'health',    name: 'Health',    name_fa: 'سلامتی' },
-        { id: 'important', name: 'Important', name_fa: 'مهم' },
-        { id: 'other',     name: 'Other',     name_fa: 'سایر' },
-    ],
-};
-
-export interface CompletedStats {
-    today: number;
-    yesterday: number;
-    this_week: number;
-    last_month: number;
-    this_year: number;
-    total: number;
-}
-
-export interface CategoryStats {
-    past: number;
-    today: number;
-    tomorrow: number;
-    this_week: number;
-    next_week: number;
-    this_month: number;
-    next_month: number;
-    this_year: number;
-    next_year: number;
-    no_date: number;
-    all: number;
-}
-
-export interface DynamicCategorySettings {
-    tomorrow: boolean;
-    this_week: boolean;
-    this_month: boolean;
-    this_year: boolean;
-}
-
-export type Language = 'en' | 'fa';
-export type TabType = 'pending' | 'completed';
-
-export type PlannerCard =
-    | 'past'
-    | 'today'
-    | 'tomorrow'
-    | 'this_week'
-    | 'next_week'
-    | 'this_month'
-    | 'next_month'
-    | 'this_year'
-    | 'next_year'
-    | 'no_date'
-    | 'all';
-
-export type WeekStartDay = 0 | 1 | 6;
-
-export interface PlannerCardsVisibility {
-    past: boolean;
-    today: boolean;
-    tomorrow: boolean;
-    this_week: boolean;
-    next_week: boolean;
-    this_month: boolean;
-    next_month: boolean;
-    this_year: boolean;
-    next_year: boolean;
-}
-
-export interface BulkUpdates {
-    applyCompleted: boolean;
-    completed: boolean;
-    applyCategory: boolean;
-    category: string;
-    applyDate: boolean;
-    dueDateJalali: string;
-    dueDateGregorian: string;
-    dueDateTs: number;
-    applyPin: boolean;
-    pinned: boolean;
-    applyNote: boolean;
-    targetFile: string;
-}
-
-export interface FirstTaskSettings {
-    language: Language;
-    useJalaliDate: boolean;
-    tasksPerPage: number;
-    weekStartDay: WeekStartDay;
-    includeFolders: string[];
-    excludeFolders: string[];
-    onlyMarkdown: boolean;
-    enableCategories: boolean;
-    showTaskBadges: boolean;
-    autoFillCreatedTime: boolean;
-    dynamicCategories: DynamicCategorySettings;
-    plannerCards: PlannerCardsVisibility;
-    currentTab: TabType;
-    panelCategory: string;
-    plannerCategory: string;
-    plannerCard: PlannerCard;
-}
-
-export const DEFAULT_SETTINGS: FirstTaskSettings = {
-    language: 'en',
-    useJalaliDate: false,
-    tasksPerPage: 20,
-    weekStartDay: 6,
-    includeFolders: [],
-    excludeFolders: ['.obsidian', 'FirstTask', '.trash'],
-    onlyMarkdown: true,
-    enableCategories: true,
-    showTaskBadges: false,
-    autoFillCreatedTime: true,
-    dynamicCategories: {
-        tomorrow: true,
-        this_week: true,
-        this_month: true,
-        this_year: true,
-    },
-    plannerCards: {
-        past: true,
-        today: true,
-        tomorrow: true,
-        this_week: true,
-        next_week: true,
-        this_month: true,
-        next_month: true,
-        this_year: true,
-        next_year: true,
-    },
-    currentTab: 'pending',
-    panelCategory: '',
-    plannerCategory: '',
-    plannerCard: 'all',
-};
