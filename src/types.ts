@@ -105,13 +105,17 @@ export interface CompletedStats {
     total: number;
 }
 
+/* 🆕 CategoryStats با کارت‌های جدید */
 export interface CategoryStats {
     past: number;
     today: number;
     tomorrow: number;
     this_week: number;
+    next_week: number;
     this_month: number;
+    next_month: number;
     this_year: number;
+    next_year: number;
     no_date: number;
     all: number;
 }
@@ -125,35 +129,47 @@ export interface DynamicCategorySettings {
 
 export type Language = 'en' | 'fa';
 export type TabType = 'pending' | 'completed';
-export type PlannerCard = 'past' | 'today' | 'tomorrow' | 'this_week' | 'this_month' | 'this_year' | 'no_date' | 'all';
+
+/* 🆕 PlannerCard با ۳ کارت جدید */
+export type PlannerCard =
+    | 'past'
+    | 'today'
+    | 'tomorrow'
+    | 'this_week'
+    | 'next_week'
+    | 'this_month'
+    | 'next_month'
+    | 'this_year'
+    | 'next_year'
+    | 'no_date'
+    | 'all';
+
 export type WeekStartDay = 0 | 1 | 6;
 
+/* 🆕 PlannerCardsVisibility با ۳ کارت جدید */
 export interface PlannerCardsVisibility {
     past: boolean;
     today: boolean;
     tomorrow: boolean;
     this_week: boolean;
+    next_week: boolean;
     this_month: boolean;
+    next_month: boolean;
     this_year: boolean;
+    next_year: boolean;
 }
 
-/* 🆕 Bulk updates */
 export interface BulkUpdates {
-    /* وضعیت انجام */
-    applyCompleted: boolean;      /* 🆕 */
-    completed: boolean;           /* 🆕 */
-    /* دسته‌بندی */
+    applyCompleted: boolean;
+    completed: boolean;
     applyCategory: boolean;
     category: string;
-    /* تاریخ */
     applyDate: boolean;
     dueDateJalali: string;
     dueDateGregorian: string;
     dueDateTs: number;
-    /* پین */
     applyPin: boolean;
     pinned: boolean;
-    /* انتقال به نوت */
     applyNote: boolean;
     targetFile: string;
 }
@@ -199,8 +215,11 @@ export const DEFAULT_SETTINGS: FirstTaskSettings = {
         today: true,
         tomorrow: true,
         this_week: true,
+        next_week: true,
         this_month: true,
+        next_month: true,
         this_year: true,
+        next_year: true,
     },
     currentTab: 'pending',
     panelCategory: '',
