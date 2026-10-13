@@ -20,7 +20,7 @@ export interface ExtractedTask {
     _id: string;
     _source_file: string;
     _source_line: number;
-    _occurrence: number;   /* 🆕 شماره تکرار عنوان توی فایل */
+    _occurrence: number;
 }
 
 export interface TaskIndexEntry {
@@ -126,7 +126,7 @@ export interface DynamicCategorySettings {
 export type Language = 'en' | 'fa';
 export type TabType = 'pending' | 'completed';
 export type PlannerCard = 'past' | 'today' | 'tomorrow' | 'this_week' | 'this_month' | 'this_year' | 'no_date' | 'all';
-export type WeekStartDay = 0 | 1 | 6;  /* 0=Sunday, 1=Monday, 6=Saturday */
+export type WeekStartDay = 0 | 1 | 6;
 
 export interface PlannerCardsVisibility {
     past: boolean;
@@ -135,6 +135,20 @@ export interface PlannerCardsVisibility {
     this_week: boolean;
     this_month: boolean;
     this_year: boolean;
+}
+
+/* 🆕 Bulk edit updates */
+export interface BulkUpdates {
+    applyCategory: boolean;
+    category: string;
+    applyDate: boolean;
+    dueDateJalali: string;
+    dueDateGregorian: string;
+    dueDateTs: number;
+    applyPin: boolean;
+    pinned: boolean;
+    applyNote: boolean;
+    targetFile: string;
 }
 
 export interface FirstTaskSettings {
@@ -147,6 +161,7 @@ export interface FirstTaskSettings {
     onlyMarkdown: boolean;
     enableCategories: boolean;
     showTaskBadges: boolean;
+    autoFillCreatedTime: boolean;   /* 🆕 */
     dynamicCategories: DynamicCategorySettings;
     plannerCards: PlannerCardsVisibility;
     currentTab: TabType;
@@ -165,6 +180,7 @@ export const DEFAULT_SETTINGS: FirstTaskSettings = {
     onlyMarkdown: true,
     enableCategories: true,
     showTaskBadges: false,
+    autoFillCreatedTime: true,   /* 🆕 پیش‌فرض روشن */
     dynamicCategories: {
         tomorrow: true,
         this_week: true,
