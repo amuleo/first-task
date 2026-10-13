@@ -1,21 +1,87 @@
 /* ════════════════════════════════════════════════════════════
    🔎 مودال جزئیات + ویرایش — v0.1.2
-   ✅ باکس عنوان و توضیحات (readonly)
+   ✅ DateSuggest + NoteSuggest توی حالت ویرایش
+   ✅ باکس عنوان و توضیحات
    ✅ دکمه‌های داینامیک
-   ✅ نام نوت ۱۲ کاراکتر
-   ✅ همیشه نمایش نام نوت (بدون تنظیم)
    ════════════════════════════════════════════════════════════ */
 
-import { App, Modal, Setting } from 'obsidian';
+import {
+    App, Modal, Setting, TFile, AbstractInputSuggest,
+} from 'obsidian';
 import type FirstTaskPlugin from '../main';
 import type { ExtractedTask } from '../types';
 import { t, applyDirection } from '../i18n';
 import { parseDateInput } from '../utils/jalaliDate';
 import { truncateNoteName } from '../utils/noteUtils';
 import { displayString } from '../utils/numberUtils';
+import { DateSuggest } from './DateSuggest';
 
 const NOTE_NAME_MAX = 12;
 
+/* ═══════════════════════════════════════════════════════
+   🎯 NoteSuggest داخلی
+   ═══════════════════════════════════════════════════════ */
+class NoteSuggest extends AbstractInputSuggest<TFile> {
+    private plugin: FirstTaskPlugin;
+    private selectCallback: (file: TFile) => void;
+
+    constructor(
+        app: App,
+        inputEl: HTMLInputElement,
+        plugin: FirstTaskPlugin,
+        selectCallback: (file: TFile) => void
+    ) {
+        super(app, inputEl);
+        this.plugin = plugin;
+        this.selectCallback = selectCallback;
+    }
+
+    getSuggestions(query: string): TFile[] {
+        const files = this.plugin.taskManager.getScannableFiles();
+        const lowerQuery = (query || '').toLowerCase();
+        const activeFile = this.app.workspace.getActiveFile();
+        const activePath = activeFile?.path || '';
+
+        const sorted = [...files].sort((a, b) => {
+            if (a.path === activePath) return -1;
+            if (b.path === activePath) return 1;
+            return b.stat.mtime - a.stat.mtime;
+        });
+
+        let filtered = sorted;
+        if (lowerQuery) {
+            filtered = sorted.filter(f => f.path.toLowerCase().includes(lowerQuery));
+        }
+        return filtered.slice(0, 20);
+    }
+
+    renderSuggestion(file: TFile, el: HTMLElement): void {
+        const activeFile = this.app.workspace.getActiveFile();
+        const isActive = activeFile?.path === file.path;
+        const name = file.path.split('/').pop() || file.path;
+        const folder = file.parent?.path || '';
+
+        const container = el.createDiv({ cls: 'first-task-suggest-item' });
+        const nameRow = container.createDiv({ cls: 'first-task-suggest-name' });
+        if (isActive) {
+            nameRow.createSpan({ cls: 'first-task-suggest-active-dot', text: '● ' });
+        }
+        nameRow.createSpan({ text: name });
+
+        if (folder && folder !== '/') {
+            container.createDiv({ text: folder, cls: 'first-task-suggest-path' });
+        }
+    }
+
+    selectSuggestion(file: TFile): void {
+        this.selectCallback(file);
+        this.close();
+    }
+}
+
+/* ═══════════════════════════════════════════════════════
+   🔎 مودال
+   ═══════════════════════════════════════════════════════ */
 export class TaskDetailsModal extends Modal {
     plugin: FirstTaskPlugin;
     task: ExtractedTask;
@@ -56,7 +122,7 @@ export class TaskDetailsModal extends Modal {
         const lang = this.plugin.settings.language;
         const useJalali = this.plugin.settings.useJalaliDate;
 
-        /* ─── نام نوت مبدأ (همیشه نمایش داده می‌شه) ─── */
+        /* ─── نام نوت ─── */
         const noteName = this.task._source_file.split('/').pop() || this.task._source_file;
         const truncated = truncateNoteName(noteName, NOTE_NAME_MAX);
 
@@ -73,13 +139,13 @@ export class TaskDetailsModal extends Modal {
             this.openSourceNote();
         };
 
-        /* ─── باکس عنوان (readonly) ─── */
+        /* ─── باکس عنوان ─── */
         const titleBox = parent.createDiv({ cls: 'first-task-details-box' });
         titleBox.createDiv({ cls: 'first-task-details-box-label', text: t(lang, 'field_title') });
         const titleContent = titleBox.createDiv({ cls: 'first-task-details-box-content' });
         titleContent.setText(this.task.title);
 
-        /* ─── باکس توضیحات (readonly) ─── */
+        /* ─── باکس توضیحات ─── */
         const descBox = parent.createDiv({ cls: 'first-task-details-box' });
         descBox.createDiv({ cls: 'first-task-details-box-label', text: t(lang, 'field_description') });
         const descContent = descBox.createDiv({ cls: 'first-task-details-box-content' });
@@ -216,6 +282,7 @@ export class TaskDetailsModal extends Modal {
             cls: 'first-task-modal-title',
         });
 
+        /* ─── عنوان ─── */
         new Setting(parent)
             .setName(t(lang, 'field_title'))
             .addText(text => {
@@ -223,6 +290,7 @@ export class TaskDetailsModal extends Modal {
                 text.onChange(v => { this.editTitle = v; });
             });
 
+        /* ─── توضیحات ─── */
         new Setting(parent)
             .setName(t(lang, 'field_description'))
             .addTextArea(ta => {
@@ -232,6 +300,7 @@ export class TaskDetailsModal extends Modal {
                 ta.onChange(v => { this.editDescription = v; });
             });
 
+        /* ─── تاریخ با Suggest ─── */
         new Setting(parent)
             .setName(t(lang, 'field_due_date'))
             .addText(text => {
@@ -239,8 +308,15 @@ export class TaskDetailsModal extends Modal {
                 text.inputEl.dir = 'ltr';
                 text.setPlaceholder(useJalali ? '1405/07/25' : '2026-10-15');
                 text.onChange(v => { this.editDate = v; });
+
+                /* 🆕 Date Suggest */
+                new DateSuggest(this.app, text.inputEl, this.plugin, (dateStr) => {
+                    text.setValue(displayString(dateStr, lang));
+                    this.editDate = dateStr;
+                });
             });
 
+        /* ─── دسته‌بندی ─── */
         if (this.plugin.settings.enableCategories) {
             const cats = this.plugin.taskManager.getCategories();
             new Setting(parent)
@@ -256,6 +332,21 @@ export class TaskDetailsModal extends Modal {
                 });
         }
 
+        /* ─── نوت مبدأ با Suggest ─── */
+        new Setting(parent)
+            .setName(t(lang, 'field_source_file'))
+            .setDesc(t(lang, 'field_source_file_hint'))
+            .addText(text => {
+                text.setValue(this.task._source_file);
+                text.inputEl.style.width = '100%';
+
+                /* 🆕 Note Suggest */
+                new NoteSuggest(this.app, text.inputEl, this.plugin, (file) => {
+                    text.setValue(file.path);
+                });
+            });
+
+        /* ─── دکمه‌ها ─── */
         const actions = parent.createDiv({ cls: 'first-task-modal-buttons' });
         const cancelBtn = actions.createEl('button', { text: t(lang, 'btn_cancel') });
         cancelBtn.onclick = () => {
