@@ -3,7 +3,7 @@
    ✅ شروع هفته (شنبه/یکشنبه/دوشنبه)
    ✅ نمایش badge ها (پیش‌فرض خاموش)
    ✅ پر کردن خودکار تاریخ ساخت
-   ✅ کارت‌های پلنر (قابل تنظیم)
+   ✅ کارت‌های پلنر (قابل تنظیم) — ۹ کارت + بدون تاریخ + همه
    ════════════════════════════════════════════════════════════ */
 
 import { App, PluginSettingTab, Setting } from 'obsidian';
@@ -190,7 +190,7 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
             .setHeading();
 
         const mkCardToggle = (
-            key: 'past' | 'today' | 'tomorrow' | 'this_week' | 'this_month' | 'this_year',
+            key: 'past' | 'today' | 'tomorrow' | 'this_week' | 'next_week' | 'this_month' | 'next_month' | 'this_year' | 'next_year',
             labelKey: string
         ) => {
             new Setting(containerEl)
@@ -208,8 +208,11 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
         mkCardToggle('today', 'settings_planner_cards_today');
         mkCardToggle('tomorrow', 'settings_planner_cards_tomorrow');
         mkCardToggle('this_week', 'settings_planner_cards_this_week');
+        mkCardToggle('next_week', 'settings_planner_cards_next_week');
         mkCardToggle('this_month', 'settings_planner_cards_this_month');
+        mkCardToggle('next_month', 'settings_planner_cards_next_month');
         mkCardToggle('this_year', 'settings_planner_cards_this_year');
+        mkCardToggle('next_year', 'settings_planner_cards_next_year');
     }
 
     private parseFolders(input: string): string[] {
