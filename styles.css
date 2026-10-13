@@ -265,6 +265,14 @@
     border-inline-start: 3px solid var(--interactive-accent);
     background: var(--background-secondary-alt);
 }
+
+/* 🆕 حالت انتخاب */
+.first-task-card.is-selected {
+    border-color: var(--interactive-accent) !important;
+    background: var(--background-modifier-active-hover) !important;
+    box-shadow: 0 0 0 1px var(--interactive-accent) inset;
+}
+
 .first-task-card-checkbox {
     display: flex;
     align-items: center;
@@ -363,6 +371,81 @@
     border-color: var(--interactive-accent);
     color: var(--text-accent);
     border-style: solid;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   🆕 نوار انتخاب گروهی
+   ═══════════════════════════════════════════════════════════ */
+.first-task-selection-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 12px;
+    margin-top: 10px;
+    background: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 10px;
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
+}
+.first-task-selection-count {
+    font-size: var(--font-ui-small);
+    font-weight: 600;
+    color: var(--text-normal);
+    white-space: nowrap;
+}
+.first-task-selection-actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.first-task-selection-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 12px;
+    font-size: var(--font-ui-smaller);
+    font-weight: 500;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    border: 1px solid var(--background-modifier-border);
+    background: var(--background-primary);
+    color: var(--text-normal);
+}
+.first-task-selection-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+.first-task-selection-btn:not(:disabled):hover {
+    background: var(--background-secondary-alt);
+}
+.first-task-selection-btn.mod-cta:not(:disabled) {
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border-color: var(--interactive-accent);
+}
+.first-task-selection-btn.mod-warning:not(:disabled) {
+    background: var(--color-red, #e74c3c);
+    color: white;
+    border-color: var(--color-red, #e74c3c);
+}
+.first-task-selection-icon svg {
+    width: 13px;
+    height: 13px;
+}
+
+/* ─── خلاصه توی مودال ویرایش گروهی ─── */
+.first-task-bulk-summary {
+    padding: 8px 12px;
+    margin-bottom: 12px;
+    background: var(--background-secondary);
+    border-radius: 6px;
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+    text-align: center;
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -500,7 +583,7 @@
 }
 
 /* ═══════════════════════════════════════════════════════════
-   🎯 Suggest (نوت + تاریخ)
+   🎯 Suggest
    ═══════════════════════════════════════════════════════════ */
 .first-task-suggest-item {
     display: flex;
@@ -635,104 +718,8 @@
         font-size: 12px;
         padding: 7px 10px;
     }
-}
 
-@media (min-width: 601px) and (max-width: 900px) {
-    .first-task-toast-container {
-        top: calc(max(14px, env(safe-area-inset-top)) + 24px) !important;
-    }
-}
-/* ═══════════════════════════════════════════════════════════
-   🆕 حالت انتخاب گروهی
-   ═══════════════════════════════════════════════════════════ */
-.first-task-card.is-selected {
-    border-color: var(--interactive-accent) !important;
-    background: var(--background-modifier-active-hover) !important;
-    box-shadow: 0 0 0 1px var(--interactive-accent) inset;
-}
-
-.first-task-selection-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    padding: 10px 12px;
-    margin-top: 10px;
-    background: var(--background-secondary);
-    border: 1px solid var(--background-modifier-border);
-    border-radius: 10px;
-    position: sticky;
-    bottom: 0;
-    z-index: 10;
-}
-
-.first-task-selection-count {
-    font-size: var(--font-ui-small);
-    font-weight: 600;
-    color: var(--text-normal);
-    white-space: nowrap;
-}
-
-.first-task-selection-actions {
-    display: flex;
-    gap: 6px;
-    flex-wrap: wrap;
-}
-
-.first-task-selection-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 6px 12px;
-    font-size: var(--font-ui-smaller);
-    font-weight: 500;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.15s ease;
-    border: 1px solid var(--background-modifier-border);
-    background: var(--background-primary);
-    color: var(--text-normal);
-}
-
-.first-task-selection-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-.first-task-selection-btn:not(:disabled):hover {
-    background: var(--background-secondary-alt);
-}
-
-.first-task-selection-btn.mod-cta:not(:disabled) {
-    background: var(--interactive-accent);
-    color: var(--text-on-accent);
-    border-color: var(--interactive-accent);
-}
-
-.first-task-selection-btn.mod-warning:not(:disabled) {
-    background: var(--color-red, #e74c3c);
-    color: white;
-    border-color: var(--color-red, #e74c3c);
-}
-
-.first-task-selection-icon svg {
-    width: 13px;
-    height: 13px;
-}
-
-/* ─── خلاصه توی مودال ویرایش گروهی ─── */
-.first-task-bulk-summary {
-    padding: 8px 12px;
-    margin-bottom: 12px;
-    background: var(--background-secondary);
-    border-radius: 6px;
-    font-size: var(--font-ui-smaller);
-    color: var(--text-muted);
-    text-align: center;
-}
-
-/* ─── موبایل ─── */
-@media (max-width: 600px) {
+    /* 🆕 نوار انتخاب روی موبایل */
     .first-task-selection-bar {
         flex-direction: column;
         align-items: stretch;
@@ -743,5 +730,11 @@
     .first-task-selection-btn {
         flex: 1;
         justify-content: center;
+    }
+}
+
+@media (min-width: 601px) and (max-width: 900px) {
+    .first-task-toast-container {
+        top: calc(max(14px, env(safe-area-inset-top)) + 24px) !important;
     }
 }
