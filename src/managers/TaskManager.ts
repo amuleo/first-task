@@ -1,7 +1,7 @@
 /* ════════════════════════════════════════════════════════════
    📋 مدیریت تسک‌ها — v0.1.2 (نهایی)
+   ✅ پشتیبانی از occurrence (عنوان تکراری)
    ✅ استفاده از توابع دقیق تاریخ
-   ✅ پشتیبانی از weekStartDay
    ✅ متدهای Planner
    ════════════════════════════════════════════════════════════ */
 
@@ -277,7 +277,7 @@ export class TaskManager {
     }
 
     /* ═══════════════════════════════════════════════════════
-       دسته‌بندی داینامیک (روی تسک)
+       دسته‌بندی داینامیک
        ═══════════════════════════════════════════════════════ */
     getTaskDynamicCategories(task: ExtractedTask): string[] {
         const cats: string[] = [];
@@ -298,7 +298,7 @@ export class TaskManager {
     }
 
     /* ═══════════════════════════════════════════════════════
-       Planner: فیلتر زمانی (دقیق)
+       Planner
        ═══════════════════════════════════════════════════════ */
     filterByCard(tasks: ExtractedTask[], card: PlannerCard): ExtractedTask[] {
         const useJalali = this.settings.useJalaliDate;
@@ -376,7 +376,6 @@ export class TaskManager {
         return this.categories.getDisplayName(id, this.settings.language);
     }
 
-    /* ─── آیا تسکی بدون دسته وجود داره؟ ─── */
     hasTasksWithoutCategory(): boolean {
         return this.getPendingTasks().some(t => !t.category);
     }
@@ -475,7 +474,17 @@ export class TaskManager {
                         lines[lineIdx] = `${match[1]}${updates.title.trim()}${match[4]}`;
                         await this.app.vault.modify(file, lines.join('\n'));
 
-                        const newId = generateTaskId(task._source_file, updates.title.trim());
+                        /* 🆕 محاسبه occurrence جدید */
+                        const newContent = lines.join('\n');
+                        const newOccurrences = newContent
+                            .split('\n')
+                            .filter(line => {
+                                const m = /^\s*[-*+]\s+\[([ xX])\]\s+(.+?)\s*$/.exec(line);
+                                return m && m[2].trim() === updates.title.trim();
+                            })
+                            .length - 1;
+
+                        const newId = generateTaskId(task._source_file, updates.title.trim(), Math.max(0, newOccurrences));
                         const oldEntry = this.index.getEntry(taskId);
                         await this.index.removeEntry(taskId);
                         await this.index.updateEntry(newId, {
@@ -531,10 +540,20 @@ export class TaskManager {
 
         try {
             const content = await this.scanner.readFile(file);
+
+            /* 🆕 محاسبه occurrence */
+            const existingOccurrences = content
+                .split('\n')
+                .filter(line => {
+                    const m = /^\s*[-*+]\s+\[([ xX])\]\s+(.+?)\s*$/.exec(line);
+                    return m && m[2].trim() === title;
+                })
+                .length;
+
             const result = this.extractor.addTaskToContent(content, title);
             await this.app.vault.modify(file, result.content);
 
-            const newId = generateTaskId(sourceFile, title);
+            const newId = generateTaskId(sourceFile, title, existingOccurrences);
             const now = new Date();
 
             await this.index.updateEntry(newId, {
