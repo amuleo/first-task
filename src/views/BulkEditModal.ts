@@ -1,6 +1,7 @@
 /* ════════════════════════════════════════════════════════════
    ✏️ Bulk Edit Modal — v0.1.2
-   ✅ وضعیت انجام / دسته‌بندی / تاریخ / پین / نوت
+   ✅ وضعیت انجام داینامیک (انجام شده / برگرداندن / mixed)
+   ✅ دسته‌بندی، تاریخ، پین، نوت
    ✅ اعداد فارسی داینامیک
    ════════════════════════════════════════════════════════════ */
 
@@ -21,12 +22,7 @@ class NoteSuggest extends AbstractInputSuggest<TFile> {
     private plugin: FirstTaskPlugin;
     private selectCallback: (file: TFile) => void;
 
-    constructor(
-        app: App,
-        inputEl: HTMLInputElement,
-        plugin: FirstTaskPlugin,
-        selectCallback: (file: TFile) => void
-    ) {
+    constructor(app: App, inputEl: HTMLInputElement, plugin: FirstTaskPlugin, selectCallback: (file: TFile) => void) {
         super(app, inputEl);
         this.plugin = plugin;
         this.selectCallback = selectCallback;
@@ -66,6 +62,11 @@ class NoteSuggest extends AbstractInputSuggest<TFile> {
 }
 
 /* ═══════════════════════════════════════════════════════
+   Selection State Type
+   ═══════════════════════════════════════════════════════ */
+type SelectionState = 'all-pending' | 'all-completed' | 'mixed' | 'empty';
+
+/* ═══════════════════════════════════════════════════════
    Bulk Edit Modal
    ═══════════════════════════════════════════════════════ */
 export class BulkEditModal extends Modal {
@@ -75,6 +76,7 @@ export class BulkEditModal extends Modal {
     private busy = false;
 
     private updates: BulkUpdates;
+    private selectionState: SelectionState;
 
     constructor(
         app: App,
@@ -87,9 +89,26 @@ export class BulkEditModal extends Modal {
         this.taskIds = taskIds;
         this.onDone = onDone;
 
+        /* 🆕 محاسبه‌ی وضعیت انتخاب */
+        this.selectionState = this.computeSelectionState();
+
+        /* 🆕 مقدار پیش‌فرض بر اساس وضعیت */
+        let defaultCompleted = true;
+        let defaultApply = false;
+        if (this.selectionState === 'all-pending') {
+            defaultCompleted = true;
+            defaultApply = true;
+        } else if (this.selectionState === 'all-completed') {
+            defaultCompleted = false;
+            defaultApply = true;
+        } else if (this.selectionState === 'mixed') {
+            defaultCompleted = true;
+            defaultApply = false;
+        }
+
         this.updates = {
-            applyCompleted: false,      /* 🆕 */
-            completed: true,            /* 🆕 */
+            applyCompleted: defaultApply,
+            completed: defaultCompleted,
             applyCategory: false,
             category: '',
             applyDate: false,
@@ -101,6 +120,22 @@ export class BulkEditModal extends Modal {
             applyNote: false,
             targetFile: '',
         };
+    }
+
+    /* 🆕 محاسبه‌ی وضعیت تسک‌های انتخاب‌شده */
+    private computeSelectionState(): SelectionState {
+        let pending = 0;
+        let done = 0;
+        for (const id of this.taskIds) {
+            const task = this.plugin.taskManager.getTaskById(id);
+            if (!task) continue;
+            if (task.completed) done++;
+            else pending++;
+        }
+        if (done === 0 && pending === 0) return 'empty';
+        if (done === 0) return 'all-pending';
+        if (pending === 0) return 'all-completed';
+        return 'mixed';
     }
 
     onOpen(): void { this.render(); }
@@ -118,32 +153,49 @@ export class BulkEditModal extends Modal {
             cls: 'first-task-modal-title',
         });
 
-        /* ─── خلاصه (با اعداد داینامیک) ─── */
         const count = this.taskIds.length;
         const summary = contentEl.createDiv({ cls: 'first-task-bulk-summary' });
         summary.setText(t(lang, 'bulk_selected_count', {
             count: displayNumber(count, lang),
         }));
 
-        /* ═══════ وضعیت انجام 🆕 ═══════ */
-        new Setting(contentEl)
-            .setName(t(lang, 'bulk_field_completed'))
-            .addToggle(tg => tg
-                .setValue(this.updates.applyCompleted)
-                .onChange(v => {
-                    this.updates.applyCompleted = v;
-                    this.render();
-                }));
-
-        if (this.updates.applyCompleted) {
+        /* ═══════ وضعیت انجام (داینامیک) ═══════ */
+        if (this.selectionState !== 'empty') {
             new Setting(contentEl)
-                .setName(t(lang, 'bulk_completed_value'))
-                .addDropdown(dd => {
-                    dd.addOption('true', t(lang, 'bulk_completed_on'));
-                    dd.addOption('false', t(lang, 'bulk_completed_off'));
-                    dd.setValue(this.updates.completed ? 'true' : 'false');
-                    dd.onChange(v => { this.updates.completed = v === 'true'; });
-                });
+                .setName(t(lang, 'bulk_field_completed'))
+                .addToggle(tg => tg
+                    .setValue(this.updates.applyCompleted)
+                    .onChange(v => {
+                        this.updates.applyCompleted = v;
+                        this.render();
+                    }));
+
+            if (this.updates.applyCompleted) {
+                const hintSetting = new Setting(contentEl);
+
+                /* ─── حالت ۱: همه در انتظار → انجام شد ─── */
+                if (this.selectionState === 'all-pending') {
+                    this.updates.completed = true;
+                    hintSetting.setDesc(t(lang, 'bulk_completed_pending_hint'));
+                }
+                /* ─── حالت ۲: همه انجام شده → برگرداندن ─── */
+                else if (this.selectionState === 'all-completed') {
+                    this.updates.completed = false;
+                    hintSetting.setDesc(t(lang, 'bulk_completed_done_hint'));
+                }
+                /* ─── حالت ۳: مخلوط → کاربر انتخاب می‌کنه ─── */
+                else {
+                    hintSetting
+                        .setName(t(lang, 'bulk_completed_value'))
+                        .setDesc(t(lang, 'bulk_completed_mixed_hint'))
+                        .addDropdown(dd => {
+                            dd.addOption('true', t(lang, 'bulk_completed_on'));
+                            dd.addOption('false', t(lang, 'bulk_completed_off'));
+                            dd.setValue(this.updates.completed ? 'true' : 'false');
+                            dd.onChange(v => { this.updates.completed = v === 'true'; });
+                        });
+                }
+            }
         }
 
         /* ═══════ دسته‌بندی ═══════ */
@@ -172,7 +224,7 @@ export class BulkEditModal extends Modal {
             }
         }
 
-        /* ═══════ تاریخ انجام ═══════ */
+        /* ═══════ تاریخ ═══════ */
         new Setting(contentEl)
             .setName(t(lang, 'bulk_field_date'))
             .addToggle(tg => tg
