@@ -1,8 +1,10 @@
 /* ════════════════════════════════════════════════════════════
    📋 مدیریت تسک‌ها — v0.1.2 (نهایی)
-   ✅ پشتیبانی از occurrence (عنوان تکراری)
-   ✅ استفاده از توابع دقیق تاریخ
+   ✅ پشتیبانی از occurrence
+   ✅ توابع دقیق تاریخ
    ✅ متدهای Planner
+   ✅ Auto-fill created time
+   ✅ حذف/ویرایش گروهی
    ════════════════════════════════════════════════════════════ */
 
 import { App, TFile } from 'obsidian';
@@ -14,6 +16,7 @@ import type {
     TaskIndexEntry,
     CategoryDef,
     PlannerCard,
+    BulkUpdates,
 } from '../types';
 import { VaultScanner } from './VaultScanner';
 import { TaskExtractor } from './TaskExtractor';
@@ -63,7 +66,7 @@ export class TaskManager {
     }
 
     /* ═══════════════════════════════════════════════════════
-       اسکن
+       اسکن کامل
        ═══════════════════════════════════════════════════════ */
     async rescanAll(): Promise<void> {
         const files = this.scanner.getMarkdownFiles();
@@ -83,7 +86,8 @@ export class TaskManager {
             const entry = this.index.getEntry(task._id);
             this.applyEntry(task, entry);
 
-            if (!entry.created_ts) {
+            /* 🆕 فقط اگه autoFillCreatedTime روشن باشه */
+            if (!entry.created_ts && this.settings.autoFillCreatedTime) {
                 await this.setCreatedTime(task._id);
                 const refreshed = this.index.getEntry(task._id);
                 this.applyEntry(task, refreshed);
@@ -156,7 +160,8 @@ export class TaskManager {
             const entry = this.index.getEntry(task._id);
             this.applyEntry(task, entry);
 
-            if (!entry.created_ts) {
+            /* 🆕 شرط autoFillCreatedTime */
+            if (!entry.created_ts && this.settings.autoFillCreatedTime) {
                 await this.setCreatedTime(task._id);
                 const refreshed = this.index.getEntry(task._id);
                 this.applyEntry(task, refreshed);
@@ -408,7 +413,7 @@ export class TaskManager {
                 completed_ts: newCompleted ? now.getTime() : 0,
             };
 
-            if (!task.created_ts) {
+            if (!task.created_ts && this.settings.autoFillCreatedTime) {
                 patch.created_jalali = getJalaliDateFull(now);
                 patch.created_gregorian = getGregorianDateFull(now);
                 patch.created_ts = now.getTime();
@@ -474,7 +479,6 @@ export class TaskManager {
                         lines[lineIdx] = `${match[1]}${updates.title.trim()}${match[4]}`;
                         await this.app.vault.modify(file, lines.join('\n'));
 
-                        /* 🆕 محاسبه occurrence جدید */
                         const newContent = lines.join('\n');
                         const newOccurrences = newContent
                             .split('\n')
@@ -541,7 +545,6 @@ export class TaskManager {
         try {
             const content = await this.scanner.readFile(file);
 
-            /* 🆕 محاسبه occurrence */
             const existingOccurrences = content
                 .split('\n')
                 .filter(line => {
@@ -601,6 +604,178 @@ export class TaskManager {
             console.warn('[First Task] deleteTask failed:', e);
             return false;
         }
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       🆕 حذف گروهی
+       ═══════════════════════════════════════════════════════ */
+    async bulkDelete(taskIds: string[]): Promise<boolean> {
+        if (taskIds.length === 0) return false;
+
+        const byFile = new Map<string, ExtractedTask[]>();
+        for (const id of taskIds) {
+            const task = this.tasks.get(id);
+            if (!task) continue;
+            if (!byFile.has(task._source_file)) byFile.set(task._source_file, []);
+            byFile.get(task._source_file)!.push(task);
+        }
+
+        for (const [filePath, tasks] of byFile) {
+            const file = this.scanner.getFileByPath(filePath);
+            if (!file) continue;
+
+            let content = await this.scanner.readFile(file);
+
+            /* ─── مرتب نزولی بر اساس خط ─── */
+            const sortedTasks = [...tasks].sort((a, b) => b._source_line - a._source_line);
+
+            for (const task of sortedTasks) {
+                const currentLine = this.extractor.findTaskLine(content, filePath, task._id);
+                if (currentLine !== -1) {
+                    const lines = content.split('\n');
+                    lines.splice(currentLine, 1);
+                    content = lines.join('\n');
+                }
+
+                await this.index.removeEntry(task._id);
+                this.tasks.delete(task._id);
+            }
+
+            await this.app.vault.modify(file, content);
+        }
+
+        this.recomputeStats();
+        return true;
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       🆕 ویرایش گروهی
+       ═══════════════════════════════════════════════════════ */
+    async bulkUpdate(taskIds: string[], updates: BulkUpdates): Promise<boolean> {
+        if (taskIds.length === 0) return false;
+
+        /* ─── اگه انتقال به نوت داریم → روش جدا ─── */
+        if (updates.applyNote && updates.targetFile) {
+            return await this.bulkMoveAndUpdate(taskIds, updates);
+        }
+
+        /* ─── وگرنه فقط index ─── */
+        for (const id of taskIds) {
+            const task = this.tasks.get(id);
+            if (!task) continue;
+
+            const patch: Partial<TaskIndexEntry> = {};
+
+            if (updates.applyCategory) patch.category = updates.category;
+            if (updates.applyDate) {
+                patch.due_date_jalali = updates.dueDateJalali;
+                patch.due_date_gregorian = updates.dueDateGregorian;
+                patch.due_date_ts = updates.dueDateTs;
+            }
+            if (updates.applyPin) patch.pinned = updates.pinned;
+
+            if (Object.keys(patch).length > 0) {
+                await this.index.updateEntry(id, patch);
+
+                if (patch.category !== undefined) task.category = patch.category;
+                if (patch.due_date_jalali !== undefined) task.due_date_jalali = patch.due_date_jalali;
+                if (patch.due_date_gregorian !== undefined) task.due_date_gregorian = patch.due_date_gregorian;
+                if (patch.due_date_ts !== undefined) task.due_date_ts = patch.due_date_ts;
+                if (patch.pinned !== undefined) task.pinned = patch.pinned;
+            }
+        }
+
+        this.recomputeStats();
+        return true;
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       🆕 انتقال گروهی + آپدیت
+       ═══════════════════════════════════════════════════════ */
+    private async bulkMoveAndUpdate(taskIds: string[], updates: BulkUpdates): Promise<boolean> {
+        const targetFile = this.scanner.getFileByPath(updates.targetFile);
+        if (!targetFile) return false;
+
+        /* ─── جمع‌آوری ─── */
+        const collected: { task: ExtractedTask; entry: TaskIndexEntry }[] = [];
+        for (const id of taskIds) {
+            const task = this.tasks.get(id);
+            if (!task) continue;
+            const entry = this.index.getEntry(id);
+            collected.push({ task, entry });
+        }
+        if (collected.length === 0) return false;
+
+        /* ─── گروه‌بندی بر اساس فایل مبدأ ─── */
+        const byFile = new Map<string, { task: ExtractedTask; entry: TaskIndexEntry }[]>();
+        for (const item of collected) {
+            const path = item.task._source_file;
+            if (!byFile.has(path)) byFile.set(path, []);
+            byFile.get(path)!.push(item);
+        }
+
+        /* ─── حذف از فایل‌های مبدأ ─── */
+        for (const [filePath, items] of byFile) {
+            const file = this.scanner.getFileByPath(filePath);
+            if (!file) continue;
+
+            let content = await this.scanner.readFile(file);
+            const sortedItems = [...items].sort((a, b) => b.task._source_line - a.task._source_line);
+
+            for (const { task } of sortedItems) {
+                const line = this.extractor.findTaskLine(content, filePath, task._id);
+                if (line !== -1) {
+                    const lines = content.split('\n');
+                    lines.splice(line, 1);
+                    content = lines.join('\n');
+                }
+                await this.index.removeEntry(task._id);
+                this.tasks.delete(task._id);
+            }
+
+            await this.app.vault.modify(file, content);
+        }
+
+        /* ─── افزودن به فایل هدف ─── */
+        let targetContent = await this.scanner.readFile(targetFile);
+
+        const existing = this.extractor.extractFromContent(targetContent, targetFile.path);
+        const titleCount = new Map<string, number>();
+        for (const t of existing) {
+            titleCount.set(t.title, (titleCount.get(t.title) || 0) + 1);
+        }
+
+        for (const { task, entry } of collected) {
+            const occ = titleCount.get(task.title) || 0;
+            titleCount.set(task.title, occ + 1);
+
+            const result = this.extractor.addTaskToContent(targetContent, task.title);
+            targetContent = result.content;
+
+            const newId = generateTaskId(targetFile.path, task.title, occ);
+
+            const newEntry: TaskIndexEntry = {
+                description: entry.description,
+                category: updates.applyCategory ? updates.category : entry.category,
+                pinned: updates.applyPin ? updates.pinned : entry.pinned,
+                due_date_jalali: updates.applyDate ? updates.dueDateJalali : entry.due_date_jalali,
+                due_date_gregorian: updates.applyDate ? updates.dueDateGregorian : entry.due_date_gregorian,
+                due_date_ts: updates.applyDate ? updates.dueDateTs : entry.due_date_ts,
+                created_jalali: entry.created_jalali,
+                created_gregorian: entry.created_gregorian,
+                created_ts: entry.created_ts,
+                completed_jalali: entry.completed_jalali,
+                completed_gregorian: entry.completed_gregorian,
+                completed_ts: entry.completed_ts,
+            };
+
+            await this.index.updateEntry(newId, newEntry);
+        }
+
+        await this.app.vault.modify(targetFile, targetContent);
+        await this.rescanFile(targetFile);
+
+        return true;
     }
 
     /* ═══════════════════════════════════════════════════════
