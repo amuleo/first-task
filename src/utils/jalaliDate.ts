@@ -1,8 +1,8 @@
 /* ════════════════════════════════════════════════════════════
    📅 تاریخ شمسی — v0.1.2 (پیشرفته)
    ✅ الگوریتم دقیق khusrav/jalaali
-   ✅ پشتیبانی کامل کبیسه‌ها
-   ✅ توابع کمکی برای DateSuggest
+   ✅ پشتیبانی تا سال ۳۱۷۸
+   ✅ محاسبات دقیق هفته / ماه / سال (فعلی و آینده)
    ════════════════════════════════════════════════════════════ */
 
 import { normalizeNumbers } from './numberUtils';
@@ -288,6 +288,7 @@ export function startOfYesterday(ts: number): number {
     return startOfDaysAgo(ts, 1);
 }
 
+/* ─── هفته ─── */
 export function startOfWeek(ts: number, weekStartDay: WeekStartDay): number {
     const d = new Date(ts);
     const currentDay = d.getDay();
@@ -305,6 +306,7 @@ export function endOfWeek(ts: number, weekStartDay: WeekStartDay): number {
     return d.getTime();
 }
 
+/* ─── ماه میلادی ─── */
 export function startOfGregorianMonth(ts: number): number {
     const d = new Date(ts);
     d.setDate(1);
@@ -319,6 +321,7 @@ export function endOfGregorianMonth(ts: number): number {
     return d.getTime();
 }
 
+/* ─── ماه شمسی ─── */
 export function startOfJalaliMonth(ts: number): number {
     const d = new Date(ts);
     const [jy, jm] = toJalali(d.getFullYear(), d.getMonth() + 1, d.getDate());
@@ -334,6 +337,7 @@ export function endOfJalaliMonth(ts: number): number {
     return new Date(gy, gm - 1, gd, 23, 59, 59, 999).getTime();
 }
 
+/* ─── سال میلادی ─── */
 export function startOfGregorianYear(ts: number): number {
     const d = new Date(ts);
     d.setMonth(0, 1);
@@ -348,6 +352,7 @@ export function endOfGregorianYear(ts: number): number {
     return d.getTime();
 }
 
+/* ─── سال شمسی ─── */
 export function startOfJalaliYear(ts: number): number {
     const d = new Date(ts);
     const [jy] = toJalali(d.getFullYear(), d.getMonth() + 1, d.getDate());
@@ -364,7 +369,7 @@ export function endOfJalaliYear(ts: number): number {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   بررسی بازه‌ها
+   بررسی بازه‌ها (فعلی)
    ═══════════════════════════════════════════════════════════ */
 
 export function isPastTs(ts: number): boolean {
@@ -401,6 +406,127 @@ export function isThisYearTs(ts: number, useJalali: boolean): boolean {
     if (!ts) return false;
     const start = useJalali ? startOfJalaliYear(Date.now()) : startOfGregorianYear(Date.now());
     const end = useJalali ? endOfJalaliYear(Date.now()) : endOfGregorianYear(Date.now());
+    return ts >= start && ts <= end;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   🆕 بررسی بازه‌های آینده
+   ═══════════════════════════════════════════════════════════ */
+
+/* ─── هفته آینده ─── */
+export function startOfNextWeek(ts: number, weekStartDay: WeekStartDay): number {
+    const thisWeekStart = startOfWeek(ts, weekStartDay);
+    const d = new Date(thisWeekStart);
+    d.setDate(d.getDate() + 7);
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
+}
+
+export function endOfNextWeek(ts: number, weekStartDay: WeekStartDay): number {
+    const start = startOfNextWeek(ts, weekStartDay);
+    const d = new Date(start);
+    d.setDate(d.getDate() + 6);
+    d.setHours(23, 59, 59, 999);
+    return d.getTime();
+}
+
+export function isNextWeekTs(ts: number, weekStartDay: WeekStartDay): boolean {
+    if (!ts) return false;
+    const start = startOfNextWeek(Date.now(), weekStartDay);
+    const end = endOfNextWeek(Date.now(), weekStartDay);
+    return ts >= start && ts <= end;
+}
+
+/* ─── ماه شمسی آینده ─── */
+export function startOfNextJalaliMonth(ts: number): number {
+    const d = new Date(ts);
+    let [jy, jm] = toJalali(d.getFullYear(), d.getMonth() + 1, d.getDate());
+    jm += 1;
+    if (jm > 12) { jm = 1; jy += 1; }
+    const [gy, gm, gd] = toGregorian(jy, jm, 1);
+    return new Date(gy, gm - 1, gd, 0, 0, 0, 0).getTime();
+}
+
+export function endOfNextJalaliMonth(ts: number): number {
+    const d = new Date(ts);
+    let [jy, jm] = toJalali(d.getFullYear(), d.getMonth() + 1, d.getDate());
+    jm += 1;
+    if (jm > 12) { jm = 1; jy += 1; }
+    const daysInMonth = getJalaliMonthDays(jy, jm);
+    const [gy, gm, gd] = toGregorian(jy, jm, daysInMonth);
+    return new Date(gy, gm - 1, gd, 23, 59, 59, 999).getTime();
+}
+
+/* ─── ماه میلادی آینده ─── */
+export function startOfNextGregorianMonth(ts: number): number {
+    const d = new Date(ts);
+    d.setDate(1);
+    d.setMonth(d.getMonth() + 1);
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
+}
+
+export function endOfNextGregorianMonth(ts: number): number {
+    const d = new Date(ts);
+    d.setDate(1);
+    d.setMonth(d.getMonth() + 2, 0);
+    d.setHours(23, 59, 59, 999);
+    return d.getTime();
+}
+
+export function isNextMonthTs(ts: number, useJalali: boolean): boolean {
+    if (!ts) return false;
+    const start = useJalali
+        ? startOfNextJalaliMonth(Date.now())
+        : startOfNextGregorianMonth(Date.now());
+    const end = useJalali
+        ? endOfNextJalaliMonth(Date.now())
+        : endOfNextGregorianMonth(Date.now());
+    return ts >= start && ts <= end;
+}
+
+/* ─── سال شمسی آینده ─── */
+export function startOfNextJalaliYear(ts: number): number {
+    const d = new Date(ts);
+    const [jy] = toJalali(d.getFullYear(), d.getMonth() + 1, d.getDate());
+    const [gy, gm, gd] = toGregorian(jy + 1, 1, 1);
+    return new Date(gy, gm - 1, gd, 0, 0, 0, 0).getTime();
+}
+
+export function endOfNextJalaliYear(ts: number): number {
+    const d = new Date(ts);
+    const [jy] = toJalali(d.getFullYear(), d.getMonth() + 1, d.getDate());
+    const nextYear = jy + 1;
+    const lastDay = getJalaliMonthDays(nextYear, 12);
+    const [gy, gm, gd] = toGregorian(nextYear, 12, lastDay);
+    return new Date(gy, gm - 1, gd, 23, 59, 59, 999).getTime();
+}
+
+/* ─── سال میلادی آینده ─── */
+export function startOfNextGregorianYear(ts: number): number {
+    const d = new Date(ts);
+    d.setMonth(0, 1);
+    d.setFullYear(d.getFullYear() + 1);
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
+}
+
+export function endOfNextGregorianYear(ts: number): number {
+    const d = new Date(ts);
+    d.setMonth(11, 31);
+    d.setFullYear(d.getFullYear() + 1);
+    d.setHours(23, 59, 59, 999);
+    return d.getTime();
+}
+
+export function isNextYearTs(ts: number, useJalali: boolean): boolean {
+    if (!ts) return false;
+    const start = useJalali
+        ? startOfNextJalaliYear(Date.now())
+        : startOfNextGregorianYear(Date.now());
+    const end = useJalali
+        ? endOfNextJalaliYear(Date.now())
+        : endOfNextGregorianYear(Date.now());
     return ts >= start && ts <= end;
 }
 
