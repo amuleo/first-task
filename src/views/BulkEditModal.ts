@@ -1,6 +1,8 @@
 /* ════════════════════════════════════════════════════════════
    ✏️ Bulk Edit Modal — v0.1.2
    ✅ وضعیت انجام داینامیک (انجام شده / برگرداندن / mixed)
+   ✅ Toggle وضعیت به صورت پیش‌فرض خاموش (کاربر خودش انتخاب می‌کنه)
+   ✅ راهنمای هوشمند وقتی toggle خاموشه
    ✅ دسته‌بندی، تاریخ، پین، نوت
    ✅ اعداد فارسی داینامیک
    ════════════════════════════════════════════════════════════ */
@@ -92,22 +94,16 @@ export class BulkEditModal extends Modal {
         /* 🆕 محاسبه‌ی وضعیت انتخاب */
         this.selectionState = this.computeSelectionState();
 
-        /* 🆕 مقدار پیش‌فرض بر اساس وضعیت */
+        /* 🆕 مقدار پیش‌فرض — toggle همیشه خاموش، کاربر خودش انتخاب می‌کنه */
+        /* ─── فقط مقدار `completed` رو بر اساس وضعیت تعیین می‌کنیم ─── */
         let defaultCompleted = true;
-        let defaultApply = false;
-        if (this.selectionState === 'all-pending') {
-            defaultCompleted = true;
-            defaultApply = true;
-        } else if (this.selectionState === 'all-completed') {
+        if (this.selectionState === 'all-completed') {
             defaultCompleted = false;
-            defaultApply = true;
-        } else if (this.selectionState === 'mixed') {
-            defaultCompleted = true;
-            defaultApply = false;
         }
+        /* all-pending و mixed → defaultCompleted = true (انجام بشن) */
 
         this.updates = {
-            applyCompleted: defaultApply,
+            applyCompleted: false,   /* ← همیشه خاموش */
             completed: defaultCompleted,
             applyCategory: false,
             category: '',
@@ -136,6 +132,17 @@ export class BulkEditModal extends Modal {
         if (done === 0) return 'all-pending';
         if (pending === 0) return 'all-completed';
         return 'mixed';
+    }
+
+    /* 🆕 متن راهنمای وضعیت */
+    private getCompletedHint(lang: 'en' | 'fa'): string {
+        if (this.selectionState === 'all-pending') {
+            return t(lang, 'bulk_completed_pending_hint');
+        }
+        if (this.selectionState === 'all-completed') {
+            return t(lang, 'bulk_completed_done_hint');
+        }
+        return t(lang, 'bulk_completed_mixed_hint');
     }
 
     onOpen(): void { this.render(); }
@@ -170,6 +177,7 @@ export class BulkEditModal extends Modal {
                         this.render();
                     }));
 
+            /* ─── وقتی روشنه ─── */
             if (this.updates.applyCompleted) {
                 const hintSetting = new Setting(contentEl);
 
@@ -195,6 +203,12 @@ export class BulkEditModal extends Modal {
                             dd.onChange(v => { this.updates.completed = v === 'true'; });
                         });
                 }
+            }
+            /* ─── 🆕 وقتی خاموشه: راهنما (کم‌رنگ) ─── */
+            else {
+                const hint = new Setting(contentEl);
+                hint.setDesc(this.getCompletedHint(lang));
+                hint.settingEl.style.opacity = '0.6';
             }
         }
 
