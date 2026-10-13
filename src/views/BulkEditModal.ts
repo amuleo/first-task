@@ -2,7 +2,6 @@
    ✏️ Bulk Edit Modal — v0.1.2
    ✅ وضعیت انجام داینامیک (انجام شده / برگرداندن / mixed)
    ✅ Toggle وضعیت به صورت پیش‌فرض خاموش (کاربر خودش انتخاب می‌کنه)
-   ✅ راهنمای هوشمند وقتی toggle خاموشه
    ✅ دسته‌بندی، تاریخ، پین، نوت
    ✅ اعداد فارسی داینامیک
    ════════════════════════════════════════════════════════════ */
@@ -134,17 +133,6 @@ export class BulkEditModal extends Modal {
         return 'mixed';
     }
 
-    /* 🆕 متن راهنمای وضعیت */
-    private getCompletedHint(lang: 'en' | 'fa'): string {
-        if (this.selectionState === 'all-pending') {
-            return t(lang, 'bulk_completed_pending_hint');
-        }
-        if (this.selectionState === 'all-completed') {
-            return t(lang, 'bulk_completed_done_hint');
-        }
-        return t(lang, 'bulk_completed_mixed_hint');
-    }
-
     onOpen(): void { this.render(); }
 
     private render(): void {
@@ -177,7 +165,7 @@ export class BulkEditModal extends Modal {
                         this.render();
                     }));
 
-            /* ─── وقتی روشنه ─── */
+            /* ─── فقط وقتی کاربر روشن کرد، جزئیات رو نشون بده ─── */
             if (this.updates.applyCompleted) {
                 const hintSetting = new Setting(contentEl);
 
@@ -203,12 +191,6 @@ export class BulkEditModal extends Modal {
                             dd.onChange(v => { this.updates.completed = v === 'true'; });
                         });
                 }
-            }
-            /* ─── 🆕 وقتی خاموشه: راهنما (کم‌رنگ) ─── */
-            else {
-                const hint = new Setting(contentEl);
-                hint.setDesc(this.getCompletedHint(lang));
-                hint.settingEl.style.opacity = '0.6';
             }
         }
 
