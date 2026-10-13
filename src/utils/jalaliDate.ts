@@ -1,29 +1,31 @@
 /* ════════════════════════════════════════════════════════════
-   📅 تاریخ شمسی — v0.1.2 (الگوریتم دقیق khusrav/jalaali)
-   ✅ کبیسه‌های دقیق (اسفند ۲۹ یا ۳۰)
-   ✅ ۶ ماه اول ۳۱ روز، ۵ ماه ۳۰ روز
-   ✅ پیش‌بینی تا سال ۳۱۷۷
+   📅 تاریخ شمسی — v0.1.2 (پیشرفته)
+   ✅ الگوریتم دقیق khusrav/jalaali
+   ✅ پشتیبانی کامل کبیسه‌ها
+   ✅ توابع کمکی برای DateSuggest
    ════════════════════════════════════════════════════════════ */
 
 import { normalizeNumbers } from './numberUtils';
-import type { WeekStartDay } from '../types';
+import type { WeekStartDay, Language } from '../types';
 
 /* ═══════════════════════════════════════════════════════════
-   الگوریتم دقیق کبیسه (از jalaali-js)
+   الگوریتم دقیق (بر اساس jalaali-js)
    ═══════════════════════════════════════════════════════════ */
 
 const BREAKS = [
     -61, 9, 38, 199, 426, 686, 756, 818, 1111, 1181, 1210,
-    1635, 2060, 2097, 2192, 2262, 2324, 2394, 2456, 3178
+    1635, 2060, 2097, 2192, 2262, 2324, 2394, 2456, 3178,
 ];
 
-interface JalCal {
-    leap: number;
-    gy: number;
-    march: number;
+function div(a: number, b: number): number {
+    return Math.trunc(a / b);
 }
 
-function jalCal(jy: number): JalCal {
+function mod(a: number, b: number): number {
+    return a - Math.trunc(a / b) * b;
+}
+
+function jalCal(jy: number): { leap: number; gy: number; march: number } {
     const bl = BREAKS.length;
     const gy = jy + 621;
     let leapJ = -14;
@@ -32,7 +34,6 @@ function jalCal(jy: number): JalCal {
     let jump = 0;
 
     if (jy < jp || jy >= BREAKS[bl - 1]) {
-        /* خارج از بازه — fallback به الگوریتم ساده */
         return { leap: -1, gy, march: 20 };
     }
 
@@ -40,19 +41,19 @@ function jalCal(jy: number): JalCal {
         jm = BREAKS[i];
         jump = jm - jp;
         if (jy < jm) break;
-        leapJ = leapJ + Math.floor(jump / 33) * 8 + Math.floor((jump % 33) / 4);
+        leapJ = leapJ + div(jump, 33) * 8 + div(mod(jump, 33), 4);
         jp = jm;
     }
     let n = jy - jp;
 
-    leapJ = leapJ + Math.floor(n / 33) * 8 + Math.floor(((n % 33) + 3) / 4);
-    if (jump % 33 === 4 && jump - n === 4) leapJ += 1;
+    leapJ = leapJ + div(n, 33) * 8 + div(mod(n, 33) + 3, 4);
+    if (mod(jump, 33) === 4 && jump - n === 4) leapJ += 1;
 
-    const leapG = Math.floor(gy / 4) - Math.floor((Math.floor(gy / 100) + 1) * 3 / 4) - 150;
+    const leapG = div(gy, 4) - div((div(gy, 100) + 1) * 3, 4) - 150;
     const march = 20 + leapJ - leapG;
 
-    if (jump - n < 6) n = n - jump + Math.floor((jump + 4) / 33) * 33;
-    let leap = ((n + 1) % 33 - 1) % 4;
+    if (jump - n < 6) n = n - jump + div(jump + 4, 33) * 33;
+    let leap = mod(mod(n + 1, 33) - 1, 4);
     if (leap === -1) leap = 4;
 
     return { leap, gy, march };
@@ -63,12 +64,21 @@ export function isJalaliLeapYear(jy: number): boolean {
     return jalCal(jy).leap === 0;
 }
 
-/* ─── تعداد روزهای یه ماه شمسی ─── */
+/* ─── تعداد روزهای ماه شمسی ─── */
 export function getJalaliMonthDays(jy: number, jm: number): number {
     if (jm <= 6) return 31;
     if (jm <= 11) return 30;
-    /* اسفند */
     return isJalaliLeapYear(jy) ? 30 : 29;
+}
+
+/* ─── اعتبارسنجی سال شمسی ─── */
+export function isValidJalaliYear(jy: number): boolean {
+    return jy >= 1300 && jy <= 1500;
+}
+
+/* ─── اعتبارسنجی سال میلادی ─── */
+export function isValidGregorianYear(gy: number): boolean {
+    return gy >= 1900 && gy <= 2200;
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -167,6 +177,33 @@ export function getTodayDateInput(useJalali: boolean): string {
 }
 
 /* ═══════════════════════════════════════════════════════════
+   اسم ماه شمسی
+   ═══════════════════════════════════════════════════════════ */
+
+const JALALI_MONTHS_FA = [
+    'فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور',
+    'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند',
+];
+
+const JALALI_MONTHS_EN = [
+    'Farvardin', 'Ordibehesht', 'Khordad', 'Tir', 'Mordad', 'Shahrivar',
+    'Mehr', 'Aban', 'Azar', 'Dey', 'Bahman', 'Esfand',
+];
+
+export function getJalaliMonthName(jm: number, lang: Language): string {
+    if (jm < 1 || jm > 12) return '';
+    return lang === 'fa' ? JALALI_MONTHS_FA[jm - 1] : JALALI_MONTHS_EN[jm - 1];
+}
+
+/* ─── اسم روز هفته ─── */
+const WEEKDAYS_FA = ['یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنجشنبه', 'جمعه', 'شنبه'];
+const WEEKDAYS_EN = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+export function getWeekdayName(date: Date, lang: Language): string {
+    return lang === 'fa' ? WEEKDAYS_FA[date.getDay()] : WEEKDAYS_EN[date.getDay()];
+}
+
+/* ═══════════════════════════════════════════════════════════
    پارس ورودی تاریخ
    ═══════════════════════════════════════════════════════════ */
 
@@ -190,7 +227,7 @@ export function parseDateInput(input: string, useJalali: boolean): ParsedDate | 
         jm = parseInt(match[2]);
         jd = parseInt(match[3]);
 
-        if (jy < 1300 || jy > 1500) return null;
+        if (!isValidJalaliYear(jy)) return null;
         if (jm < 1 || jm > 12) return null;
         const maxDay = getJalaliMonthDays(jy, jm);
         if (jd < 1 || jd > maxDay) return null;
@@ -201,7 +238,7 @@ export function parseDateInput(input: string, useJalali: boolean): ParsedDate | 
         const gm = parseInt(match[2]);
         const gd = parseInt(match[3]);
 
-        if (gy < 1900 || gy > 2200) return null;
+        if (!isValidGregorianYear(gy)) return null;
         if (gm < 1 || gm > 12) return null;
         if (gd < 1 || gd > 31) return null;
 
