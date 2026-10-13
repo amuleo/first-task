@@ -1,7 +1,7 @@
 /* ════════════════════════════════════════════════════════════
    ✏️ Bulk Edit Modal — ویرایش گروهی
    ✅ دسته‌بندی، تاریخ، پین، انتقال به نوت
-   ✅ هر فیلد یه toggle جدا برای فعال/غیرفعال
+   ✅ هر فیلد یه toggle جدا
    ════════════════════════════════════════════════════════════ */
 
 import {
@@ -21,7 +21,12 @@ class NoteSuggest extends AbstractInputSuggest<TFile> {
     private plugin: FirstTaskPlugin;
     private selectCallback: (file: TFile) => void;
 
-    constructor(app: App, inputEl: HTMLInputElement, plugin: FirstTaskPlugin, selectCallback: (file: TFile) => void) {
+    constructor(
+        app: App,
+        inputEl: HTMLInputElement,
+        plugin: FirstTaskPlugin,
+        selectCallback: (file: TFile) => void
+    ) {
         super(app, inputEl);
         this.plugin = plugin;
         this.selectCallback = selectCallback;
@@ -118,7 +123,7 @@ export class BulkEditModal extends Modal {
 
         /* ═══════ دسته‌بندی ═══════ */
         if (this.plugin.settings.enableCategories) {
-            const catSetting = new Setting(contentEl)
+            new Setting(contentEl)
                 .setName(t(lang, 'bulk_field_category'))
                 .addToggle(tg => tg
                     .setValue(this.updates.applyCategory)
@@ -156,7 +161,11 @@ export class BulkEditModal extends Modal {
             new Setting(contentEl)
                 .addText(text => {
                     const useJalali = this.plugin.settings.useJalaliDate;
-                    text.setValue(displayString(this.updates.dueDateJalali || this.updates.dueDateGregorian, lang));
+                    const currentValue = useJalali
+                        ? this.updates.dueDateJalali
+                        : this.updates.dueDateGregorian;
+
+                    text.setValue(displayString(currentValue, lang));
                     text.inputEl.dir = 'ltr';
                     text.setPlaceholder(useJalali ? '1405/07/25' : '2026-10-15');
 
@@ -247,10 +256,8 @@ export class BulkEditModal extends Modal {
 
     private async handleApply(): Promise<void> {
         if (this.busy) return;
-
         const lang = this.plugin.settings.language;
 
-        /* ─── چک کن حداقل یه فیلد فعاله ─── */
         const anyActive =
             this.updates.applyCategory ||
             this.updates.applyDate ||
@@ -265,7 +272,6 @@ export class BulkEditModal extends Modal {
             return;
         }
 
-        /* ─── اگه انتقال به نوت فعاله ولی نوت انتخاب نشده ─── */
         if (this.updates.applyNote && !this.updates.targetFile) {
             this.plugin.toastManager.show(t(lang, 'notice_no_file'), 'warning');
             return;
