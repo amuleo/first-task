@@ -1,5 +1,6 @@
 /* ════════════════════════════════════════════════════════════
-   📦 تایپ‌های First Task v0.1.2
+   📦 تایپ‌های First Task v0.1.3
+   ✅ _title و _source_file برای بازیابی خودکار متادیتا
    ════════════════════════════════════════════════════════════ */
 
 export interface ExtractedTask {
@@ -23,7 +24,11 @@ export interface ExtractedTask {
     _occurrence: number;
 }
 
+/* 🆕 _title و _source_file برای بازیابی خودکار متادیتا */
 export interface TaskIndexEntry {
+    _title: string;
+    _source_file: string;
+    _last_seen_ts?: number;
     description: string;
     category: string;
     pinned: boolean;
@@ -39,6 +44,9 @@ export interface TaskIndexEntry {
 }
 
 export const DEFAULT_ENTRY: TaskIndexEntry = {
+    _title: '',
+    _source_file: '',
+    _last_seen_ts: 0,
     description: '',
     category: '',
     pinned: false,
@@ -105,7 +113,6 @@ export interface CompletedStats {
     total: number;
 }
 
-/* 🆕 CategoryStats با کارت‌های جدید */
 export interface CategoryStats {
     past: number;
     today: number;
@@ -130,7 +137,6 @@ export interface DynamicCategorySettings {
 export type Language = 'en' | 'fa';
 export type TabType = 'pending' | 'completed';
 
-/* 🆕 PlannerCard با ۳ کارت جدید */
 export type PlannerCard =
     | 'past'
     | 'today'
@@ -146,7 +152,6 @@ export type PlannerCard =
 
 export type WeekStartDay = 0 | 1 | 6;
 
-/* 🆕 PlannerCardsVisibility با ۳ کارت جدید */
 export interface PlannerCardsVisibility {
     past: boolean;
     today: boolean;
