@@ -2,6 +2,7 @@
    ⚙️ تب تنظیمات — v0.1.2
    ✅ شروع هفته (شنبه/یکشنبه/دوشنبه)
    ✅ نمایش badge ها (پیش‌فرض خاموش)
+   ✅ پر کردن خودکار تاریخ ساخت
    ✅ کارت‌های پلنر (قابل تنظیم)
    ════════════════════════════════════════════════════════════ */
 
@@ -67,7 +68,7 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
                     this.plugin.refreshPanel();
                 }));
 
-        /* ─── شروع هفته (۳ گزینه) ─── */
+        /* ─── شروع هفته ─── */
         new Setting(containerEl)
             .setName(t(lang, 'settings_week_start'))
             .setDesc(t(lang, 'settings_week_start_desc'))
@@ -109,6 +110,18 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
                 .setValue(this.plugin.settings.showTaskBadges)
                 .onChange(async (v) => {
                     this.plugin.settings.showTaskBadges = v;
+                    await this.plugin.saveSettings();
+                    this.plugin.refreshPanel();
+                }));
+
+        /* 🆕 پر کردن خودکار تاریخ ساخت */
+        new Setting(containerEl)
+            .setName(t(lang, 'settings_auto_fill_created'))
+            .setDesc(t(lang, 'settings_auto_fill_created_desc'))
+            .addToggle(tg => tg
+                .setValue(this.plugin.settings.autoFillCreatedTime)
+                .onChange(async (v) => {
+                    this.plugin.settings.autoFillCreatedTime = v;
                     await this.plugin.saveSettings();
                     this.plugin.refreshPanel();
                 }));
