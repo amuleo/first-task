@@ -1,8 +1,8 @@
 /* ════════════════════════════════════════════════════════════
-   🔐 توابع هش (سبک، بدون وابستگی، کار روی موبایل و دسکتاپ)
+   🔐 توابع هش — v0.1.2
+   ✅ پشتیبانی از occurrence (تسک‌های با عنوان تکراری)
    ════════════════════════════════════════════════════════════ */
 
-/* FNV-1a hash — سریع، بدون وابستگی، و کار روی همه‌ی پلتفرم‌ها */
 function fnv1a(input: string): string {
     let hash = 2166136261;
     for (let i = 0; i < input.length; i++) {
@@ -12,24 +12,23 @@ function fnv1a(input: string): string {
     return (hash >>> 0).toString(16).padStart(8, '0');
 }
 
-/* ═══════════════════════════════════════════════════════
-   🆔 ساخت شناسه یکتا از فایل + عنوان
-   → ۱۶ کاراکتر (ترکیب دو هش FNV)
-   
-   نکته: اگه عنوان یا فایل عوض بشه، ID عوض می‌شه.
-   ولی تغییر توضیحات/تاریخ/دسته → ID ثابت می‌مونه.
-   ═══════════════════════════════════════════════════════ */
-export function generateTaskId(sourceFile: string, title: string): string {
-    const raw = `${sourceFile}:::${title}`;
+/* 🆕 ساخت شناسه با شماره تکرار
+   → دو تسک با عنوان یکسان توی یه فایل، ID متفاوت می‌گیرن
+   ─ مثال:
+     task1: file.md:::خرید نان:::0
+     task2: file.md:::خرید نان:::1
+*/
+export function generateTaskId(
+    sourceFile: string,
+    title: string,
+    occurrence: number = 0
+): string {
+    const raw = `${sourceFile}:::${title}:::${occurrence}`;
     const h1 = fnv1a(raw);
     const h2 = fnv1a(raw + '::first-task-salt');
     return h1 + h2;
 }
 
-/* ═══════════════════════════════════════════════════════
-   📄 هش محتوای فایل (برای کش هوشمند)
-   وقتی mtime عوض بشه ولی محتوا یکی باشه، rescan نکن
-   ═══════════════════════════════════════════════════════ */
 export function hashContent(content: string): string {
     const h1 = fnv1a(content);
     const h2 = fnv1a(content + '::hash-salt');
