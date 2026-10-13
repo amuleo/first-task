@@ -500,13 +500,13 @@
 }
 
 /* ═══════════════════════════════════════════════════════════
-   🎯 Suggest
+   🎯 Suggest (نوت + تاریخ)
    ═══════════════════════════════════════════════════════════ */
 .first-task-suggest-item {
     display: flex;
     flex-direction: column;
     gap: 2px;
-    padding: 2px 0;
+    padding: 4px 0;
 }
 .first-task-suggest-name {
     font-size: var(--font-ui-small);
