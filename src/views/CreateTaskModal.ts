@@ -1,8 +1,8 @@
 /* ════════════════════════════════════════════════════════════
    ➕ مودال ساخت تسک جدید — v0.1.2
-   ✅ Suggest هوشمند برای انتخاب نوت (mtime + active)
+   ✅ Suggest هوشمند (active + mtime)
    ✅ تاریخ پیش‌فرض = امروز
-   ✅ پدینگ بالای مودال
+   ✅ اعداد داینامیک
    ════════════════════════════════════════════════════════════ */
 
 import {
@@ -12,12 +12,10 @@ import {
 import type FirstTaskPlugin from '../main';
 import { t, applyDirection } from '../i18n';
 import { parseDateInput, getTodayDateInput } from '../utils/jalaliDate';
+import { displayString } from '../utils/numberUtils';
 
 /* ═══════════════════════════════════════════════════════
-   🎯 Suggest هوشمند برای انتخاب نوت
-   ✅ پیشنهاد اول: نوت فعلی
-   ✅ مرتب بر اساس mtime (آخرین تغییر)
-   ✅ محدودیت ۲۰ مورد
+   🎯 Suggest هوشمند
    ═══════════════════════════════════════════════════════ */
 class NoteSuggest extends AbstractInputSuggest<TFile> {
     private plugin: FirstTaskPlugin;
@@ -37,33 +35,26 @@ class NoteSuggest extends AbstractInputSuggest<TFile> {
     getSuggestions(query: string): TFile[] {
         const files = this.plugin.taskManager.getScannableFiles();
         const lowerQuery = (query || '').toLowerCase();
-
-        /* ─── نوت فعلی ─── */
         const activeFile = this.app.workspace.getActiveFile();
         const activePath = activeFile?.path || '';
 
-        /* ─── مرتب‌سازی: active اول، بعد mtime ─── */
+        /* ─── مرتب: active اول، بعد mtime ─── */
         const sorted = [...files].sort((a, b) => {
             if (a.path === activePath) return -1;
             if (b.path === activePath) return 1;
             return b.stat.mtime - a.stat.mtime;
         });
 
-        /* ─── فیلتر ─── */
         let filtered = sorted;
         if (lowerQuery) {
-            filtered = sorted.filter(f =>
-                f.path.toLowerCase().includes(lowerQuery)
-            );
+            filtered = sorted.filter(f => f.path.toLowerCase().includes(lowerQuery));
         }
-
         return filtered.slice(0, 20);
     }
 
     renderSuggestion(file: TFile, el: HTMLElement): void {
         const activeFile = this.app.workspace.getActiveFile();
         const isActive = activeFile?.path === file.path;
-
         const name = file.path.split('/').pop() || file.path;
         const folder = file.parent?.path || '';
 
@@ -86,7 +77,7 @@ class NoteSuggest extends AbstractInputSuggest<TFile> {
 }
 
 /* ═══════════════════════════════════════════════════════
-   ➕ مودال ساخت تسک
+   ➕ مودال
    ═══════════════════════════════════════════════════════ */
 export class CreateTaskModal extends Modal {
     plugin: FirstTaskPlugin;
@@ -138,13 +129,14 @@ export class CreateTaskModal extends Modal {
                 ta.inputEl.style.width = '100%';
             });
 
-        /* ─── تاریخ ─── */
+        /* ─── تاریخ (پیش‌فرض امروز) ─── */
         new Setting(contentEl)
             .setName(t(lang, 'field_due_date'))
             .addText(text => {
                 this.dateComponent = text;
                 const useJalali = this.plugin.settings.useJalaliDate;
-                text.setValue(getTodayDateInput(useJalali));
+                const today = getTodayDateInput(useJalali);
+                text.setValue(displayString(today, lang));
                 text.inputEl.dir = 'ltr';
                 text.setPlaceholder(useJalali ? '1405/07/25' : '2026-10-15');
             });
@@ -201,11 +193,6 @@ export class CreateTaskModal extends Modal {
 
     /* ═══════════════════════════════════════════════════════
        🎯 انتخاب نوت پیش‌فرض هوشمند
-       اولویت:
-       1. نوت فعلی
-       2. آخرین نوت فعال
-       3. inbox.md
-       4. جدیدترین نوت
        ═══════════════════════════════════════════════════════ */
     private getSmartDefaultFile(files: TFile[]): string {
         if (files.length === 0) return '';
@@ -233,7 +220,6 @@ export class CreateTaskModal extends Modal {
         return sorted[0]?.path || '';
     }
 
-    /* ─── ارسال ─── */
     private async submit(): Promise<void> {
         if (this.submitting) return;
         const lang = this.plugin.settings.language;
@@ -254,7 +240,6 @@ export class CreateTaskModal extends Modal {
             return;
         }
 
-        /* ─── پارس تاریخ ─── */
         let dueJalali = '';
         let dueGregorian = '';
         let dueTs = 0;
@@ -262,12 +247,7 @@ export class CreateTaskModal extends Modal {
         if (dateInput) {
             const parsed = parseDateInput(dateInput, this.plugin.settings.useJalaliDate);
             if (!parsed) {
-                this.plugin.toastManager.show(
-                    lang === 'fa'
-                        ? 'قالب تاریخ اشتباهه (مثال: ۱۴۰۵/۰۷/۲۵)'
-                        : 'Invalid date format (e.g., 2026-10-15)',
-                    'warning'
-                );
+                this.plugin.toastManager.show(t(lang, 'notice_invalid_date'), 'warning');
                 return;
             }
             dueJalali = parsed.jalali;
