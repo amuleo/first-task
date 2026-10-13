@@ -1,10 +1,8 @@
 /* ════════════════════════════════════════════════════════════
    📋 مدیریت تسک‌ها — v0.1.2 (نهایی)
-   ✅ پشتیبانی از occurrence
-   ✅ توابع دقیق تاریخ
-   ✅ متدهای Planner
+   ✅ رفع باگ آمار (تسک‌های [x] بدون completed_ts)
+   ✅ Bulk complete/restore
    ✅ Auto-fill created time
-   ✅ حذف/ویرایش گروهی
    ════════════════════════════════════════════════════════════ */
 
 import { App, TFile } from 'obsidian';
@@ -86,12 +84,15 @@ export class TaskManager {
             const entry = this.index.getEntry(task._id);
             this.applyEntry(task, entry);
 
-            /* 🆕 فقط اگه autoFillCreatedTime روشن باشه */
+            /* 🆕 پر کردن خودکار تاریخ ساخت */
             if (!entry.created_ts && this.settings.autoFillCreatedTime) {
                 await this.setCreatedTime(task._id);
                 const refreshed = this.index.getEntry(task._id);
                 this.applyEntry(task, refreshed);
             }
+
+            /* 🆕 رفع باگ: اگه تسک انجام‌شده‌ست ولی completed_ts نداره */
+            await this.ensureCompletedTime(task);
         }
 
         this.tasks = newTasks;
@@ -124,6 +125,29 @@ export class TaskManager {
             created_gregorian: getGregorianDateFull(now),
             created_ts: now.getTime(),
         });
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       🆕 اگر تسک انجام‌شده‌ست ولی completed_ts نداره
+       → از mtime فایل استفاده کن (بهترین تخمین)
+       ═══════════════════════════════════════════════════════ */
+    private async ensureCompletedTime(task: ExtractedTask): Promise<void> {
+        if (!task.completed) return;
+        if (task.completed_ts > 0) return;
+
+        /* ─── بهترین تخمین: mtime فایل ─── */
+        const file = this.scanner.getFileByPath(task._source_file);
+        const fallbackTs = file?.stat.mtime || Date.now();
+
+        await this.index.updateEntry(task._id, {
+            completed_jalali: getJalaliDateFull(new Date(fallbackTs)),
+            completed_gregorian: getGregorianDateFull(new Date(fallbackTs)),
+            completed_ts: fallbackTs,
+        });
+
+        task.completed_jalali = getJalaliDateFull(new Date(fallbackTs));
+        task.completed_gregorian = getGregorianDateFull(new Date(fallbackTs));
+        task.completed_ts = fallbackTs;
     }
 
     private async scanSingleFile(file: TFile): Promise<ExtractedTask[]> {
@@ -160,12 +184,14 @@ export class TaskManager {
             const entry = this.index.getEntry(task._id);
             this.applyEntry(task, entry);
 
-            /* 🆕 شرط autoFillCreatedTime */
             if (!entry.created_ts && this.settings.autoFillCreatedTime) {
                 await this.setCreatedTime(task._id);
                 const refreshed = this.index.getEntry(task._id);
                 this.applyEntry(task, refreshed);
             }
+
+            /* 🆕 رفع باگ */
+            await this.ensureCompletedTime(task);
 
             this.tasks.set(task._id, task);
         }
@@ -198,7 +224,8 @@ export class TaskManager {
     }
 
     /* ═══════════════════════════════════════════════════════
-       آمار
+       🆕 آمار — الگوریتم اصلاح‌شده
+       ─ همه‌ی تسک‌های completed=true شمرده می‌شن (نه فقط اونایی که ts دارن)
        ═══════════════════════════════════════════════════════ */
     private recomputeStats(): void {
         const now = Date.now();
@@ -219,18 +246,37 @@ export class TaskManager {
             prevMonthStart = getGregorianPrevMonthStart(now);
         }
 
-        const completed = Array.from(this.tasks.values()).filter(t =>
-            t.completed && t.completed_ts > 0
-        );
+        /* ─── همه‌ی تسک‌های انجام‌شده (بدون فیلتر ts) ─── */
+        const completed = Array.from(this.tasks.values()).filter(t => t.completed);
+
+        /* ─── زمان موثر برای دسته‌بندی ─── */
+        const effectiveTime = (t: ExtractedTask): number => {
+            if (t.completed_ts > 0) return t.completed_ts;
+            if (t.created_ts > 0) return t.created_ts;
+            return 0;
+        };
 
         this.stats = {
-            today: completed.filter(t => t.completed_ts >= todayStart).length,
-            yesterday: completed.filter(t =>
-                t.completed_ts >= yesterdayStart && t.completed_ts < todayStart
-            ).length,
-            this_week: completed.filter(t => t.completed_ts >= weekStart).length,
-            last_month: completed.filter(t => t.completed_ts >= prevMonthStart).length,
-            this_year: completed.filter(t => t.completed_ts >= yearStart).length,
+            today: completed.filter(t => {
+                const et = effectiveTime(t);
+                return et > 0 && et >= todayStart;
+            }).length,
+            yesterday: completed.filter(t => {
+                const et = effectiveTime(t);
+                return et > 0 && et >= yesterdayStart && et < todayStart;
+            }).length,
+            this_week: completed.filter(t => {
+                const et = effectiveTime(t);
+                return et > 0 && et >= weekStart;
+            }).length,
+            last_month: completed.filter(t => {
+                const et = effectiveTime(t);
+                return et > 0 && et >= prevMonthStart;
+            }).length,
+            this_year: completed.filter(t => {
+                const et = effectiveTime(t);
+                return et > 0 && et >= yearStart;
+            }).length,
             total: completed.length,
         };
     }
@@ -251,7 +297,11 @@ export class TaskManager {
     getCompletedTasks(): ExtractedTask[] {
         return Array.from(this.tasks.values())
             .filter(t => t.completed)
-            .sort((a, b) => b.completed_ts - a.completed_ts);
+            .sort((a, b) => {
+                const ta = a.completed_ts || a.created_ts || 0;
+                const tb = b.completed_ts || b.created_ts || 0;
+                return tb - ta;
+            });
     }
 
     getTaskById(id: string): ExtractedTask | null {
@@ -607,7 +657,7 @@ export class TaskManager {
     }
 
     /* ═══════════════════════════════════════════════════════
-       🆕 حذف گروهی
+       حذف گروهی
        ═══════════════════════════════════════════════════════ */
     async bulkDelete(taskIds: string[]): Promise<boolean> {
         if (taskIds.length === 0) return false;
@@ -626,7 +676,6 @@ export class TaskManager {
 
             let content = await this.scanner.readFile(file);
 
-            /* ─── مرتب نزولی بر اساس خط ─── */
             const sortedTasks = [...tasks].sort((a, b) => b._source_line - a._source_line);
 
             for (const task of sortedTasks) {
@@ -649,17 +698,93 @@ export class TaskManager {
     }
 
     /* ═══════════════════════════════════════════════════════
-       🆕 ویرایش گروهی
+       🆕 انجام / برگرداندن گروهی
+       ═══════════════════════════════════════════════════════ */
+    async bulkComplete(taskIds: string[], completed: boolean): Promise<boolean> {
+        if (taskIds.length === 0) return false;
+
+        /* ─── گروه‌بندی بر اساس فایل ─── */
+        const byFile = new Map<string, ExtractedTask[]>();
+        for (const id of taskIds) {
+            const task = this.tasks.get(id);
+            if (!task) continue;
+            if (task.completed === completed) continue;   /* از قبل همینه */
+            if (!byFile.has(task._source_file)) byFile.set(task._source_file, []);
+            byFile.get(task._source_file)!.push(task);
+        }
+
+        if (byFile.size === 0) return true;
+
+        const now = new Date();
+        const nowJalali = getJalaliDateFull(now);
+        const nowGregorian = getGregorianDateFull(now);
+        const nowTs = now.getTime();
+
+        for (const [filePath, tasks] of byFile) {
+            const file = this.scanner.getFileByPath(filePath);
+            if (!file) continue;
+
+            let content = await this.scanner.readFile(file);
+
+            for (const task of tasks) {
+                const newContent = this.extractor.toggleTaskInContent(content, filePath, task._id);
+                if (newContent === null) continue;
+                content = newContent;
+
+                const patch: Partial<TaskIndexEntry> = {};
+                if (completed) {
+                    patch.completed_jalali = nowJalali;
+                    patch.completed_gregorian = nowGregorian;
+                    patch.completed_ts = nowTs;
+                } else {
+                    patch.completed_jalali = '';
+                    patch.completed_gregorian = '';
+                    patch.completed_ts = 0;
+                }
+
+                if (!task.created_ts && this.settings.autoFillCreatedTime) {
+                    patch.created_jalali = nowJalali;
+                    patch.created_gregorian = nowGregorian;
+                    patch.created_ts = nowTs;
+                }
+
+                await this.index.updateEntry(task._id, patch);
+
+                task.completed = completed;
+                task.completed_jalali = patch.completed_jalali || '';
+                task.completed_gregorian = patch.completed_gregorian || '';
+                task.completed_ts = patch.completed_ts || 0;
+                if (patch.created_ts) {
+                    task.created_jalali = patch.created_jalali || '';
+                    task.created_gregorian = patch.created_gregorian || '';
+                    task.created_ts = patch.created_ts;
+                }
+            }
+
+            await this.app.vault.modify(file, content);
+        }
+
+        this.recomputeStats();
+        return true;
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       ویرایش گروهی
        ═══════════════════════════════════════════════════════ */
     async bulkUpdate(taskIds: string[], updates: BulkUpdates): Promise<boolean> {
         if (taskIds.length === 0) return false;
 
-        /* ─── اگه انتقال به نوت داریم → روش جدا ─── */
+        /* 🆕 اول completed رو اعمال کن */
+        if (updates.applyCompleted) {
+            await this.bulkComplete(taskIds, updates.completed);
+        }
+
+        /* اگه انتقال به نوت داریم → روش جدا */
         if (updates.applyNote && updates.targetFile) {
             return await this.bulkMoveAndUpdate(taskIds, updates);
         }
 
-        /* ─── وگرنه فقط index ─── */
+        /* وگرنه فقط index */
         for (const id of taskIds) {
             const task = this.tasks.get(id);
             if (!task) continue;
@@ -689,14 +814,10 @@ export class TaskManager {
         return true;
     }
 
-    /* ═══════════════════════════════════════════════════════
-       🆕 انتقال گروهی + آپدیت
-       ═══════════════════════════════════════════════════════ */
     private async bulkMoveAndUpdate(taskIds: string[], updates: BulkUpdates): Promise<boolean> {
         const targetFile = this.scanner.getFileByPath(updates.targetFile);
         if (!targetFile) return false;
 
-        /* ─── جمع‌آوری ─── */
         const collected: { task: ExtractedTask; entry: TaskIndexEntry }[] = [];
         for (const id of taskIds) {
             const task = this.tasks.get(id);
@@ -706,7 +827,6 @@ export class TaskManager {
         }
         if (collected.length === 0) return false;
 
-        /* ─── گروه‌بندی بر اساس فایل مبدأ ─── */
         const byFile = new Map<string, { task: ExtractedTask; entry: TaskIndexEntry }[]>();
         for (const item of collected) {
             const path = item.task._source_file;
@@ -714,7 +834,6 @@ export class TaskManager {
             byFile.get(path)!.push(item);
         }
 
-        /* ─── حذف از فایل‌های مبدأ ─── */
         for (const [filePath, items] of byFile) {
             const file = this.scanner.getFileByPath(filePath);
             if (!file) continue;
@@ -736,7 +855,6 @@ export class TaskManager {
             await this.app.vault.modify(file, content);
         }
 
-        /* ─── افزودن به فایل هدف ─── */
         let targetContent = await this.scanner.readFile(targetFile);
 
         const existing = this.extractor.extractFromContent(targetContent, targetFile.path);
