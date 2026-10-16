@@ -1,6 +1,7 @@
 /* ════════════════════════════════════════════════════════════
-   🌐 i18n — انگلیسی + فارسی (v0.2.0)
-   ✅ Desktop keys اضافه شد
+   🌐 i18n — انگلیسی + فارسی (v0.2.1)
+   ✅ Desktop keys
+   ✅ 🆕 Import keys
    ════════════════════════════════════════════════════════════ */
 
 import type { Language } from '../types';
@@ -64,7 +65,7 @@ const en = {
     planner_stat_all: 'All',
     planner_tasks_in: 'Tasks in',
 
-    /* ─── 🆕 Desktop ─── */
+    /* ─── Desktop ─── */
     desktop_title: 'My Desktop',
     desktop_create_title: 'New Desktop task',
     desktop_new_task: 'New task',
@@ -77,6 +78,29 @@ const en = {
     desktop_stats_this_month: 'This month',
     desktop_stats_this_year: 'This year',
     desktop_stats_total: 'Total',
+    desktop_disabled: 'Desktop is disabled in settings',
+
+    /* ─── 🆕 Import ─── */
+    import_title: 'Import from notes',
+    import_loading: 'Scanning notes...',
+    import_no_tasks: 'No pending tasks found in your notes',
+    import_no_match: 'No tasks match your filters',
+    import_search: 'Search',
+    import_search_ph: 'Search by title...',
+    import_filter_file: 'Filter by file',
+    import_all_files: 'All files',
+    import_show_imported: 'Show already imported',
+    import_select_all: 'Select all',
+    import_select_none: 'Clear',
+    import_already_done: 'Already imported',
+    import_delete_from_note: 'Delete from note',
+    import_delete_from_note_desc: 'Remove task lines from notes after import',
+    import_assign_category: 'Assign category',
+    import_assign_category_desc: 'Apply this category to all imported tasks',
+    import_keep_category: 'Keep original',
+    import_button: 'Import ({count})',
+    import_success: 'Imported {count} task(s)',
+    import_failed: 'Import failed',
 
     /* ─── Create Modal ─── */
     create_title: 'New task',
@@ -166,7 +190,7 @@ const en = {
     settings_planner_cards_this_year: 'This year',
     settings_planner_cards_next_year: 'Next year',
 
-    /* ─── 🆕 Desktop Settings ─── */
+    /* ─── Desktop Settings ─── */
     settings_desktop: 'My Desktop',
     settings_desktop_enabled: 'Enable Desktop',
     settings_desktop_enabled_desc: 'Show the Desktop panel for tasks without notes',
@@ -190,6 +214,8 @@ const en = {
     bulk_apply: 'Apply',
     bulk_select_all: 'Select all',
     bulk_clear_selection: 'Clear',
+    bulk_move_to_desktop: 'To Desktop',
+    bulk_move_to_desktop_confirm: 'Move {count} task(s) to Desktop? They will be removed from notes.',
 
     bulk_field_completed: 'Change status',
     bulk_completed_value: 'Status',
@@ -210,6 +236,7 @@ const en = {
 
     notice_bulk_deleted: 'Tasks deleted',
     notice_bulk_updated: 'Tasks updated',
+    notice_bulk_moved: 'Moved {count} task(s) to Desktop',
 
     /* ─── Notices ─── */
     notice_task_created: 'Task created',
@@ -287,7 +314,7 @@ const fa: typeof en = {
     planner_stat_all: 'همه',
     planner_tasks_in: 'تسک‌های',
 
-    /* ─── 🆕 میز من ─── */
+    /* ─── میز من ─── */
     desktop_title: 'میز من',
     desktop_create_title: 'تسک جدید روی میز',
     desktop_new_task: 'تسک جدید',
@@ -300,6 +327,29 @@ const fa: typeof en = {
     desktop_stats_this_month: 'این ماه',
     desktop_stats_this_year: 'امسال',
     desktop_stats_total: 'کل',
+    desktop_disabled: 'میز من توی تنظیمات غیرفعاله',
+
+    /* ─── 🆕 Import ─── */
+    import_title: 'افزودن از نوت‌ها',
+    import_loading: 'در حال اسکن نوت‌ها...',
+    import_no_tasks: 'تسک انجام‌نشده‌ای توی نوت‌ها پیدا نشد',
+    import_no_match: 'تسکی با فیلترهای فعلی پیدا نشد',
+    import_search: 'جستجو',
+    import_search_ph: 'جستجو بر اساس عنوان...',
+    import_filter_file: 'فیلتر فایل',
+    import_all_files: 'همه فایل‌ها',
+    import_show_imported: 'نمایش import‌شده‌ها',
+    import_select_all: 'انتخاب همه',
+    import_select_none: 'پاک کردن',
+    import_already_done: 'قبلاً اضافه شده',
+    import_delete_from_note: 'حذف از نوت',
+    import_delete_from_note_desc: 'بعد از import، خط تسک از نوت پاک بشه',
+    import_assign_category: 'دسته‌بندی',
+    import_assign_category_desc: 'این دسته به همه‌ی تسک‌های import‌شده داده بشه',
+    import_keep_category: 'دسته اصلی',
+    import_button: 'افزودن ({count})',
+    import_success: '{count} تسک اضافه شد',
+    import_failed: 'افزودن ناموفق',
 
     /* ─── مودال ساخت ─── */
     create_title: 'تسک جدید',
@@ -389,7 +439,7 @@ const fa: typeof en = {
     settings_planner_cards_this_year: 'امسال',
     settings_planner_cards_next_year: 'سال آینده',
 
-    /* ─── 🆕 تنظیمات میز من ─── */
+    /* ─── تنظیمات میز من ─── */
     settings_desktop: 'میز من',
     settings_desktop_enabled: 'فعال‌سازی میز من',
     settings_desktop_enabled_desc: 'نمایش پنل میز برای تسک‌های بدون نوت',
@@ -413,6 +463,8 @@ const fa: typeof en = {
     bulk_apply: 'اعمال',
     bulk_select_all: 'انتخاب همه',
     bulk_clear_selection: 'پاک کردن',
+    bulk_move_to_desktop: 'به میز من',
+    bulk_move_to_desktop_confirm: '{count} تسک به میز من منتقل بشن؟ از نوت‌ها حذف می‌شن.',
 
     bulk_field_completed: 'تغییر وضعیت',
     bulk_completed_value: 'وضعیت',
@@ -433,6 +485,7 @@ const fa: typeof en = {
 
     notice_bulk_deleted: 'تسک‌ها حذف شدن',
     notice_bulk_updated: 'تسک‌ها بروزرسانی شدن',
+    notice_bulk_moved: '{count} تسک به میز من منتقل شد',
 
     /* ─── اعلان‌ها ─── */
     notice_task_created: 'تسک ساخته شد',
