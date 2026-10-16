@@ -1,16 +1,16 @@
 /* ════════════════════════════════════════════════════════════
-   🖥️ Desktop View — میز من (v0.2.1)
+   🖥️ Desktop View — میز من (v0.3.0)
    ✅ پنل مستقل
    ✅ Tabs: در انتظار / انجام شده
    ✅ آمار
    ✅ انتخاب گروهی + Bulk Edit
-   ✅ فیلتر دسته‌بندی
-   ✅ 🆕 دکمه Import از نوت‌ها
+   ✅ Import از نوت‌ها
+   ✅ 🆕 نمایش ساجست‌های تکرارشونده
    ════════════════════════════════════════════════════════════ */
 
 import { ItemView, WorkspaceLeaf, setIcon } from 'obsidian';
 import type FirstTaskPlugin from '../main';
-import type { DesktopTask } from '../types';
+import type { DesktopTask, RecurringSuggestion } from '../types';
 import { t, applyDirection } from '../i18n';
 import { displayNumber, displayString } from '../utils/numberUtils';
 import { DesktopCreateModal, DesktopTaskDetailsModal } from './DesktopTaskModal';
@@ -25,6 +25,7 @@ export class DesktopView extends ItemView {
     private selectionMode: boolean = false;
     private selectedIds: Set<string> = new Set();
     private currentTab: 'pending' | 'completed' = 'pending';
+    private suggestionsCollapsed: boolean = false;
 
     constructor(leaf: WorkspaceLeaf, plugin: FirstTaskPlugin) {
         super(leaf);
@@ -68,6 +69,11 @@ export class DesktopView extends ItemView {
         this.renderCategoryDropdown(contentEl);
         this.renderTabs(contentEl);
 
+        /* 🆕 ساجست‌ها — فقط توی تب در انتظار */
+        if (this.currentTab === 'pending') {
+            this.renderSuggestions(contentEl);
+        }
+
         if (this.currentTab === 'pending') {
             this.renderPending(contentEl);
         } else {
@@ -96,7 +102,6 @@ export class DesktopView extends ItemView {
 
         const actions = topRow.createDiv({ cls: 'first-task-header-actions' });
 
-        /* 🆕 دکمه Import از نوت‌ها */
         if (!this.selectionMode) {
             const importBtn = actions.createEl('button', { cls: 'clickable-icon' });
             setIcon(importBtn, 'download');
@@ -188,6 +193,173 @@ export class DesktopView extends ItemView {
         mkTab('completed', 'check-circle', t(lang, 'tab_completed'), completedCount);
     }
 
+    /* ═══════════════════════════════════════════════════════
+       🆕 ساجست‌های تکرارشونده
+       ═══════════════════════════════════════════════════════ */
+    private renderSuggestions(parent: HTMLElement): void {
+        /* ─── چک فعال بودن ─── */
+        if (!this.plugin.settings.desktop.recurringEnabled) return;
+
+        const suggestions = this.plugin.recurringManager.getTodaysSuggestions();
+        if (suggestions.length === 0) return;
+
+        const lang = this.plugin.settings.language;
+        const useJalali = this.plugin.settings.useJalaliDate;
+
+        const wrap = parent.createDiv({ cls: 'first-task-suggestions' });
+
+        /* ─── هدر ─── */
+        const header = wrap.createDiv({ cls: 'first-task-suggestions-header' });
+
+        const headerLeft = header.createDiv({ cls: 'first-task-suggestions-header-left' });
+        const iconWrap = headerLeft.createSpan({ cls: 'first-task-suggestions-header-icon' });
+        setIcon(iconWrap, 'repeat');
+
+        headerLeft.createSpan({
+            text: t(lang, 'recurring_title'),
+            cls: 'first-task-suggestions-header-title',
+        });
+
+        const countBadge = headerLeft.createSpan({
+            cls: 'first-task-suggestions-count',
+            text: displayNumber(suggestions.length, lang),
+        });
+
+        /* ─── دکمه Add All ─── */
+        const addAllBtn = header.createEl('button', {
+            cls: 'first-task-suggestions-add-all',
+        });
+        setIcon(addAllBtn.createSpan({ cls: 'first-task-suggestions-add-all-icon' }), 'check-check');
+        addAllBtn.createSpan({
+            text: ' ' + t(lang, 'recurring_add_all'),
+        });
+        addAllBtn.onclick = () => this.handleAddAllSuggestions(suggestions);
+
+        /* ─── لیست ─── */
+        const list = wrap.createDiv({ cls: 'first-task-suggestions-list' });
+
+        for (const suggestion of suggestions) {
+            this.renderSuggestionRow(list, suggestion);
+        }
+    }
+
+    /* ─── ردیف ساجست ─── */
+    private renderSuggestionRow(
+        parent: HTMLElement,
+        suggestion: RecurringSuggestion
+    ): void {
+        const lang = this.plugin.settings.language;
+        const useJalali = this.plugin.settings.useJalaliDate;
+        const template = suggestion.template;
+
+        const row = parent.createDiv({ cls: 'first-task-suggestion-row' });
+
+        /* ─── آیکون نوع ─── */
+        const iconWrap = row.createDiv({ cls: 'first-task-suggestion-icon' });
+        const iconName = this.getRecurrenceIcon(template.recurrence);
+        setIcon(iconWrap, iconName);
+
+        /* ─── بدنه ─── */
+        const body = row.createDiv({ cls: 'first-task-suggestion-body' });
+
+        const titleRow = body.createDiv({ cls: 'first-task-suggestion-title' });
+        titleRow.setText(template.title);
+
+        const meta = body.createDiv({ cls: 'first-task-suggestion-meta' });
+
+        /* ─── تاریخ ساجست ─── */
+        const dateDisplay = useJalali
+            ? suggestion.instance_date_jalali
+            : suggestion.instance_date_gregorian;
+
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const isToday = suggestion.instance_date_ts === todayStart.getTime();
+
+        const dateBadge = meta.createSpan({
+            cls: 'first-task-suggestion-date-badge' +
+                (isToday ? '' : ' is-overdue'),
+        });
+
+        if (isToday) {
+            dateBadge.setText(t(lang, 'recurring_suggestion_from') + ': ' + displayString(dateDisplay, lang));
+        } else {
+            dateBadge.setText(t(lang, 'recurring_suggestion_overdue') + ': ' + displayString(dateDisplay, lang));
+        }
+
+        /* ─── دسته ─── */
+        if (template.category) {
+            const catName = this.plugin.taskManager.getCategoryDisplayName(template.category);
+            meta.createSpan({
+                cls: 'first-task-suggestion-cat',
+                text: ' · ' + catName,
+            });
+        }
+
+        /* ─── دکمه Add ─── */
+        const addBtn = row.createEl('button', {
+            cls: 'first-task-suggestion-add-btn',
+        });
+        setIcon(addBtn, 'plus');
+        addBtn.setAttribute('aria-label', t(lang, 'recurring_add_one'));
+        addBtn.onclick = (e) => {
+            e.stopPropagation();
+            this.handleAddSuggestion(suggestion);
+        };
+    }
+
+    /* ─── افزودن یک ساجست ─── */
+    private async handleAddSuggestion(suggestion: RecurringSuggestion): Promise<void> {
+        const lang = this.plugin.settings.language;
+
+        const result = await this.plugin.recurringManager.createInstanceFromSuggestion(
+            suggestion
+        );
+
+        if (result) {
+            this.plugin.toastManager.show(t(lang, 'recurring_added_one'), 'success');
+            this.render();
+        } else {
+            this.plugin.toastManager.show(
+                lang === 'fa' ? 'افزودن ناموفق' : 'Add failed',
+                'error'
+            );
+        }
+    }
+
+    /* ─── افزودن همه ─── */
+    private async handleAddAllSuggestions(
+        suggestions: RecurringSuggestion[]
+    ): Promise<void> {
+        const lang = this.plugin.settings.language;
+        let count = 0;
+
+        for (const s of suggestions) {
+            const result = await this.plugin.recurringManager.createInstanceFromSuggestion(s);
+            if (result) count++;
+        }
+
+        if (count > 0) {
+            this.plugin.toastManager.show(
+                t(lang, 'recurring_added_many', {
+                    count: displayNumber(count, lang),
+                }),
+                'success'
+            );
+            this.render();
+        }
+    }
+
+    /* ─── آیکون نوع تکرار ─── */
+    private getRecurrenceIcon(type: string): string {
+        switch (type) {
+            case 'daily': return 'sun';
+            case 'weekly': return 'calendar-days';
+            case 'monthly': return 'calendar';
+            default: return 'repeat';
+        }
+    }
+
     /* ─── Pending ─── */
     private renderPending(parent: HTMLElement): void {
         const lang = this.plugin.settings.language;
@@ -197,11 +369,17 @@ export class DesktopView extends ItemView {
         const tasks = this.plugin.desktopStore.getByCategory(category);
 
         if (tasks.length === 0) {
-            this.renderEmpty(
-                body,
-                t(lang, 'desktop_empty'),
-                t(lang, 'desktop_empty_hint')
-            );
+            /* اگه ساجست هست، پیام خالی نشون نده */
+            const hasSuggestions = this.plugin.settings.desktop.recurringEnabled &&
+                this.plugin.recurringManager.getTodaysSuggestions().length > 0;
+
+            if (!hasSuggestions) {
+                this.renderEmpty(
+                    body,
+                    t(lang, 'desktop_empty'),
+                    t(lang, 'desktop_empty_hint')
+                );
+            }
             return;
         }
 
@@ -344,10 +522,15 @@ export class DesktopView extends ItemView {
             });
         }
 
-        /* ─── Desktop badge ─── */
-        const desktopEl = meta.createSpan({ cls: 'first-task-card-note' });
-        setIcon(desktopEl.createSpan({ cls: 'first-task-icon' }), 'layout-dashboard');
-        desktopEl.createSpan({ text: ' ' + t(lang, 'desktop_badge') });
+        /* ─── Desktop badge یا Recurring badge ─── */
+        const badgeEl = meta.createSpan({ cls: 'first-task-card-note' });
+        if (task.from_recurring) {
+            setIcon(badgeEl.createSpan({ cls: 'first-task-icon' }), 'repeat');
+            badgeEl.createSpan({ text: ' ' + t(lang, 'recurring_title') });
+        } else {
+            setIcon(badgeEl.createSpan({ cls: 'first-task-icon' }), 'layout-dashboard');
+            badgeEl.createSpan({ text: ' ' + t(lang, 'desktop_badge') });
+        }
 
         /* ─── Click ─── */
         bodyCard.onclick = () => {
@@ -462,7 +645,7 @@ export class DesktopView extends ItemView {
         new DesktopCreateModal(this.app, this.plugin, () => this.render()).open();
     }
 
-    /* ─── 🆕 Import ─── */
+    /* ─── Import ─── */
     private handleImport(): void {
         new ImportModal(this.app, this.plugin, () => this.render()).open();
     }
