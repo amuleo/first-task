@@ -1,9 +1,9 @@
 /* ════════════════════════════════════════════════════════════
-   🗂️ مدیریت ایندکس — v0.1.3
+   🗂️ مدیریت ایندکس — v0.3.0
+   ✅ Debounced save برای سرعت بالا
    ✅ Backup خودکار در صورت خرابی
    ✅ Guard ایمنی در cleanupOrphans
    ✅ Grace period برای orphanها
-   ✅ متدهای کمکی برای بازیابی متادیتا
    ════════════════════════════════════════════════════════════ */
 
 import { App, normalizePath } from 'obsidian';
@@ -21,8 +21,10 @@ const CACHE_FILE = 'file-cache.json';
 const README_FILE = 'DO-NOT-DELETE.md';
 const GITIGNORE_FILE = '.gitignore';
 
-/* 🆕 grace period: ۳۰ روز */
 const ORPHAN_GRACE_PERIOD_MS = 30 * 24 * 60 * 60 * 1000;
+
+/* 🆕 زمان debounce برای save */
+const SAVE_DEBOUNCE_MS = 300;
 
 const DEFAULT_INDEX: TaskIndexFile = {
     version: 1,
@@ -66,6 +68,13 @@ export class IndexManager {
     private index: TaskIndexFile = { ...DEFAULT_INDEX };
     private fileCache: FileCacheFile = { ...DEFAULT_CACHE };
 
+    /* 🆕 Debounced save state */
+    private indexSaveTimer: number | null = null;
+    private indexDirty = false;
+
+    private cacheSaveTimer: number | null = null;
+    private cacheDirty = false;
+
     constructor(app: App) {
         this.app = app;
         this.folderPath = normalizePath(FOLDER_NAME);
@@ -73,7 +82,9 @@ export class IndexManager {
         this.cachePath = normalizePath(`${FOLDER_NAME}/${CACHE_FILE}`);
     }
 
-    /* ─── اطمینان از پوشه + فایل‌ها ─── */
+    /* ═══════════════════════════════════════════════════════
+       اطمینان از پوشه + فایل‌ها
+       ═══════════════════════════════════════════════════════ */
     async ensureFolder(): Promise<void> {
         const adapter = this.app.vault.adapter;
         try {
@@ -102,7 +113,7 @@ export class IndexManager {
         }
     }
 
-    /* ─── لود index (با backup خرابی) ─── */
+    /* ─── لود index ─── */
     async loadIndex(): Promise<void> {
         try {
             const exists = await this.app.vault.adapter.exists(this.indexPath);
@@ -113,7 +124,6 @@ export class IndexManager {
 
             const content = await this.app.vault.adapter.read(this.indexPath);
 
-            /* 🆕 اگه JSON خراب بود، backup بگیر */
             let parsed: any;
             try {
                 parsed = JSON.parse(content);
@@ -144,13 +154,48 @@ export class IndexManager {
         }
     }
 
+    /* ─── Save Index — مستقیم (forced) ─── */
     async saveIndex(): Promise<void> {
         try {
             this.index.last_updated = Date.now();
             const content = JSON.stringify(this.index, null, 2);
             await this.app.vault.adapter.write(this.indexPath, content);
+            this.indexDirty = false;
         } catch (e) {
             console.warn('[First Task] Index save failed:', e);
+        }
+    }
+
+    /* 🆕 Save Index — debounced */
+    private scheduleIndexSave(): void {
+        this.indexDirty = true;
+
+        if (this.indexSaveTimer !== null) return;
+
+        this.indexSaveTimer = window.setTimeout(async () => {
+            this.indexSaveTimer = null;
+            if (this.indexDirty) {
+                await this.saveIndex();
+            }
+        }, SAVE_DEBOUNCE_MS);
+    }
+
+    /* 🆕 Flush — برای unload */
+    async flushSave(): Promise<void> {
+        if (this.indexSaveTimer !== null) {
+            window.clearTimeout(this.indexSaveTimer);
+            this.indexSaveTimer = null;
+        }
+        if (this.indexDirty) {
+            await this.saveIndex();
+        }
+
+        if (this.cacheSaveTimer !== null) {
+            window.clearTimeout(this.cacheSaveTimer);
+            this.cacheSaveTimer = null;
+        }
+        if (this.cacheDirty) {
+            await this.saveFileCache();
         }
     }
 
@@ -178,38 +223,46 @@ export class IndexManager {
         try {
             const content = JSON.stringify(this.fileCache, null, 2);
             await this.app.vault.adapter.write(this.cachePath, content);
+            this.cacheDirty = false;
         } catch (e) {
             console.warn('[First Task] File cache save failed:', e);
         }
     }
 
-    /* ─── گرفتن ورودی (با پیش‌فرض) ─── */
+    /* 🆕 Debounced cache save */
+    private scheduleCacheSave(): void {
+        this.cacheDirty = true;
+
+        if (this.cacheSaveTimer !== null) return;
+
+        this.cacheSaveTimer = window.setTimeout(async () => {
+            this.cacheSaveTimer = null;
+            if (this.cacheDirty) {
+                await this.saveFileCache();
+            }
+        }, SAVE_DEBOUNCE_MS * 2);
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       گرفتن ورودی
+       ═══════════════════════════════════════════════════════ */
     getEntry(taskId: string): TaskIndexEntry {
         const existing = this.index.tasks[taskId];
         if (!existing) return { ...DEFAULT_ENTRY };
         return { ...DEFAULT_ENTRY, ...existing };
     }
 
-    /* 🆕 چک وجود */
     hasEntry(taskId: string): boolean {
         return !!this.index.tasks[taskId];
     }
 
-    /* 🆕 گرفتن همه‌ی entryها برای بازیابی */
     exportAllEntries(): Array<[string, TaskIndexEntry]> {
         return Object.entries(this.index.tasks);
     }
 
-    /* 🆕 انتقال entry از یه ID به یه ID دیگه */
-    async moveEntry(fromId: string, toId: string): Promise<void> {
-        const entry = this.index.tasks[fromId];
-        if (!entry) return;
-        this.index.tasks[toId] = { ...entry };
-        delete this.index.tasks[fromId];
-        await this.saveIndex();
-    }
-
-    /* ─── آپدیت ─── */
+    /* ═══════════════════════════════════════════════════════
+       آپدیت — حالا debounced
+       ═══════════════════════════════════════════════════════ */
     async updateEntry(
         taskId: string,
         patch: Partial<TaskIndexEntry>
@@ -219,32 +272,36 @@ export class IndexManager {
             ...existing,
             ...patch,
         };
-        await this.saveIndex();
+        /* 🆕 فقط schedule کن، نه save مستقیم */
+        this.scheduleIndexSave();
     }
 
-    /* ─── حذف ─── */
     async removeEntry(taskId: string): Promise<void> {
         if (this.index.tasks[taskId]) {
             delete this.index.tasks[taskId];
-            await this.saveIndex();
+            this.scheduleIndexSave();
         }
     }
 
+    async moveEntry(fromId: string, toId: string): Promise<void> {
+        const entry = this.index.tasks[fromId];
+        if (!entry) return;
+        this.index.tasks[toId] = { ...entry };
+        delete this.index.tasks[fromId];
+        this.scheduleIndexSave();
+    }
+
     /* ═══════════════════════════════════════════════════════
-       🆕 cleanupOrphans — ایمن و عاقلانه
-       - گارد ایمنی: اگه بیشتر از ۵۰٪ ایندکس می‌خواد پاک بشه، رد کن
-       - Grace period: orphanها ۳۰ روز زنده می‌مونن
+       cleanupOrphans
        ═══════════════════════════════════════════════════════ */
     async cleanupOrphans(activeIds: Set<string>): Promise<number> {
         const totalEntries = Object.keys(this.index.tasks).length;
         const totalActive = activeIds.size;
 
-        /* 🆕 گارد ایمنی — جلوگیری از فاجعه */
         if (totalEntries > 5 && totalActive < totalEntries * 0.5) {
             console.warn(
                 `[First Task] Skipping cleanupOrphans: ` +
-                `only ${totalActive} active vs ${totalEntries} entries. ` +
-                `Possible bug, keeping metadata safe.`
+                `only ${totalActive} active vs ${totalEntries} entries.`
             );
             return 0;
         }
@@ -254,7 +311,6 @@ export class IndexManager {
 
         for (const id of Object.keys(this.index.tasks)) {
             if (activeIds.has(id)) {
-                /* 🆕 mark as seen */
                 (this.index.tasks[id] as any)._last_seen_ts = now;
                 continue;
             }
@@ -262,35 +318,40 @@ export class IndexManager {
             const lastSeen =
                 (this.index.tasks[id] as any)._last_seen_ts || 0;
 
-            /* اگه entry قدیمی بدون last_seen داریم → بهش زمان بده */
             if (!lastSeen) {
                 (this.index.tasks[id] as any)._last_seen_ts = now;
                 continue;
             }
 
-            /* اگه هنوز تو بازه‌ی مهلته → نگهش دار */
             if (now - lastSeen < ORPHAN_GRACE_PERIOD_MS) continue;
 
             delete this.index.tasks[id];
             removed++;
         }
 
-        if (removed > 0) await this.saveIndex();
+        if (removed > 0) {
+            this.scheduleIndexSave();
+        }
         return removed;
     }
 
-    /* ─── کش فایل‌ها ─── */
+    /* ═══════════════════════════════════════════════════════
+       کش فایل‌ها
+       ═══════════════════════════════════════════════════════ */
     getFileCache(filePath: string): FileCacheEntry | null {
         return this.fileCache.files[filePath] || null;
     }
 
     updateFileCache(filePath: string, entry: FileCacheEntry): void {
         this.fileCache.files[filePath] = entry;
+        /* 🆕 فقط schedule کن */
+        this.scheduleCacheSave();
     }
 
     removeFileCache(filePath: string): void {
         if (this.fileCache.files[filePath]) {
             delete this.fileCache.files[filePath];
+            this.scheduleCacheSave();
         }
     }
 }
