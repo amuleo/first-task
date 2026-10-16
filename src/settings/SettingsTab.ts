@@ -1,15 +1,19 @@
 /* ════════════════════════════════════════════════════════════
-   ⚙️ تب تنظیمات — v0.3.0
-   ✅ Desktop section
-   ✅ 🆕 Recurring section (مدیریت الگوها)
+   ⚙️ تب تنظیمات — v0.4.0
+   ✅ Desktop + Recurring
+   ✅ 🆕 Suggestions + Archive
    ════════════════════════════════════════════════════════════ */
 
 import { App, PluginSettingTab, Setting, setIcon } from 'obsidian';
 import type FirstTaskPlugin from '../main';
-import type { Language, WeekStartDay, RecurringTemplate } from '../types';
+import type {
+    Language,
+    WeekStartDay,
+    RecurringTemplate,
+} from '../types';
 import { t, applyDirection } from '../i18n';
 import { RecurringModal } from '../views/RecurringModal';
-import { displayString } from '../utils/numberUtils';
+import { displayString, displayNumber } from '../utils/numberUtils';
 
 export class FirstTaskSettingsTab extends PluginSettingTab {
     plugin: FirstTaskPlugin;
@@ -212,10 +216,8 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
         mkCardToggle('this_year', 'settings_planner_cards_this_year');
         mkCardToggle('next_year', 'settings_planner_cards_next_year');
 
-        /* ═══════ 🆕 میز من ═══════ */
-        new Setting(containerEl)
-            .setName(t(lang, 'settings_desktop'))
-            .setHeading();
+        /* ═══════ میز من ═══════ */
+        new Setting(containerEl).setName(t(lang, 'settings_desktop')).setHeading();
 
         new Setting(containerEl)
             .setName(t(lang, 'settings_desktop_enabled'))
@@ -263,7 +265,7 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
                 });
             });
 
-        /* ═══════ 🆕 تسک‌های تکرارشونده ═══════ */
+        /* ═══════ تسک‌های تکرارشونده ═══════ */
         new Setting(containerEl)
             .setName(t(lang, 'settings_recurring'))
             .setHeading();
@@ -280,19 +282,116 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
                     this.scheduleRefresh();
                 }));
 
-        /* ─── لیست الگوها ─── */
         if (this.plugin.settings.desktop.recurringEnabled) {
             this.renderRecurringList(containerEl, lang);
+        }
+
+        /* ═══════ 🆕 پیشنهادهای هوشمند ═══════ */
+        new Setting(containerEl)
+            .setName(t(lang, 'settings_suggestions'))
+            .setHeading();
+
+        new Setting(containerEl)
+            .setName(t(lang, 'settings_suggestions_enabled'))
+            .setDesc(t(lang, 'settings_suggestions_enabled_desc'))
+            .addToggle(tg => tg
+                .setValue(this.plugin.settings.desktop.suggestionsEnabled)
+                .onChange(async (v) => {
+                    this.plugin.settings.desktop.suggestionsEnabled = v;
+                    await this.plugin.saveSettings();
+                    this.plugin.refreshPanel();
+                }));
+
+        /* ═══════ 🆕 آرشیو خودکار ═══════ */
+        new Setting(containerEl)
+            .setName(t(lang, 'settings_archive'))
+            .setHeading();
+
+        new Setting(containerEl)
+            .setName(t(lang, 'settings_archive_enabled'))
+            .setDesc(t(lang, 'settings_archive_enabled_desc'))
+            .addToggle(tg => tg
+                .setValue(this.plugin.settings.desktop.autoArchiveEnabled)
+                .onChange(async (v) => {
+                    this.plugin.settings.desktop.autoArchiveEnabled = v;
+                    await this.plugin.saveSettings();
+                    this.scheduleRefresh();
+                }));
+
+        if (this.plugin.settings.desktop.autoArchiveEnabled) {
+            /* ─── تعداد ─── */
+            new Setting(containerEl)
+                .setName(t(lang, 'settings_archive_count'))
+                .setDesc(t(lang, 'settings_archive_count_desc'))
+                .addDropdown(dd => {
+                    const options = [100, 500, 1000, 2000];
+                    for (const n of options) {
+                        dd.addOption(String(n), displayNumber(n, lang));
+                    }
+                    dd.setValue(String(this.plugin.settings.desktop.autoArchiveCount));
+                    dd.onChange(async (v) => {
+                        this.plugin.settings.desktop.autoArchiveCount = parseInt(v);
+                        await this.plugin.saveSettings();
+                    });
+                });
+
+            /* ─── بازه ─── */
+            new Setting(containerEl)
+                .setName(t(lang, 'settings_archive_days'))
+                .setDesc(t(lang, 'settings_archive_days_desc'))
+                .addDropdown(dd => {
+                    dd.addOption('30', t(lang, 'archive_days_30'));
+                    dd.addOption('60', t(lang, 'archive_days_60'));
+                    dd.addOption('90', t(lang, 'archive_days_90'));
+                    dd.addOption('180', t(lang, 'archive_days_180'));
+                    dd.addOption('365', t(lang, 'archive_days_365'));
+                    dd.setValue(String(this.plugin.settings.desktop.autoArchiveDays));
+                    dd.onChange(async (v) => {
+                        this.plugin.settings.desktop.autoArchiveDays = parseInt(v) as 30 | 60 | 90 | 180 | 365;
+                        await this.plugin.saveSettings();
+                    });
+                });
+
+            /* ─── حالت ─── */
+            new Setting(containerEl)
+                .setName(t(lang, 'settings_archive_mode'))
+                .setDesc(t(lang, 'settings_archive_mode_desc'))
+                .addDropdown(dd => {
+                    dd.addOption('threshold', t(lang, 'archive_mode_threshold'));
+                    dd.addOption('always', t(lang, 'archive_mode_always'));
+                    dd.setValue(this.plugin.settings.desktop.autoArchiveMode);
+                    dd.onChange(async (v) => {
+                        this.plugin.settings.desktop.autoArchiveMode = v as 'threshold' | 'always';
+                        await this.plugin.saveSettings();
+                    });
+                });
+
+            /* ─── وضعیت ─── */
+            const lastTs = this.plugin.archiveManager.getLastArchiveTs();
+            const statusText = lastTs > 0
+                ? t(lang, 'archive_last_run', {
+                    date: displayString(this.formatDate(lastTs), lang),
+                })
+                : t(lang, 'archive_never_run');
+
+            new Setting(containerEl)
+                .setName(t(lang, 'archive_run_now'))
+                .setDesc(statusText)
+                .addButton(btn => btn
+                    .setButtonText(t(lang, 'archive_run_now'))
+                    .setCta()
+                    .onClick(async () => {
+                        await this.handleManualArchive();
+                    }));
         }
     }
 
     /* ═══════════════════════════════════════════════════════
-       🆕 لیست الگوهای تکرارشونده
+       Recurring List
        ═══════════════════════════════════════════════════════ */
     private renderRecurringList(parent: HTMLElement, lang: Language): void {
         const templates = this.plugin.recurringManager.getAll();
 
-        /* ─── اگه خالیه ─── */
         if (templates.length === 0) {
             const emptyBox = parent.createDiv({ cls: 'first-task-recurring-empty' });
             emptyBox.createEl('p', {
@@ -300,15 +399,12 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
                 cls: 'first-task-recurring-empty-text',
             });
         } else {
-            /* ─── لیست ─── */
             const listWrap = parent.createDiv({ cls: 'first-task-recurring-list' });
-
             for (const template of templates) {
                 this.renderRecurringRow(listWrap, template, lang);
             }
         }
 
-        /* ─── دکمه‌ی افزودن ─── */
         const addWrap = parent.createDiv({ cls: 'first-task-recurring-add-wrap' });
         const addBtn = addWrap.createEl('button', {
             cls: 'first-task-recurring-add-btn mod-cta',
@@ -326,7 +422,6 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
         };
     }
 
-    /* ─── ردیف هر الگو ─── */
     private renderRecurringRow(
         parent: HTMLElement,
         template: RecurringTemplate,
@@ -337,24 +432,18 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
                 (template.active ? '' : ' is-inactive'),
         });
 
-        /* ─── آیکون وضعیت ─── */
         const iconWrap = row.createDiv({ cls: 'first-task-recurring-row-icon' });
         const recIcon = this.getRecurrenceIcon(template.recurrence);
         setIcon(iconWrap, recIcon);
 
-        /* ─── بدنه ─── */
         const body = row.createDiv({ cls: 'first-task-recurring-row-body' });
-
         const titleRow = body.createDiv({ cls: 'first-task-recurring-row-title' });
         titleRow.setText(template.title);
 
         const meta = body.createDiv({ cls: 'first-task-recurring-row-meta' });
-
-        /* نوع تکرار */
         const typeLabel = this.getRecurrenceLabel(template, lang);
         meta.createSpan({ cls: 'first-task-recurring-type-badge', text: typeLabel });
 
-        /* تاریخ شروع */
         if (template.start_date_jalali || template.start_date_gregorian) {
             const startDisplay = this.plugin.settings.useJalaliDate
                 ? template.start_date_jalali
@@ -364,19 +453,14 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
             });
         }
 
-        /* دسته */
         if (template.category) {
             const catName = this.plugin.taskManager.getCategoryDisplayName(template.category);
             meta.createSpan({ text: ' · ' + catName });
         }
 
-        /* ─── اکشن‌ها ─── */
         const actions = row.createDiv({ cls: 'first-task-recurring-row-actions' });
 
-        /* Toggle active */
-        const toggleBtn = actions.createEl('button', {
-            cls: 'clickable-icon',
-        });
+        const toggleBtn = actions.createEl('button', { cls: 'clickable-icon' });
         setIcon(toggleBtn, template.active ? 'pause-circle' : 'play-circle');
         toggleBtn.setAttribute(
             'aria-label',
@@ -390,10 +474,7 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
             this.scheduleRefresh();
         };
 
-        /* Edit */
-        const editBtn = actions.createEl('button', {
-            cls: 'clickable-icon',
-        });
+        const editBtn = actions.createEl('button', { cls: 'clickable-icon' });
         setIcon(editBtn, 'pencil');
         editBtn.setAttribute('aria-label', t(lang, 'btn_edit'));
         editBtn.onclick = () => {
@@ -405,7 +486,6 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
             ).open();
         };
 
-        /* Delete */
         const delBtn = actions.createEl('button', {
             cls: 'clickable-icon mod-warning',
         });
@@ -424,7 +504,44 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
         };
     }
 
-    /* ─── آیکون نوع تکرار ─── */
+    /* ═══════════════════════════════════════════════════════
+       Manual Archive
+       ═══════════════════════════════════════════════════════ */
+    private async handleManualArchive(): Promise<void> {
+        const lang = this.plugin.settings.language;
+
+        try {
+            const result = await this.plugin.archiveManager.runAutoArchive(
+                this.plugin.settings.desktop
+            );
+
+            if (result.archived > 0) {
+                this.plugin.toastManager.show(
+                    t(lang, 'notice_archive_success', {
+                        count: displayNumber(result.archived, lang),
+                    }),
+                    'success'
+                );
+            } else if (result.reason === 'no_candidates') {
+                this.plugin.toastManager.show(
+                    t(lang, 'notice_archive_none'),
+                    'info'
+                );
+            } else if (result.reason === 'threshold_not_reached') {
+                this.plugin.toastManager.show(
+                    t(lang, 'notice_archive_skipped'),
+                    'info'
+                );
+            }
+
+            this.plugin.refreshPanel();
+            this.scheduleRefresh();
+        } catch (e) {
+            console.warn('[First Task] Manual archive failed:', e);
+        }
+    }
+
+    /* ─── Helpers ─── */
     private getRecurrenceIcon(type: string): string {
         switch (type) {
             case 'daily': return 'sun';
@@ -434,11 +551,7 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
         }
     }
 
-    /* ─── لیبل نوع تکرار ─── */
-    private getRecurrenceLabel(
-        template: RecurringTemplate,
-        lang: Language
-    ): string {
+    private getRecurrenceLabel(template: RecurringTemplate, lang: Language): string {
         switch (template.recurrence) {
             case 'daily':
                 return t(lang, 'recurring_type_daily');
@@ -447,12 +560,8 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
                     return t(lang, 'recurring_type_weekly');
                 }
                 const days = [
-                    'weekday_sunday',
-                    'weekday_monday',
-                    'weekday_tuesday',
-                    'weekday_wednesday',
-                    'weekday_thursday',
-                    'weekday_friday',
+                    'weekday_sunday', 'weekday_monday', 'weekday_tuesday',
+                    'weekday_wednesday', 'weekday_thursday', 'weekday_friday',
                     'weekday_saturday',
                 ];
                 return t(lang, days[template.weekDay] as any);
@@ -466,6 +575,20 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
             default:
                 return '';
         }
+    }
+
+    private formatDate(ts: number): string {
+        const d = new Date(ts);
+        if (this.plugin.settings.useJalaliDate) {
+            return displayString(
+                `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`,
+                this.plugin.settings.language
+            );
+        }
+        return displayString(
+            `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`,
+            this.plugin.settings.language
+        );
     }
 
     private parseFolders(input: string): string[] {
