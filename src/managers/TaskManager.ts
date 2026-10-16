@@ -1,6 +1,8 @@
 /* ════════════════════════════════════════════════════════════
-   📋 مدیریت تسک‌ها — v0.3.0
-   ✅ File cache skip (سرعت بالا)
+   📋 مدیریت تسک‌ها — v0.2.1
+   ✅ رفع باگ skip در اولین rescanAll
+   ✅ File cache skip با canSkip flag
+   ✅ حذف cache update تکراری (read اضافی)
    ✅ Debounced save
    ✅ رفع باگ آمار
    ════════════════════════════════════════════════════════════ */
@@ -70,31 +72,36 @@ export class TaskManager {
     }
 
     /* ═══════════════════════════════════════════════════════
-       🆕 اسکن کامل — با file cache skip
+       🆕 rescanAll — با canSkip flag
        ═══════════════════════════════════════════════════════ */
     async rescanAll(): Promise<void> {
         const files = this.scanner.getMarkdownFiles();
         const newTasks = new Map<string, ExtractedTask>();
 
+        /* 🆕 فقط وقتی می‌تونیم skip کنیم که تسک‌های قبلی موجود باشن */
+        const canSkip = this.tasks.size > 0;
+
         /* ─── فایل‌هایی که تغییر نکردن رو skip کن ─── */
         const filesToScan: TFile[] = [];
-        const skippedFiles: TFile[] = [];
+        const skippedPaths = new Set<string>();
 
         for (const file of files) {
             const stat = this.scanner.getFileStat(file);
             const cached = this.index.getFileCache(file.path);
 
-            if (cached &&
+            /* 🆕 فقط اگه canSkip true باشه و cache مطابق باشه → skip */
+            if (canSkip &&
+                cached &&
                 cached.mtime === stat.mtime &&
                 cached.size === stat.size) {
-                skippedFiles.push(file);
+                skippedPaths.add(file.path);
                 continue;
             }
 
             filesToScan.push(file);
         }
 
-        /* ─── فقط فایل‌های تغییرکرده رو اسکن کن ─── */
+        /* ─── فایل‌های تغییرکرده → اسکن (به صورت chunk شده) ─── */
         const chunks = this.chunkArray(filesToScan, 15);
         for (const chunk of chunks) {
             const results = await Promise.all(
@@ -105,22 +112,26 @@ export class TaskManager {
             }
         }
 
-        /* ─── فایل‌های skip‌شده → از tasks قبلی بردار ─── */
-        const skippedPaths = new Set(skippedFiles.map(f => f.path));
-        for (const [id, task] of this.tasks.entries()) {
-            if (skippedPaths.has(task._source_file)) {
-                newTasks.set(id, task);
+        /* ─── فایل‌های skip‌شده → از snapshot قبلی بردار ─── */
+        if (canSkip) {
+            for (const [id, task] of this.tasks.entries()) {
+                if (skippedPaths.has(task._source_file)) {
+                    newTasks.set(id, task);
+                }
             }
         }
 
-        /* ─── بازیابی متادیتا ─── */
+        /* ─── بازیابی متادیتا از orphanها ─── */
         await this.recoverOrphanMetadata(newTasks);
 
-        /* ─── اعمال entryها ─── */
+        /* ─── اعمال entryها روی تسک‌های تازه ─── */
         for (const task of newTasks.values()) {
-            /* اگه تسک از skip اومده، نیازی به applyEntry نیست */
-            if (task.description || task.category || task.due_date_ts ||
-                task.created_ts || task.completed_ts) {
+            /* 🆕 اگه تسک از snapshot اومده و metadata داره، دست بهش نزن */
+            if (task.description ||
+                task.category ||
+                task.due_date_ts > 0 ||
+                task.created_ts > 0 ||
+                task.completed_ts > 0) {
                 continue;
             }
 
@@ -144,24 +155,16 @@ export class TaskManager {
             await this.ensureCompletedTime(task);
         }
 
+        /* ─── جایگزینی tasks ─── */
         this.tasks = newTasks;
         this.lastSyncTs = Date.now();
+
+        /* 🆕 حالا آماده‌ست */
         this.ready = true;
 
-        /* 🆕 فایل‌های تازه اسکن‌شده رو توی cache ذخیره کن */
-        for (const file of filesToScan) {
-            const stat = this.scanner.getFileStat(file);
-            const content = await this.scanner.readFile(file);
-            if (content) {
-                this.index.updateFileCache(file.path, {
-                    mtime: stat.mtime,
-                    size: stat.size,
-                    hash: hashContent(content),
-                });
-            }
-        }
-
+        /* ═══ پاکسازی orphanها (با guard ایمنی) ═══ */
         await this.index.cleanupOrphans(new Set(this.tasks.keys()));
+
         this.recomputeStats();
     }
 
@@ -174,6 +177,7 @@ export class TaskManager {
         const currentIds = new Set(newTasks.keys());
         const allEntries = this.index.exportAllEntries();
 
+        /* orphanها رو گروه‌بندی کن بر اساس فایل */
         const orphansByFile = new Map<string, Array<[string, TaskIndexEntry]>>();
         for (const [id, entry] of allEntries) {
             if (currentIds.has(id)) continue;
@@ -187,6 +191,7 @@ export class TaskManager {
         let recovered = 0;
 
         for (const [filePath, orphans] of orphansByFile) {
+            /* تسک‌های جدید این فایل که هنوز متادیتا ندارن */
             const tasksWithoutMeta: Array<[string, ExtractedTask]> = [];
             for (const [taskId, task] of newTasks) {
                 if (task._source_file !== filePath) continue;
@@ -194,6 +199,7 @@ export class TaskManager {
                 tasksWithoutMeta.push([taskId, task]);
             }
 
+            /* مطابقت بر اساس عنوان */
             for (const [orphanId, orphanEntry] of orphans) {
                 if (!orphanEntry._title) continue;
 
@@ -203,6 +209,7 @@ export class TaskManager {
                 if (matchIdx === -1) continue;
 
                 const [taskId] = tasksWithoutMeta.splice(matchIdx, 1)[0];
+
                 await this.index.moveEntry(orphanId, taskId);
                 recovered++;
             }
@@ -239,6 +246,9 @@ export class TaskManager {
         });
     }
 
+    /* ═══════════════════════════════════════════════════════
+       اگر تسک انجام‌شده‌ست ولی completed_ts نداره
+       ═══════════════════════════════════════════════════════ */
     private async ensureCompletedTime(task: ExtractedTask): Promise<void> {
         if (!task.completed) return;
         if (task.completed_ts > 0) return;
@@ -265,6 +275,7 @@ export class TaskManager {
         const hash = hashContent(content);
         const tasks = this.extractor.extractFromContent(content, file.path);
 
+        /* 🆕 اینجا cache رو آپدیت می‌کنیم — نه جای دیگه */
         this.index.updateFileCache(file.path, {
             mtime: stat.mtime,
             size: stat.size,
@@ -287,6 +298,7 @@ export class TaskManager {
 
         const tasks = this.extractor.extractFromContent(content, file.path);
 
+        /* ─── بازیابی متادیتای orphanهای همین فایل ─── */
         const currentIds = new Set(tasks.map(t => t._id));
         const orphans: Array<[string, TaskIndexEntry]> = [];
         for (const [id, entry] of this.index.exportAllEntries()) {
@@ -340,6 +352,7 @@ export class TaskManager {
             hash: hashContent(content),
         });
 
+        /* 🆕 فقط وقتی آماده‌ایم پاکسازی کن */
         if (this.ready) {
             await this.index.cleanupOrphans(new Set(this.tasks.keys()));
         }
