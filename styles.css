@@ -1,8 +1,8 @@
 /* ════════════════════════════════════════════════════════════
-   🎨 First Task — Style Sheet v0.1.2
+   🎨 First Task — Style Sheet v0.2.0
    ✅ Standard, clean, RTL-friendly
    ✅ Toggle flip in RTL (settings + modals)
-   ✅ No broken layout
+   ✅ Desktop panel
    ════════════════════════════════════════════════════════════ */
 
 /* ═══════════════════════════════════════════════════════════
@@ -222,13 +222,25 @@
 .first-task-planner-stat-card[data-card="this_week"].is-active { background: rgba(41, 128, 185, 0.2); border-color: #1e5f8b; }
 .first-task-planner-stat-card[data-card="this_week"] .first-task-stat-value { color: #1e5f8b; }
 
+.first-task-planner-stat-card[data-card="next_week"] { background: rgba(41, 128, 185, 0.08); }
+.first-task-planner-stat-card[data-card="next_week"].is-active { background: rgba(41, 128, 185, 0.2); border-color: #1e5f8b; }
+.first-task-planner-stat-card[data-card="next_week"] .first-task-stat-value { color: #1e5f8b; }
+
 .first-task-planner-stat-card[data-card="this_month"] { background: rgba(46, 204, 113, 0.1); }
 .first-task-planner-stat-card[data-card="this_month"].is-active { background: rgba(46, 204, 113, 0.2); border-color: #27ae60; }
 .first-task-planner-stat-card[data-card="this_month"] .first-task-stat-value { color: #27ae60; }
 
+.first-task-planner-stat-card[data-card="next_month"] { background: rgba(46, 204, 113, 0.08); }
+.first-task-planner-stat-card[data-card="next_month"].is-active { background: rgba(46, 204, 113, 0.2); border-color: #27ae60; }
+.first-task-planner-stat-card[data-card="next_month"] .first-task-stat-value { color: #27ae60; }
+
 .first-task-planner-stat-card[data-card="this_year"] { background: rgba(39, 174, 96, 0.1); }
 .first-task-planner-stat-card[data-card="this_year"].is-active { background: rgba(39, 174, 96, 0.2); border-color: #1e8449; }
 .first-task-planner-stat-card[data-card="this_year"] .first-task-stat-value { color: #1e8449; }
+
+.first-task-planner-stat-card[data-card="next_year"] { background: rgba(39, 174, 96, 0.08); }
+.first-task-planner-stat-card[data-card="next_year"].is-active { background: rgba(39, 174, 96, 0.2); border-color: #1e8449; }
+.first-task-planner-stat-card[data-card="next_year"] .first-task-stat-value { color: #1e8449; }
 
 .first-task-planner-stat-card[data-card="no_date"] { background: rgba(149, 165, 166, 0.1); }
 .first-task-planner-stat-card[data-card="no_date"].is-active { background: rgba(149, 165, 166, 0.2); border-color: #7f8c8d; }
@@ -672,6 +684,54 @@
 }
 
 /* ═══════════════════════════════════════════════════════════
+   🆕 Desktop Panel (میز من)
+   ═══════════════════════════════════════════════════════════ */
+.first-task-desktop {
+    /* همون استایل first-task-panel رو داره، فقط یه تمایز کوچیک */
+}
+
+/* ─── Desktop badge روی کارت ─── */
+.first-task-desktop .first-task-card-note {
+    color: var(--text-accent);
+    font-weight: 500;
+}
+
+/* ─── Empty state (Desktop) ─── */
+.first-task-desktop .first-task-empty {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-muted);
+}
+
+.first-task-desktop .first-task-empty-title {
+    font-size: var(--font-ui-medium);
+    font-weight: 500;
+    margin-bottom: 4px;
+}
+
+.first-task-desktop .first-task-empty-hint {
+    font-size: var(--font-ui-smaller);
+    opacity: 0.8;
+}
+
+/* ─── Stats (Desktop) ─── */
+.first-task-desktop .first-task-stats-grid {
+    grid-template-columns: repeat(5, 1fr);
+}
+
+.first-task-desktop .first-task-stat-card {
+    padding: 10px 4px;
+}
+
+.first-task-desktop .first-task-stat-value {
+    font-size: 18px;
+}
+
+.first-task-desktop .first-task-stat-label {
+    font-size: 9.5px;
+}
+
+/* ═══════════════════════════════════════════════════════════
    ⚙️ Settings — RTL rules (toggle flip, inputs, dropdowns)
    ═══════════════════════════════════════════════════════════ */
 
@@ -843,6 +903,11 @@
     .first-task-selection-btn {
         flex: 1;
         justify-content: center;
+    }
+
+    /* 🆕 Desktop stats on mobile — 3 تا 2 تا 2 */
+    .first-task-desktop .first-task-stats-grid {
+        grid-template-columns: repeat(3, 1fr);
     }
 }
 
