@@ -1,8 +1,6 @@
 /* ════════════════════════════════════════════════════════════
-   🏷️ مدیریت دسته‌بندی‌ها
-   ✅ فایل _categories.json توی پوشه‌ی FirstTask
-   ✅ ۹ دسته‌بندی پیش‌فرض
-   ✅ کاربر می‌تونه دستی ویرایش کنه
+   🏷️ مدیریت دسته‌بندی‌ها — v0.2.1
+   ✅ Auto-merge دسته‌های جدید
    ════════════════════════════════════════════════════════════ */
 
 import { App, normalizePath } from 'obsidian';
@@ -35,7 +33,7 @@ export class CategoriesManager {
         }
     }
 
-    /* ─── لود ─── */
+    /* ─── لود (با auto-merge) ─── */
     async load(): Promise<void> {
         try {
             const exists = await this.app.vault.adapter.exists(this.path);
@@ -43,9 +41,43 @@ export class CategoriesManager {
                 this.categories = [...DEFAULT_CATEGORIES.categories];
                 return;
             }
+
             const content = await this.app.vault.adapter.read(this.path);
-            const parsed: CategoriesFile = JSON.parse(content);
-            this.categories = parsed.categories || [...DEFAULT_CATEGORIES.categories];
+            const parsed = JSON.parse(content);
+            const loaded: CategoryDef[] = parsed.categories || [
+                ...DEFAULT_CATEGORIES.categories,
+            ];
+
+            /* 🆕 Merge دسته‌های جدید پیش‌فرض */
+            const loadedIds = new Set(loaded.map(c => c.id));
+            const merged = [...loaded];
+            let changed = false;
+
+            for (const defCat of DEFAULT_CATEGORIES.categories) {
+                if (loadedIds.has(defCat.id)) continue;
+
+                /* ─── درج پویا بر اساس موقعیت ─── */
+                if (defCat.id === 'desktop') {
+                    /* قبل از important */
+                    const idx = merged.findIndex(c => c.id === 'important');
+                    if (idx !== -1) {
+                        merged.splice(idx, 0, defCat);
+                        changed = true;
+                        continue;
+                    }
+                }
+
+                /* ─── پیش‌فرض: آخر اضافه کن ─── */
+                merged.push(defCat);
+                changed = true;
+            }
+
+            this.categories = merged;
+
+            /* ─── اگه چیزی اضافه شد، ذخیره کن ─── */
+            if (changed) {
+                await this.save();
+            }
         } catch (e) {
             console.warn('[First Task] Categories load failed:', e);
             this.categories = [...DEFAULT_CATEGORIES.categories];
@@ -55,27 +87,27 @@ export class CategoriesManager {
     /* ─── ذخیره ─── */
     async save(): Promise<void> {
         try {
-            const data: CategoriesFile = {
+            const data = {
                 version: 1,
                 categories: this.categories,
             };
-            await this.app.vault.adapter.write(this.path, JSON.stringify(data, null, 2));
+            await this.app.vault.adapter.write(
+                this.path,
+                JSON.stringify(data, null, 2)
+            );
         } catch (e) {
             console.warn('[First Task] Categories save failed:', e);
         }
     }
 
-    /* ─── گرفتن همه ─── */
     getAll(): CategoryDef[] {
         return this.categories;
     }
 
-    /* ─── گرفتن بر اساس id ─── */
     getById(id: string): CategoryDef | null {
         return this.categories.find(c => c.id === id) || null;
     }
 
-    /* ─── نام نمایشی ─── */
     getDisplayName(id: string, lang: 'en' | 'fa'): string {
         const cat = this.getById(id);
         if (!cat) return id;
