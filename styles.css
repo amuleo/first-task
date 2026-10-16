@@ -1,9 +1,10 @@
 /* ════════════════════════════════════════════════════════════
-   🎨 First Task — Style Sheet v0.3.0
+   🎨 First Task — Style Sheet v0.2.1
    ✅ Standard, clean, RTL-friendly
    ✅ Desktop panel + Import modal + Recurring
    ✅ Smart Suggestions + Global Stats + Weekly chips
-   ✅ 🆕 Auto-flow planner grid + Desktop cards
+   ✅ Auto-flow planner grid + Desktop cards
+   ✅ 🆕 Disabled sections (کم‌رنگ + غیرقابل کلیک)
    ════════════════════════════════════════════════════════════ */
 
 /* ═══════════════════════════════════════════════════════════
@@ -1557,6 +1558,52 @@
 }
 
 /* ═══════════════════════════════════════════════════════════
+   🆕 Disabled Sections (Recurring / Archive)
+   ═══════════════════════════════════════════════════════════ */
+.first-task-settings .first-task-settings-dynamic {
+    transition: opacity 0.2s ease;
+    position: relative;
+}
+
+/* حالت disabled: کم‌رنگ + غیرقابل کلیک */
+.first-task-settings .first-task-settings-dynamic.is-hidden {
+    display: block !important;
+    opacity: 0.4;
+    pointer-events: none;
+    user-select: none;
+    filter: grayscale(0.5);
+}
+
+/* overlay شفاف روی بخش disabled */
+.first-task-settings .first-task-settings-dynamic.is-hidden::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: transparent;
+    cursor: not-allowed;
+    z-index: 10;
+}
+
+/* Setting items داخل بخش disabled */
+.first-task-settings .first-task-settings-dynamic.is-hidden .setting-item {
+    pointer-events: none;
+    cursor: not-allowed;
+}
+
+.first-task-settings .first-task-settings-dynamic.is-hidden input,
+.first-task-settings .first-task-settings-dynamic.is-hidden select,
+.first-task-settings .first-task-settings-dynamic.is-hidden textarea,
+.first-task-settings .first-task-settings-dynamic.is-hidden button {
+    pointer-events: none !important;
+    cursor: not-allowed !important;
+}
+
+.first-task-settings .first-task-settings-dynamic.is-hidden .first-task-recurring-add-btn {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* ═══════════════════════════════════════════════════════════
    Settings — RTL rules
    ═══════════════════════════════════════════════════════════ */
 .first-task-settings[dir="rtl"] .checkbox-container,
@@ -1729,7 +1776,6 @@
         grid-template-columns: repeat(3, 1fr);
     }
 
-    /* 🆕 Auto-flow planner grid on mobile */
     .first-task-stats-grid-auto {
         grid-template-columns: repeat(3, 1fr) !important;
     }
@@ -1787,6 +1833,11 @@
     .first-task-recurring-add-btn {
         font-size: 12px;
         padding: 9px 14px;
+    }
+
+    /* 🆕 Disabled sections on mobile */
+    .first-task-settings .first-task-settings-dynamic.is-hidden {
+        opacity: 0.35;
     }
 }
 
