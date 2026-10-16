@@ -1,7 +1,8 @@
 /* ════════════════════════════════════════════════════════════
-   📦 تایپ‌های First Task v0.2.0
+   📦 تایپ‌های First Task v0.2.1
    ✅ _title و _source_file برای بازیابی خودکار متادیتا
-   ✅ 🆕 Desktop section
+   ✅ Desktop section
+   ✅ 🆕 Import section
    ════════════════════════════════════════════════════════════ */
 
 export interface ExtractedTask {
@@ -180,7 +181,7 @@ export interface BulkUpdates {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   🆕 Desktop — میز من
+   🖥️ Desktop — میز من
    ═══════════════════════════════════════════════════════════ */
 
 export interface DesktopTask {
@@ -256,6 +257,34 @@ export interface DesktopStats {
 }
 
 /* ═══════════════════════════════════════════════════════════
+   📥 Import — افزودن تسک از نوت‌ها
+   ═══════════════════════════════════════════════════════════ */
+
+export interface DiscoveredTask {
+    /* ─── اطلاعات تسک ─── */
+    task_id: string;
+    title: string;
+    completed: boolean;
+    source_file: string;
+    source_line: number;
+
+    /* ─── اطلاعات نمایشی ─── */
+    file_display_name: string;
+    already_imported: boolean;
+}
+
+export interface ImportOptions {
+    deleteFromNote: boolean;
+    assignCategory: string;
+}
+
+export interface ImportResult {
+    imported: number;
+    removedFromNotes: number;
+    errors: string[];
+}
+
+/* ═══════════════════════════════════════════════════════════
    ⚙️ تنظیمات کلی پلاگین
    ═══════════════════════════════════════════════════════════ */
 
@@ -276,7 +305,6 @@ export interface FirstTaskSettings {
     panelCategory: string;
     plannerCategory: string;
     plannerCard: PlannerCard;
-    /* 🆕 Desktop */
     desktop: DesktopSettings;
 }
 
