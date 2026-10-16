@@ -64,7 +64,7 @@ export class StatsManager {
                 const backup = normalizePath(
                     `${FOLDER_NAME}/stats.corrupted-${Date.now()}.json`
                 );
-                await this.app.vault.write(backup, content);
+                await this.app.vault.adapter.write(backup, content);
                 console.warn(
                     `[First Task] Corrupted stats.json backed up to: ${backup}`
                 );
