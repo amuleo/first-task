@@ -1,27 +1,24 @@
 /* ════════════════════════════════════════════════════════════
-   📋 پنل اصلی — v0.1.2
-   ✅ dropdown دسته‌بندی
-   ✅ اعداد داینامیک
-   ✅ نمایش badge ها (اختیاری)
-   ✅ حالت انتخاب گروهی + حذف/ویرایش گروهی
+   📋 TaskPanel View — v0.2.1
+   ✅ ۹ کارت زمانی + بدون تاریخ + همه
+   ✅ حالت انتخاب گروهی
+   ✅ 🆕 انتقال گروهی به Desktop
    ════════════════════════════════════════════════════════════ */
 
-import { ItemView, WorkspaceLeaf, setIcon } from 'obsidian';
+import { ItemView, WorkspaceLeaf, setIcon, TFile } from 'obsidian';
 import type FirstTaskPlugin from '../main';
-import type { ExtractedTask } from '../types';
+import type { ExtractedTask, TabType } from '../types';
 import { t, applyDirection } from '../i18n';
 import { displayNumber, displayString } from '../utils/numberUtils';
-import { CreateTaskModal } from './CreateTaskModal';
 import { TaskDetailsModal } from './TaskDetailsModal';
 import { BulkEditModal } from './BulkEditModal';
+import { CreateTaskModal } from './CreateTaskModal';
 
 export const VIEW_TYPE_FIRST_TASK = 'first-task-panel';
 
 export class TaskPanelView extends ItemView {
     plugin: FirstTaskPlugin;
     private visibleCount: number = 0;
-
-    /* 🆕 حالت انتخاب گروهی */
     private selectionMode: boolean = false;
     private selectedIds: Set<string> = new Set();
 
@@ -66,7 +63,6 @@ export class TaskPanelView extends ItemView {
             this.renderCompleted(contentEl);
         }
 
-        /* 🆕 نوار انتخاب (پایین) */
         if (this.selectionMode) {
             this.renderSelectionBar(contentEl);
         }
@@ -91,13 +87,11 @@ export class TaskPanelView extends ItemView {
 
         const actions = topRow.createDiv({ cls: 'first-task-header-actions' });
 
-        /* اسکن مجدد */
         const syncBtn = actions.createEl('button', { cls: 'clickable-icon' });
         setIcon(syncBtn, 'refresh-cw');
         syncBtn.setAttribute('aria-label', t(lang, 'panel_reload'));
         syncBtn.onclick = () => this.handleRescan();
 
-        /* 🆕 دکمه انتخاب گروهی */
         if (!this.selectionMode) {
             const selectBtn = actions.createEl('button', { cls: 'clickable-icon' });
             setIcon(selectBtn, 'check-square');
@@ -105,7 +99,6 @@ export class TaskPanelView extends ItemView {
             selectBtn.onclick = () => this.enterSelectionMode();
         }
 
-        /* دکمه تسک جدید (فقط توی تب در انتظار و حالت غیرانتخاب) */
         if (this.plugin.settings.currentTab === 'pending' && !this.selectionMode) {
             const addBtn = actions.createEl('button', { cls: 'clickable-icon' });
             setIcon(addBtn, 'plus');
@@ -159,12 +152,13 @@ export class TaskPanelView extends ItemView {
         const pendingCount = this.plugin.taskManager.getPendingByCategory(currentCategory).length;
         const completedCount = this.plugin.taskManager.getCompletedByCategory(currentCategory).length;
 
-        const mkTab = (id: 'pending' | 'completed', icon: string, label: string, count: number) => {
+        const mkTab = (id: TabType, icon: string, label: string, count: number) => {
             const btn = tabs.createEl('button', {
                 cls: 'first-task-tab' + (this.plugin.settings.currentTab === id ? ' is-active' : ''),
             });
             setIcon(btn.createSpan({ cls: 'first-task-tab-icon' }), icon);
             btn.createSpan({ text: ` ${label} (${displayNumber(count, lang)})` });
+
             btn.onclick = async () => {
                 if (this.plugin.settings.currentTab === id) return;
                 this.selectionMode = false;
@@ -185,6 +179,7 @@ export class TaskPanelView extends ItemView {
     private renderPending(parent: HTMLElement): void {
         const lang = this.plugin.settings.language;
         const body = parent.createDiv({ cls: 'first-task-body' });
+
         const category = this.plugin.settings.panelCategory || '';
         const tasks = this.plugin.taskManager.getPendingByCategory(category);
 
@@ -254,18 +249,28 @@ export class TaskPanelView extends ItemView {
     }
 
     /* ═══════════════════════════════════════════════════════
-       🆕 نوار انتخاب (پایین پنل)
+       نوار انتخاب
        ═══════════════════════════════════════════════════════ */
     private renderSelectionBar(parent: HTMLElement): void {
         const lang = this.plugin.settings.language;
         const bar = parent.createDiv({ cls: 'first-task-selection-bar' });
 
         const countEl = bar.createDiv({ cls: 'first-task-selection-count' });
-        countEl.setText(t(lang, 'bulk_selected_count', { count: displayNumber(this.selectedIds.size, lang) }));
+        countEl.setText(t(lang, 'bulk_selected_count', {
+            count: displayNumber(this.selectedIds.size, lang),
+        }));
 
         const actions = bar.createDiv({ cls: 'first-task-selection-actions' });
 
-        /* حذف */
+        /* 🆕 دکمه انتقال به Desktop */
+        const moveBtn = actions.createEl('button', {
+            cls: 'first-task-selection-btn',
+        });
+        setIcon(moveBtn.createSpan({ cls: 'first-task-selection-icon' }), 'layout-dashboard');
+        moveBtn.createSpan({ text: ' ' + t(lang, 'bulk_move_to_desktop') });
+        moveBtn.disabled = this.selectedIds.size === 0;
+        moveBtn.onclick = () => this.handleBulkMoveToDesktop();
+
         const delBtn = actions.createEl('button', {
             cls: 'first-task-selection-btn mod-warning',
         });
@@ -274,7 +279,6 @@ export class TaskPanelView extends ItemView {
         delBtn.disabled = this.selectedIds.size === 0;
         delBtn.onclick = () => this.handleBulkDelete();
 
-        /* ویرایش */
         const editBtn = actions.createEl('button', {
             cls: 'first-task-selection-btn mod-cta',
         });
@@ -283,7 +287,6 @@ export class TaskPanelView extends ItemView {
         editBtn.disabled = this.selectedIds.size === 0;
         editBtn.onclick = () => this.handleBulkEdit();
 
-        /* انصراف */
         const cancelBtn = actions.createEl('button', {
             cls: 'first-task-selection-btn',
         });
@@ -292,7 +295,7 @@ export class TaskPanelView extends ItemView {
     }
 
     /* ═══════════════════════════════════════════════════════
-       🆕 مدیریت حالت انتخاب
+       مدیریت حالت انتخاب
        ═══════════════════════════════════════════════════════ */
     private enterSelectionMode(): void {
         this.selectionMode = true;
@@ -321,7 +324,9 @@ export class TaskPanelView extends ItemView {
         const count = this.selectedIds.size;
         if (count === 0) return;
 
-        const confirmMsg = t(lang, 'bulk_delete_confirm', { count: displayNumber(count, lang) });
+        const confirmMsg = t(lang, 'bulk_delete_confirm', {
+            count: displayNumber(count, lang),
+        });
         if (!window.confirm(confirmMsg)) return;
 
         const ids = Array.from(this.selectedIds);
@@ -336,11 +341,58 @@ export class TaskPanelView extends ItemView {
     /* ─── ویرایش گروهی ─── */
     private handleBulkEdit(): void {
         if (this.selectedIds.size === 0) return;
-
         const ids = Array.from(this.selectedIds);
+
         new BulkEditModal(this.app, this.plugin, ids, () => {
             this.exitSelectionMode();
         }).open();
+    }
+
+    /* ─── 🆕 انتقال گروهی به Desktop ─── */
+    private async handleBulkMoveToDesktop(): Promise<void> {
+        if (this.selectedIds.size === 0) return;
+        const lang = this.plugin.settings.language;
+        const count = this.selectedIds.size;
+
+        /* ─── confirm ─── */
+        const msg = t(lang, 'bulk_move_to_desktop_confirm', {
+            count: displayNumber(count, lang),
+        });
+        if (!window.confirm(msg)) return;
+
+        const ids = Array.from(this.selectedIds);
+
+        try {
+            const result = await this.plugin.importManager.moveTasksFromNotes(
+                ids,
+                {
+                    deleteFromNote: true,
+                    assignCategory: '',
+                }
+            );
+
+            if (result.imported > 0) {
+                this.plugin.toastManager.show(
+                    t(lang, 'notice_bulk_moved', {
+                        count: displayNumber(result.imported, lang),
+                    }),
+                    'success'
+                );
+                this.exitSelectionMode();
+                this.plugin.refreshPanel();
+            } else {
+                this.plugin.toastManager.show(
+                    lang === 'fa' ? 'انتقال ناموفق' : 'Move failed',
+                    'error'
+                );
+            }
+        } catch (e) {
+            console.warn('[First Task] Bulk move failed:', e);
+            this.plugin.toastManager.show(
+                lang === 'fa' ? 'خطا در انتقال' : 'Move error',
+                'error'
+            );
+        }
     }
 
     /* ═══════════════════════════════════════════════════════
@@ -349,7 +401,8 @@ export class TaskPanelView extends ItemView {
     private renderTaskCard(parent: HTMLElement, task: ExtractedTask, isCompleted: boolean): void {
         const lang = this.plugin.settings.language;
         const useJalali = this.plugin.settings.useJalaliDate;
-        const pinnedClass = (task.pinned && !isCompleted) ? ' is-pinned' : '';
+
+        const pinnedClass = task.pinned && !isCompleted ? ' is-pinned' : '';
         const isSelected = this.selectedIds.has(task._id);
         const selectedClass = isSelected ? ' is-selected' : '';
 
@@ -358,7 +411,6 @@ export class TaskPanelView extends ItemView {
 
         const cbWrap = card.createDiv({ cls: 'first-task-card-checkbox' });
 
-        /* 🆕 توی حالت انتخاب → چک‌باکس انتخاب */
         if (this.selectionMode) {
             const selCb = cbWrap.createEl('input', { type: 'checkbox' });
             selCb.checked = isSelected;
@@ -418,7 +470,6 @@ export class TaskPanelView extends ItemView {
             text: ' ' + this.plugin.taskManager.getDisplayNoteName(task._source_file),
         });
 
-        /* badge های داینامیک (اختیاری) */
         if (!isCompleted && this.plugin.settings.showTaskBadges) {
             const dynCats = this.plugin.taskManager.getTaskDynamicCategories(task);
             if (dynCats.length > 0) {
@@ -427,12 +478,11 @@ export class TaskPanelView extends ItemView {
                     const badge = badgesRow.createSpan({
                         cls: `first-task-dynamic-badge first-task-dynamic-${c}`,
                     });
-                    badge.setText(t(lang, `category_${c}` as any));
+                    badge.setText(t(lang, `category_${c}`));
                 }
             }
         }
 
-        /* کلیک روی کارت */
         bodyCard.onclick = () => {
             if (this.selectionMode) {
                 this.toggleTaskSelection(task._id);
