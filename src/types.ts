@@ -1,6 +1,7 @@
 /* ════════════════════════════════════════════════════════════
-   📦 تایپ‌های First Task v0.1.3
+   📦 تایپ‌های First Task v0.2.0
    ✅ _title و _source_file برای بازیابی خودکار متادیتا
+   ✅ 🆕 Desktop section
    ════════════════════════════════════════════════════════════ */
 
 export interface ExtractedTask {
@@ -178,6 +179,86 @@ export interface BulkUpdates {
     targetFile: string;
 }
 
+/* ═══════════════════════════════════════════════════════════
+   🆕 Desktop — میز من
+   ═══════════════════════════════════════════════════════════ */
+
+export interface DesktopTask {
+    id: string;
+    title: string;
+    description: string;
+    category: string;
+    pinned: boolean;
+    completed: boolean;
+    due_date_jalali: string;
+    due_date_gregorian: string;
+    due_date_ts: number;
+    created_jalali: string;
+    created_gregorian: string;
+    created_ts: number;
+    completed_jalali: string;
+    completed_gregorian: string;
+    completed_ts: number;
+    modified_ts: number;
+}
+
+export const DEFAULT_DESKTOP_TASK: DesktopTask = {
+    id: '',
+    title: '',
+    description: '',
+    category: '',
+    pinned: false,
+    completed: false,
+    due_date_jalali: '',
+    due_date_gregorian: '',
+    due_date_ts: 0,
+    created_jalali: '',
+    created_gregorian: '',
+    created_ts: 0,
+    completed_jalali: '',
+    completed_gregorian: '',
+    completed_ts: 0,
+    modified_ts: 0,
+};
+
+export interface DesktopStoreFile {
+    version: number;
+    last_updated: number;
+    tasks: Record<string, DesktopTask>;
+}
+
+export const DEFAULT_DESKTOP_STORE: DesktopStoreFile = {
+    version: 1,
+    last_updated: 0,
+    tasks: {},
+};
+
+export interface DesktopSettings {
+    enabled: boolean;
+    showInTasks: boolean;
+    showInPlanner: boolean;
+    defaultImportMode: 'copy' | 'move';
+}
+
+export const DEFAULT_DESKTOP_SETTINGS: DesktopSettings = {
+    enabled: true,
+    showInTasks: false,
+    showInPlanner: false,
+    defaultImportMode: 'move',
+};
+
+export interface DesktopStats {
+    today: number;
+    this_week: number;
+    this_month: number;
+    this_year: number;
+    total: number;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ⚙️ تنظیمات کلی پلاگین
+   ═══════════════════════════════════════════════════════════ */
+
 export interface FirstTaskSettings {
     language: Language;
     useJalaliDate: boolean;
@@ -195,6 +276,8 @@ export interface FirstTaskSettings {
     panelCategory: string;
     plannerCategory: string;
     plannerCard: PlannerCard;
+    /* 🆕 Desktop */
+    desktop: DesktopSettings;
 }
 
 export const DEFAULT_SETTINGS: FirstTaskSettings = {
@@ -229,4 +312,5 @@ export const DEFAULT_SETTINGS: FirstTaskSettings = {
     panelCategory: '',
     plannerCategory: '',
     plannerCard: 'all',
+    desktop: { ...DEFAULT_DESKTOP_SETTINGS },
 };
