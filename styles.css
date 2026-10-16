@@ -1,10 +1,11 @@
 /* ════════════════════════════════════════════════════════════
-   🎨 First Task — Style Sheet v0.2.0
+   🎨 First Task — Style Sheet v0.2.1
    ✅ Standard, clean, RTL-friendly
    ✅ Desktop panel
    ✅ Import modal
    ✅ Recurring suggestions + settings
    ✅ Smart Suggestions + Global Stats
+   ✅ 🆕 Weekly chips + suggestions fix
    ════════════════════════════════════════════════════════════ */
 
 /* ═══════════════════════════════════════════════════════════
@@ -902,11 +903,16 @@
 }
 
 .first-task-suggestions-add-all {
-    display: inline-flex;
+    display: inline-flex !important;
     align-items: center;
+    justify-content: center;
     gap: 4px;
-    padding: 5px 10px;
-    font-size: var(--font-ui-smaller);
+    padding: 4px 10px !important;
+    height: 26px !important;
+    min-height: 26px !important;
+    max-height: 26px !important;
+    line-height: 1 !important;
+    font-size: 11px;
     font-weight: 600;
     border-radius: 6px;
     cursor: pointer;
@@ -914,6 +920,7 @@
     color: var(--text-on-accent);
     border: 1px solid var(--interactive-accent);
     transition: all 0.15s ease;
+    white-space: nowrap;
 }
 
 .first-task-suggestions-add-all:hover {
@@ -921,9 +928,14 @@
     transform: translateY(-1px);
 }
 
+.first-task-suggestions-add-all-icon {
+    display: inline-flex;
+    align-items: center;
+}
+
 .first-task-suggestions-add-all-icon svg {
-    width: 12px;
-    height: 12px;
+    width: 11px;
+    height: 11px;
 }
 
 .first-task-suggestions-list {
@@ -1004,6 +1016,13 @@
     color: var(--text-muted);
 }
 
+.first-task-suggestion-actions {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+    align-items: center;
+}
+
 .first-task-suggestion-add-btn {
     flex-shrink: 0;
     display: inline-flex;
@@ -1028,6 +1047,32 @@
 .first-task-suggestion-add-btn svg {
     width: 14px;
     height: 14px;
+}
+
+.first-task-suggestion-dismiss-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border-radius: 6px;
+    cursor: pointer;
+    background: var(--background-secondary);
+    color: var(--text-muted);
+    border: 1px solid var(--background-modifier-border);
+    transition: all 0.15s ease;
+}
+
+.first-task-suggestion-dismiss-btn:hover {
+    background: rgba(231, 76, 60, 0.15);
+    color: #c0392b;
+    border-color: #c0392b;
+}
+
+.first-task-suggestion-dismiss-btn svg {
+    width: 13px;
+    height: 13px;
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -1131,26 +1176,35 @@
     flex-shrink: 0;
 }
 
+/* 🆕 دکمه تمام عرض */
 .first-task-recurring-add-wrap {
-    margin-top: 10px;
+    margin-top: 12px;
     display: flex;
-    justify-content: flex-end;
+    width: 100%;
 }
 
 .first-task-recurring-add-btn {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    padding: 10px 16px;
+    font-size: var(--font-ui-small);
+    font-weight: 600;
+    border-radius: 8px;
+    cursor: pointer;
+    text-align: center;
+}
+
+.first-task-recurring-add-icon {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    padding: 6px 14px;
-    font-size: var(--font-ui-smaller);
-    font-weight: 600;
-    border-radius: 6px;
-    cursor: pointer;
 }
 
 .first-task-recurring-add-icon svg {
-    width: 13px;
-    height: 13px;
+    width: 14px;
+    height: 14px;
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -1412,6 +1466,72 @@
 }
 
 /* ═══════════════════════════════════════════════════════════
+   🆕 Weekly Mode Chips
+   ═══════════════════════════════════════════════════════════ */
+.first-task-weekday-chips-wrap {
+    margin: 12px 0 16px 0;
+    padding: 10px 12px;
+    background: var(--background-secondary);
+    border-radius: 8px;
+}
+
+.first-task-weekday-chips-label {
+    font-size: var(--font-ui-smaller);
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+}
+
+.first-task-weekday-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.first-task-weekday-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 12px;
+    font-size: var(--font-ui-smaller);
+    font-weight: 500;
+    border-radius: 16px;
+    cursor: pointer;
+    background: var(--background-primary);
+    color: var(--text-muted);
+    border: 1px solid var(--background-modifier-border);
+    transition: all 0.15s ease;
+    min-width: 60px;
+    text-align: center;
+}
+
+.first-task-weekday-chip:hover {
+    border-color: var(--interactive-accent);
+    color: var(--text-normal);
+}
+
+.first-task-weekday-chip.is-active {
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border-color: var(--interactive-accent);
+    font-weight: 600;
+}
+
+.first-task-weekday-chip.is-active:hover {
+    background: var(--interactive-accent-hover);
+}
+
+.first-task-weekday-info {
+    margin: 8px 0 12px 0;
+    padding: 10px 12px;
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+    background: var(--background-secondary);
+    border-radius: 8px;
+    text-align: center;
+}
+
+/* ═══════════════════════════════════════════════════════════
    Settings — RTL rules
    ═══════════════════════════════════════════════════════════ */
 .first-task-settings[dir="rtl"] .checkbox-container,
@@ -1592,7 +1712,7 @@
     }
     .first-task-suggestions-add-all {
         font-size: 10.5px;
-        padding: 4px 8px;
+        padding: 4px 8px !important;
     }
     .first-task-recurring-row {
         flex-wrap: wrap;
@@ -1613,6 +1733,18 @@
     }
     .first-task-global-stats-grid {
         grid-template-columns: 1fr;
+    }
+
+    /* 🆕 Weekly chips */
+    .first-task-weekday-chip {
+        min-width: 50px;
+        padding: 5px 10px;
+        font-size: 11px;
+    }
+
+    .first-task-recurring-add-btn {
+        font-size: 12px;
+        padding: 9px 14px;
     }
 }
 
