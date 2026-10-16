@@ -1,7 +1,8 @@
 /* ════════════════════════════════════════════════════════════
-   ⚙️ تب تنظیمات — v0.3.0
-   ✅ 🎯 رفع کامل باگ پرش اسکرول
+   ⚙️ تب تنظیمات — v0.2.1
+   ✅ رفع کامل باگ پرش اسکرول
    ✅ visibility toggle به‌جای rebuild
+   ✅ بخش‌های disabled کم‌رنگ + غیرقابل کلیک
    ✅ موبایل + دسکتاپ
    ════════════════════════════════════════════════════════════ */
 
@@ -20,7 +21,7 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
     plugin: FirstTaskPlugin;
     private refreshTimer: number | null = null;
 
-    /* 🆕 container های مخفی/نمایان */
+    /* container های بخش‌های داینامیک */
     private recurringDetailsEl: HTMLElement | null = null;
     private archiveDetailsEl: HTMLElement | null = null;
 
