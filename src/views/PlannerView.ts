@@ -1,8 +1,8 @@
 /* ════════════════════════════════════════════════════════════
-   📅 Planner — v0.2.1
+   📅 Planner — v0.2.0
    ✅ ۹ کارت زمانی + بدون تاریخ + همه
    ✅ حالت انتخاب گروهی
-   ✅ 🆕 انتقال گروهی به Desktop
+   ✅ انتقال گروهی به Desktop
    ════════════════════════════════════════════════════════════ */
 
 import { ItemView, WorkspaceLeaf, setIcon } from 'obsidian';
@@ -367,7 +367,7 @@ export class PlannerView extends ItemView {
 
         const actions = bar.createDiv({ cls: 'first-task-selection-actions' });
 
-        /* 🆕 دکمه انتقال به Desktop */
+        /* ─── دکمه انتقال به Desktop ─── */
         const moveBtn = actions.createEl('button', {
             cls: 'first-task-selection-btn',
         });
@@ -448,7 +448,7 @@ export class PlannerView extends ItemView {
         }).open();
     }
 
-    /* ─── 🆕 انتقال گروهی به Desktop ─── */
+    /* ─── انتقال گروهی به Desktop ─── */
     private async handleBulkMoveToDesktop(): Promise<void> {
         if (this.selectedIds.size === 0) return;
         const lang = this.plugin.settings.language;
