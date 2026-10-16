@@ -1,8 +1,7 @@
 /* ════════════════════════════════════════════════════════════
-   🌐 i18n — انگلیسی + فارسی (v0.3.0)
-   ✅ Desktop keys
-   ✅ Import keys
-   ✅ 🆕 Recurring keys + weekdays
+   🌐 i18n — انگلیسی + فارسی (v0.4.0)
+   ✅ Desktop + Import + Recurring
+   ✅ 🆕 Smart Suggestions + Archive + Global Stats
    ════════════════════════════════════════════════════════════ */
 
 import type { Language } from '../types';
@@ -37,6 +36,9 @@ const en = {
     stats_last_month: 'Last month',
     stats_this_year: 'This year',
     stats_total: 'Total',
+    stats_global_title: 'All-time stats',
+    stats_global_total_completed: 'Total done',
+    stats_global_total_archived: 'Archived',
 
     /* ─── Task ─── */
     task_pending: 'Pending',
@@ -103,7 +105,7 @@ const en = {
     import_success: 'Imported {count} task(s)',
     import_failed: 'Import failed',
 
-    /* ─── 🆕 Recurring ─── */
+    /* ─── Recurring ─── */
     recurring_title: 'Recurring suggestions',
     recurring_suggestion_from: 'Due',
     recurring_suggestion_overdue: 'Overdue',
@@ -140,6 +142,18 @@ const en = {
     weekday_thursday: 'Thursday',
     weekday_friday: 'Friday',
     weekday_saturday: 'Saturday',
+
+    /* ─── 🆕 Smart Suggestions ─── */
+    smart_title: 'Suggestions',
+    smart_type_from_notes: 'From notes',
+    smart_type_from_pattern: 'Pattern detected',
+    smart_type_from_old_task: 'Forgotten task',
+    smart_type_random_pick: 'Pick for you',
+    smart_pattern_count: 'Seen {count} times',
+    smart_pattern_hint: 'Create a recurring task for this pattern in Settings',
+    smart_action_move: 'Move to Desktop',
+    smart_action_create_recurring: 'Make recurring',
+    smart_action_dismiss: 'Dismiss',
 
     /* ─── Create Modal ─── */
     create_title: 'New task',
@@ -242,12 +256,38 @@ const en = {
     settings_desktop_import_copy: 'Copy (keep in note)',
     settings_desktop_import_move: 'Move (remove from note)',
 
-    /* ─── 🆕 Recurring Settings ─── */
+    /* ─── Recurring Settings ─── */
     settings_recurring: 'Recurring tasks',
     settings_recurring_enabled: 'Enable recurring tasks',
     settings_recurring_enabled_desc: 'Show suggestions for tasks that repeat on a schedule',
     recurring_empty: 'No recurring tasks yet',
     recurring_add: 'Add recurring task',
+
+    /* ─── 🆕 Suggestions Settings ─── */
+    settings_suggestions: 'Smart suggestions',
+    settings_suggestions_enabled: 'Enable smart suggestions',
+    settings_suggestions_enabled_desc: 'Get smart tips from your notes, patterns, and forgotten tasks',
+
+    /* ─── 🆕 Archive Settings ─── */
+    settings_archive: 'Auto-archive',
+    settings_archive_enabled: 'Enable auto-archive',
+    settings_archive_enabled_desc: 'Move old completed tasks to a separate archive file',
+    settings_archive_count: 'Minimum count',
+    settings_archive_count_desc: 'Only archive if there are at least this many eligible tasks',
+    settings_archive_days: 'Age threshold',
+    settings_archive_days_desc: 'Only archive tasks completed more than this many days ago',
+    settings_archive_mode: 'Archive mode',
+    settings_archive_mode_desc: 'How many tasks to archive each time',
+    archive_mode_threshold: 'Only if count reached',
+    archive_mode_always: 'Archive all eligible',
+    archive_days_30: '30 days',
+    archive_days_60: '60 days',
+    archive_days_90: '90 days',
+    archive_days_180: '180 days',
+    archive_days_365: '365 days',
+    archive_run_now: 'Run archive now',
+    archive_last_run: 'Last run: {date}',
+    archive_never_run: 'Never run yet',
 
     /* ─── Bulk operations ─── */
     bulk_select: 'Select',
@@ -298,6 +338,11 @@ const en = {
     notice_rescan_failed: 'Rescan failed: {error}',
     notice_invalid_date: 'Invalid date format',
 
+    /* ─── 🆕 Archive Notices ─── */
+    notice_archive_success: 'Archived {count} task(s)',
+    notice_archive_skipped: 'Not enough tasks to archive',
+    notice_archive_none: 'No eligible tasks for archiving',
+
     unspecified: 'Unspecified',
 };
 
@@ -331,6 +376,9 @@ const fa: typeof en = {
     stats_last_month: 'ماه گذشته',
     stats_this_year: 'امسال',
     stats_total: 'کل',
+    stats_global_title: 'آمار کلی',
+    stats_global_total_completed: 'کل انجام‌شده',
+    stats_global_total_archived: 'آرشیو شده',
 
     /* ─── تسک ─── */
     task_pending: 'در انتظار',
@@ -397,7 +445,7 @@ const fa: typeof en = {
     import_success: '{count} تسک اضافه شد',
     import_failed: 'افزودن ناموفق',
 
-    /* ─── 🆕 تسک‌های تکرارشونده ─── */
+    /* ─── تسک‌های تکرارشونده ─── */
     recurring_title: 'تسک‌های تکرارشونده',
     recurring_suggestion_from: 'موعد',
     recurring_suggestion_overdue: 'عقب‌افتاده',
@@ -434,6 +482,18 @@ const fa: typeof en = {
     weekday_thursday: 'پنجشنبه',
     weekday_friday: 'جمعه',
     weekday_saturday: 'شنبه',
+
+    /* ─── 🆕 پیشنهادهای هوشمند ─── */
+    smart_title: 'پیشنهادها',
+    smart_type_from_notes: 'از نوت‌ها',
+    smart_type_from_pattern: 'الگو شناسایی شد',
+    smart_type_from_old_task: 'تسک فراموش‌شده',
+    smart_type_random_pick: 'یه پیشنهاد',
+    smart_pattern_count: '{count} بار تکرار شده',
+    smart_pattern_hint: 'از تنظیمات براش یه تسک تکرارشونده بساز',
+    smart_action_move: 'انتقال به میز',
+    smart_action_create_recurring: 'تکرارشونده کن',
+    smart_action_dismiss: 'رد کن',
 
     /* ─── مودال ساخت ─── */
     create_title: 'تسک جدید',
@@ -536,12 +596,38 @@ const fa: typeof en = {
     settings_desktop_import_copy: 'کپی (توی نوت بمونه)',
     settings_desktop_import_move: 'انتقال (از نوت حذف بشه)',
 
-    /* ─── 🆕 تنظیمات تکرارشونده ─── */
+    /* ─── تنظیمات تکرارشونده ─── */
     settings_recurring: 'تسک‌های تکرارشونده',
     settings_recurring_enabled: 'فعال‌سازی تسک‌های تکرارشونده',
     settings_recurring_enabled_desc: 'نمایش پیشنهادها برای تسک‌هایی که طبق برنامه تکرار می‌شن',
     recurring_empty: 'هنوز تسک تکرارشونده‌ای نساختی',
     recurring_add: 'افزودن تسک تکرارشونده',
+
+    /* ─── 🆕 تنظیمات پیشنهادها ─── */
+    settings_suggestions: 'پیشنهادهای هوشمند',
+    settings_suggestions_enabled: 'فعال‌سازی پیشنهادهای هوشمند',
+    settings_suggestions_enabled_desc: 'پیشنهادهای هوشمند بر اساس نوت‌ها، الگوها و تسک‌های فراموش‌شده',
+
+    /* ─── 🆕 تنظیمات آرشیو ─── */
+    settings_archive: 'آرشیو خودکار',
+    settings_archive_enabled: 'فعال‌سازی آرشیو خودکار',
+    settings_archive_enabled_desc: 'تسک‌های قدیمی انجام‌شده به یه فایل جدا منتقل بشن',
+    settings_archive_count: 'حداقل تعداد',
+    settings_archive_count_desc: 'فقط اگه حداقل این تعداد تسک واجد شرط باشه، آرشیو کن',
+    settings_archive_days: 'بازه‌ی زمانی',
+    settings_archive_days_desc: 'فقط تسک‌هایی که بیشتر از این مدت از انجامشون گذشته',
+    settings_archive_mode: 'حالت آرشیو',
+    settings_archive_mode_desc: 'هر بار چند تسک آرشیو بشه',
+    archive_mode_threshold: 'فقط اگه به حد رسید',
+    archive_mode_always: 'همه‌ی واجدین شرط',
+    archive_days_30: '۳۰ روز',
+    archive_days_60: '۶۰ روز',
+    archive_days_90: '۹۰ روز',
+    archive_days_180: '۱۸۰ روز',
+    archive_days_365: '۳۶۵ روز',
+    archive_run_now: 'آرشیو کن (الان)',
+    archive_last_run: 'آخرین اجرا: {date}',
+    archive_never_run: 'هنوز اجرا نشده',
 
     /* ─── عملیات گروهی ─── */
     bulk_select: 'انتخاب',
@@ -591,6 +677,11 @@ const fa: typeof en = {
     notice_rescan_ok: 'والت دوباره اسکن شد',
     notice_rescan_failed: 'اسکن ناموفق: {error}',
     notice_invalid_date: 'قالب تاریخ اشتباهه',
+
+    /* ─── 🆕 اعلان‌های آرشیو ─── */
+    notice_archive_success: '{count} تسک آرشیو شد',
+    notice_archive_skipped: 'به تعداد لازم نرسیده',
+    notice_archive_none: 'تسک واجد شرطی برای آرشیو نیست',
 
     unspecified: 'مشخص نشده',
 };
