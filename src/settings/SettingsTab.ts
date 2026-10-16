@@ -1,7 +1,7 @@
 /* ════════════════════════════════════════════════════════════
-   ⚙️ تب تنظیمات — v0.2.1
-   ✅ Desktop + Recurring + Suggestions + Archive
-   ✅ 🆕 حفظ موقعیت اسکرول در re-render
+   ⚙️ تب تنظیمات — v0.2.2
+   ✅ حفظ دقیق موقعیت اسکرول
+   ✅ Debounced re-render
    ════════════════════════════════════════════════════════════ */
 
 import { App, PluginSettingTab, Setting, setIcon } from 'obsidian';
@@ -18,13 +18,14 @@ import { displayString, displayNumber } from '../utils/numberUtils';
 export class FirstTaskSettingsTab extends PluginSettingTab {
     plugin: FirstTaskPlugin;
     private refreshTimer: number | null = null;
+    private isFirstRender = true;
 
     constructor(app: App, plugin: FirstTaskPlugin) {
         super(app, plugin);
         this.plugin = plugin;
     }
 
-    /* ─── 🆕 پیدا کردن scroll parent ─── */
+    /* ─── پیدا کردن scroll parent ─── */
     private getScrollParent(el: HTMLElement): HTMLElement | null {
         let parent: HTMLElement | null = el.parentElement;
         while (parent) {
@@ -54,9 +55,10 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
     display(): void {
         const { containerEl } = this;
 
-        /* 🆕 ذخیره‌ی موقعیت اسکرول */
+        /* 🆕 ذخیره‌ی موقعیت اسکرول (فقط اگه render اول نباشه) */
         const scrollParent = this.getScrollParent(containerEl);
         const savedScroll = scrollParent?.scrollTop ?? 0;
+        const shouldRestoreScroll = !this.isFirstRender && savedScroll > 0;
 
         containerEl.empty();
         containerEl.addClass('first-task-settings');
@@ -403,11 +405,22 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
                     }));
         }
 
-        /* 🆕 بازگرداندن موقعیت اسکرول */
-        if (scrollParent) {
-            requestAnimationFrame(() => {
-                scrollParent.scrollTop = savedScroll;
-            });
+        /* 🆕 بازگرداندن موقعیت اسکرول — دقیق‌تر */
+        this.isFirstRender = false;
+
+        if (shouldRestoreScroll && scrollParent) {
+            /* ─── سه بار تلاش کن تا مطمئن بشیم layout آماده‌ست ─── */
+            const restore = () => {
+                if (scrollParent.isConnected) {
+                    scrollParent.scrollTop = savedScroll;
+                }
+            };
+
+            requestAnimationFrame(restore);
+            requestAnimationFrame(() => requestAnimationFrame(restore));
+            setTimeout(restore, 10);
+            setTimeout(restore, 30);
+            setTimeout(restore, 80);
         }
     }
 
@@ -430,7 +443,6 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
             }
         }
 
-        /* 🆕 دکمه تمام عرض */
         const addWrap = parent.createDiv({ cls: 'first-task-recurring-add-wrap' });
         const addBtn = addWrap.createEl('button', {
             cls: 'first-task-recurring-add-btn mod-cta',
@@ -530,9 +542,6 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
         };
     }
 
-    /* ═══════════════════════════════════════════════════════
-       Manual Archive
-       ═══════════════════════════════════════════════════════ */
     private async handleManualArchive(): Promise<void> {
         const lang = this.plugin.settings.language;
 
@@ -549,15 +558,9 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
                     'success'
                 );
             } else if (result.reason === 'no_candidates') {
-                this.plugin.toastManager.show(
-                    t(lang, 'notice_archive_none'),
-                    'info'
-                );
+                this.plugin.toastManager.show(t(lang, 'notice_archive_none'), 'info');
             } else if (result.reason === 'threshold_not_reached') {
-                this.plugin.toastManager.show(
-                    t(lang, 'notice_archive_skipped'),
-                    'info'
-                );
+                this.plugin.toastManager.show(t(lang, 'notice_archive_skipped'), 'info');
             }
 
             this.plugin.refreshPanel();
@@ -567,7 +570,6 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
         }
     }
 
-    /* ─── Helpers ─── */
     private getRecurrenceIcon(type: string): string {
         switch (type) {
             case 'daily': return 'sun';
@@ -583,14 +585,12 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
                 return t(lang, 'recurring_type_daily');
 
             case 'weekly': {
-                /* 🆕 حالت‌های هفتگی */
                 const mode = template.weeklyMode;
 
                 if (mode === 'every-day') {
                     return t(lang, 'recurring_weekly_mode_every_day');
                 }
 
-                /* روزها */
                 let days: number[] = [];
                 if (template.weekDays && template.weekDays.length > 0) {
                     days = template.weekDays;
@@ -611,7 +611,6 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
                     return t(lang, keys[days[0]] as any);
                 }
 
-                /* چند روز */
                 return days.length + ' × ' + t(lang, 'recurring_type_weekly');
             }
 
