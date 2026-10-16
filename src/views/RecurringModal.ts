@@ -1,19 +1,26 @@
 /* ════════════════════════════════════════════════════════════
-   🔄 RecurringModal — ساخت/ویرایش الگوی تکرارشونده
-   ✅ ۳ نوع: روزانه / هفتگی / ماهانه
-   ✅ انتخاب روز هفته (برای هفتگی)
-   ✅ انتخاب روز ماه (برای ماهانه)
-   ✅ تاریخ شروع با DateSuggest
-   ✅ دراپ‌دان داینامیک بر اساس recurrence
+   🔄 RecurringModal — v0.2.1
+   ✅ هفتگی چندتایی: single / multiple / every-day
+   ✅ ۷ چیپ برای انتخاب روزها (multiple)
    ════════════════════════════════════════════════════════════ */
 
 import { App, Modal, Setting } from 'obsidian';
 import type FirstTaskPlugin from '../main';
-import type { RecurringTemplate, RecurrenceType } from '../types';
+import type { RecurringTemplate, RecurrenceType, WeeklyMode } from '../types';
 import { t, applyDirection } from '../i18n';
 import { parseDateInput, getTodayDateInput } from '../utils/jalaliDate';
 import { displayString } from '../utils/numberUtils';
 import { DateSuggest } from './DateSuggest';
+
+const WEEKDAY_KEYS = [
+    'weekday_sunday',
+    'weekday_monday',
+    'weekday_tuesday',
+    'weekday_wednesday',
+    'weekday_thursday',
+    'weekday_friday',
+    'weekday_saturday',
+] as const;
 
 export class RecurringModal extends Modal {
     plugin: FirstTaskPlugin;
@@ -27,7 +34,9 @@ export class RecurringModal extends Modal {
     private descriptionValue = '';
     private categoryValue = '';
     private recurrenceValue: RecurrenceType = 'daily';
-    private weekDayValue: number = 6; /* پیش‌فرض شنبه */
+    private weeklyMode: WeeklyMode = 'single';
+    private singleWeekDay: number = 6;
+    private selectedWeekDays: Set<number> = new Set([6]);
     private monthDayValue: number = 1;
     private dateJalali = '';
     private dateGregorian = '';
@@ -44,15 +53,32 @@ export class RecurringModal extends Modal {
         this.existingTemplate = existingTemplate;
         this.onDone = onDone;
 
-        /* ─── اگه ادیت، مقادیر رو پر کن ─── */
         if (existingTemplate) {
             this.titleValue = existingTemplate.title;
             this.descriptionValue = existingTemplate.description;
             this.categoryValue = existingTemplate.category;
             this.recurrenceValue = existingTemplate.recurrence;
-            if (existingTemplate.weekDay !== undefined) {
-                this.weekDayValue = existingTemplate.weekDay;
+
+            /* ─── WeekDays backward compat ─── */
+            if (existingTemplate.weekDays && existingTemplate.weekDays.length > 0) {
+                this.selectedWeekDays = new Set(existingTemplate.weekDays);
+                this.singleWeekDay = existingTemplate.weekDays[0];
+            } else if (existingTemplate.weekDay !== undefined) {
+                this.selectedWeekDays = new Set([existingTemplate.weekDay]);
+                this.singleWeekDay = existingTemplate.weekDay;
             }
+
+            /* ─── WeeklyMode ─── */
+            if (existingTemplate.weeklyMode) {
+                this.weeklyMode = existingTemplate.weeklyMode;
+            } else if (this.selectedWeekDays.size === 7) {
+                this.weeklyMode = 'every-day';
+            } else if (this.selectedWeekDays.size > 1) {
+                this.weeklyMode = 'multiple';
+            } else {
+                this.weeklyMode = 'single';
+            }
+
             if (existingTemplate.monthDay !== undefined) {
                 this.monthDayValue = existingTemplate.monthDay;
             }
@@ -76,7 +102,6 @@ export class RecurringModal extends Modal {
         const useJalali = this.plugin.settings.useJalaliDate;
         applyDirection(contentEl, lang);
 
-        /* ─── عنوان ─── */
         contentEl.createEl('h3', {
             text: this.existingTemplate
                 ? t(lang, 'recurring_edit_title')
@@ -107,7 +132,7 @@ export class RecurringModal extends Modal {
                 ta.onChange(v => { this.descriptionValue = v; });
             });
 
-        /* ─── دسته‌بندی ─── */
+        /* ─── دسته ─── */
         if (this.plugin.settings.enableCategories) {
             const cats = this.plugin.taskManager.getCategories();
             new Setting(contentEl)
@@ -138,31 +163,77 @@ export class RecurringModal extends Modal {
                 });
             });
 
-        /* ─── روز هفته (فقط برای weekly) ─── */
+        /* ─── هفتگی: mode selector ─── */
         if (this.recurrenceValue === 'weekly') {
             new Setting(contentEl)
-                .setName(t(lang, 'recurring_weekday'))
-                .setDesc(t(lang, 'recurring_weekday_desc'))
+                .setName(t(lang, 'recurring_weekly_mode'))
+                .setDesc(t(lang, 'recurring_weekly_mode_desc'))
                 .addDropdown(dd => {
-                    /* 0=Sunday, 1=Monday, ..., 6=Saturday */
-                    const days = [
-                        { value: '0', key: 'weekday_sunday' },
-                        { value: '1', key: 'weekday_monday' },
-                        { value: '2', key: 'weekday_tuesday' },
-                        { value: '3', key: 'weekday_wednesday' },
-                        { value: '4', key: 'weekday_thursday' },
-                        { value: '5', key: 'weekday_friday' },
-                        { value: '6', key: 'weekday_saturday' },
-                    ];
-                    for (const d of days) {
-                        dd.addOption(d.value, t(lang, d.key as any));
-                    }
-                    dd.setValue(String(this.weekDayValue));
-                    dd.onChange(v => { this.weekDayValue = parseInt(v); });
+                    dd.addOption('single', t(lang, 'recurring_weekly_mode_single'));
+                    dd.addOption('multiple', t(lang, 'recurring_weekly_mode_multiple'));
+                    dd.addOption('every-day', t(lang, 'recurring_weekly_mode_every_day'));
+                    dd.setValue(this.weeklyMode);
+                    dd.onChange(v => {
+                        this.weeklyMode = v as WeeklyMode;
+                        this.render();
+                    });
                 });
+
+            /* ─── single: dropdown ─── */
+            if (this.weeklyMode === 'single') {
+                new Setting(contentEl)
+                    .setName(t(lang, 'recurring_weekday'))
+                    .setDesc(t(lang, 'recurring_weekday_desc'))
+                    .addDropdown(dd => {
+                        for (let i = 0; i < 7; i++) {
+                            dd.addOption(String(i), t(lang, WEEKDAY_KEYS[i] as any));
+                        }
+                        dd.setValue(String(this.singleWeekDay));
+                        dd.onChange(v => {
+                            this.singleWeekDay = parseInt(v);
+                            this.selectedWeekDays = new Set([this.singleWeekDay]);
+                        });
+                    });
+            }
+
+            /* ─── multiple: چیپ‌ها ─── */
+            if (this.weeklyMode === 'multiple') {
+                const wrap = contentEl.createDiv({ cls: 'first-task-weekday-chips-wrap' });
+                wrap.createDiv({
+                    cls: 'first-task-weekday-chips-label',
+                    text: t(lang, 'recurring_weekdays_pick'),
+                });
+
+                const chips = wrap.createDiv({ cls: 'first-task-weekday-chips' });
+
+                for (let i = 0; i < 7; i++) {
+                    const isActive = this.selectedWeekDays.has(i);
+                    const chip = chips.createEl('button', {
+                        cls: 'first-task-weekday-chip' + (isActive ? ' is-active' : ''),
+                    });
+                    chip.setText(t(lang, WEEKDAY_KEYS[i] as any));
+                    chip.onclick = () => {
+                        if (this.selectedWeekDays.has(i)) {
+                            /* حداقل یکی بمونه */
+                            if (this.selectedWeekDays.size > 1) {
+                                this.selectedWeekDays.delete(i);
+                            }
+                        } else {
+                            this.selectedWeekDays.add(i);
+                        }
+                        this.render();
+                    };
+                }
+            }
+
+            /* ─── every-day: نمایش ساده ─── */
+            if (this.weeklyMode === 'every-day') {
+                const info = contentEl.createDiv({ cls: 'first-task-weekday-info' });
+                info.setText('☀️ ' + t(lang, 'recurring_weekly_mode_every_day_hint'));
+            }
         }
 
-        /* ─── روز ماه (فقط برای monthly) ─── */
+        /* ─── ماهانه ─── */
         if (this.recurrenceValue === 'monthly') {
             new Setting(contentEl)
                 .setName(t(lang, 'recurring_monthday'))
@@ -230,19 +301,28 @@ export class RecurringModal extends Modal {
         const lang = this.plugin.settings.language;
         const useJalali = this.plugin.settings.useJalaliDate;
 
-        /* ─── چک عنوان ─── */
         if (!this.titleValue.trim()) {
             this.plugin.toastManager.show(t(lang, 'notice_no_title'), 'warning');
             return;
         }
 
-        /* ─── چک تاریخ ─── */
+        /* ─── اگه multiple ولی هیچ روزی انتخاب نشده ─── */
+        if (this.recurrenceValue === 'weekly' &&
+            this.weeklyMode === 'multiple' &&
+            this.selectedWeekDays.size === 0) {
+            this.plugin.toastManager.show(
+                t(lang, 'recurring_no_weekdays'),
+                'warning'
+            );
+            return;
+        }
+
+        /* ─── تاریخ شروع ─── */
         let startJalali = this.dateJalali;
         let startGregorian = this.dateGregorian;
         let startTs = this.dateTs;
 
         if (!startJalali && !startGregorian) {
-            /* اگه کاربر تاریخ نداده، از امروز استفاده کن */
             const todayDisplay = getTodayDateInput(useJalali);
             const parsed = parseDateInput(todayDisplay, useJalali);
             if (parsed) {
@@ -252,11 +332,30 @@ export class RecurringModal extends Modal {
             }
         }
 
+        /* ─── محاسبه‌ی weekDays و weekDay ─── */
+        let weekDay: number | undefined;
+        let weekDays: number[] | undefined;
+        let weeklyMode: WeeklyMode | undefined;
+
+        if (this.recurrenceValue === 'weekly') {
+            weeklyMode = this.weeklyMode;
+
+            if (this.weeklyMode === 'single') {
+                weekDay = this.singleWeekDay;
+                weekDays = [this.singleWeekDay];
+            } else if (this.weeklyMode === 'multiple') {
+                weekDays = Array.from(this.selectedWeekDays).sort();
+                weekDay = weekDays[0];
+            } else if (this.weeklyMode === 'every-day') {
+                weekDays = [0, 1, 2, 3, 4, 5, 6];
+                weekDay = undefined;
+            }
+        }
+
         this.submitting = true;
 
         try {
             if (this.existingTemplate) {
-                /* ─── Edit ─── */
                 const ok = await this.plugin.recurringManager.update(
                     this.existingTemplate.id,
                     {
@@ -264,9 +363,9 @@ export class RecurringModal extends Modal {
                         description: this.descriptionValue.trim(),
                         category: this.categoryValue,
                         recurrence: this.recurrenceValue,
-                        weekDay: this.recurrenceValue === 'weekly'
-                            ? this.weekDayValue
-                            : undefined,
+                        weekDay,
+                        weekDays,
+                        weeklyMode,
                         monthDay: this.recurrenceValue === 'monthly'
                             ? this.monthDayValue
                             : undefined,
@@ -287,15 +386,14 @@ export class RecurringModal extends Modal {
                     this.submitting = false;
                 }
             } else {
-                /* ─── Create ─── */
                 const result = await this.plugin.recurringManager.createTemplate({
                     title: this.titleValue.trim(),
                     description: this.descriptionValue.trim(),
                     category: this.categoryValue,
                     recurrence: this.recurrenceValue,
-                    weekDay: this.recurrenceValue === 'weekly'
-                        ? this.weekDayValue
-                        : undefined,
+                    weekDay,
+                    weekDays,
+                    weeklyMode,
                     monthDay: this.recurrenceValue === 'monthly'
                         ? this.monthDayValue
                         : undefined,
