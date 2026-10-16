@@ -1,10 +1,8 @@
 /* ════════════════════════════════════════════════════════════
    📋 TaskPanel View — v0.3.0
-   ✅ ۹ کارت زمانی + بدون تاریخ + همه
-   ✅ حالت انتخاب گروهی
-   ✅ انتقال گروهی به Desktop
-   ✅ 🆕 رفع باگ refresh بعد از ساخت تسک
-   ✅ 🆕 نمایش تسک‌های Desktop اگه تنظیمات فعال باشه
+   ✅ شمارش تب‌ها با Desktop tasks
+   ✅ فیلتر نامعتبر → ریست خودکار
+   ✅ Highlight فیلتر فعال
    ════════════════════════════════════════════════════════════ */
 
 import { ItemView, WorkspaceLeaf, setIcon, TFile } from 'obsidian';
@@ -42,6 +40,49 @@ export class TaskPanelView extends ItemView {
     async onClose(): Promise<void> {}
 
     refresh(): void { this.render(); }
+
+    /* 🆕 چک معتبر بودن دسته */
+    private getValidCategory(): string {
+        const cat = this.plugin.settings.panelCategory || '';
+        if (!cat) return '';
+        if (cat === 'none') return 'none';
+
+        const categories = this.plugin.taskManager.getCategories();
+        const exists = categories.some(c => c.id === cat);
+
+        if (!exists) {
+            this.plugin.settings.panelCategory = '';
+            this.plugin.saveSettings();
+            return '';
+        }
+
+        return cat;
+    }
+
+    /* 🆕 گرفتن تعداد کل با Desktop */
+    private getTotalPendingCount(category: string): number {
+        const noteTasks = this.plugin.taskManager.getPendingByCategory(category).length;
+
+        if (!this.plugin.settings.desktop.enabled ||
+            !this.plugin.settings.desktop.showInTasks) {
+            return noteTasks;
+        }
+
+        const desktopTasks = this.plugin.desktopStore.getByCategory(category).length;
+        return noteTasks + desktopTasks;
+    }
+
+    private getTotalCompletedCount(category: string): number {
+        const noteTasks = this.plugin.taskManager.getCompletedByCategory(category).length;
+
+        if (!this.plugin.settings.desktop.enabled ||
+            !this.plugin.settings.desktop.showInTasks) {
+            return noteTasks;
+        }
+
+        const desktopTasks = this.plugin.desktopStore.getCompletedByCategory(category).length;
+        return noteTasks + desktopTasks;
+    }
 
     /* ═══════════════════════════════════════════════════════
        رندر
@@ -114,6 +155,7 @@ export class TaskPanelView extends ItemView {
         const lang = this.plugin.settings.language;
         const cats = this.plugin.taskManager.getCategories();
         const hasUncategorized = this.plugin.taskManager.hasTasksWithoutCategory();
+        const validCategory = this.getValidCategory();
 
         const row = parent.createDiv({ cls: 'first-task-category-row' });
         const select = row.createEl('select', { cls: 'dropdown first-task-category-select' });
@@ -135,7 +177,13 @@ export class TaskPanelView extends ItemView {
             select.createEl('option', { value: c.id, text: label });
         }
 
-        select.value = this.plugin.settings.panelCategory || '';
+        select.value = validCategory;
+
+        /* 🆕 highlight فیلتر فعال */
+        if (validCategory) {
+            select.classList.add('is-filtered');
+        }
+
         select.onchange = async () => {
             this.plugin.settings.panelCategory = select.value;
             await this.plugin.saveSettings();
@@ -145,14 +193,14 @@ export class TaskPanelView extends ItemView {
         };
     }
 
-    /* ─── تب‌ها ─── */
+    /* ─── تب‌ها — 🆕 با Desktop tasks ─── */
     private renderTabs(parent: HTMLElement): void {
         const lang = this.plugin.settings.language;
         const tabs = parent.createDiv({ cls: 'first-task-tabs' });
 
-        const currentCategory = this.plugin.settings.panelCategory || '';
-        const pendingCount = this.plugin.taskManager.getPendingByCategory(currentCategory).length;
-        const completedCount = this.plugin.taskManager.getCompletedByCategory(currentCategory).length;
+        const category = this.getValidCategory();
+        const pendingCount = this.getTotalPendingCount(category);
+        const completedCount = this.getTotalCompletedCount(category);
 
         const mkTab = (id: TabType, icon: string, label: string, count: number) => {
             const btn = tabs.createEl('button', {
@@ -182,10 +230,9 @@ export class TaskPanelView extends ItemView {
         const lang = this.plugin.settings.language;
         const body = parent.createDiv({ cls: 'first-task-body' });
 
-        const category = this.plugin.settings.panelCategory || '';
+        const category = this.getValidCategory();
         const tasks = this.plugin.taskManager.getPendingByCategory(category);
 
-        /* 🆕 تسک‌های Desktop (اگه تنظیمات فعال باشه) */
         const desktopTasks: DesktopTask[] = [];
         if (this.plugin.settings.desktop.enabled &&
             this.plugin.settings.desktop.showInTasks) {
@@ -201,9 +248,8 @@ export class TaskPanelView extends ItemView {
         const visible = tasks.slice(0, this.visibleCount);
         for (const task of visible) this.renderTaskCard(body, task, false);
 
-        /* 🆕 Desktop tasks */
         const desktopVisible = desktopTasks.slice(0, Math.max(0, this.visibleCount - tasks.length));
-        for (const task of desktopVisible) this.renderDesktopTaskCard(body, task);
+        for (const task of desktopVisible) this.renderDesktopTaskCard(body, task, false);
 
         const totalCount = tasks.length + desktopTasks.length;
         if (totalCount > this.visibleCount) {
@@ -239,10 +285,9 @@ export class TaskPanelView extends ItemView {
         mkCard(t(lang, 'stats_total'), stats.total);
 
         const body = parent.createDiv({ cls: 'first-task-body' });
-        const category = this.plugin.settings.panelCategory || '';
+        const category = this.getValidCategory();
         const tasks = this.plugin.taskManager.getCompletedByCategory(category);
 
-        /* 🆕 Desktop completed (اگه تنظیمات فعال باشه) */
         const desktopTasks: DesktopTask[] = [];
         if (this.plugin.settings.desktop.enabled &&
             this.plugin.settings.desktop.showInTasks) {
@@ -320,9 +365,6 @@ export class TaskPanelView extends ItemView {
         cancelBtn.onclick = () => this.exitSelectionMode();
     }
 
-    /* ═══════════════════════════════════════════════════════
-       مدیریت حالت انتخاب
-       ═══════════════════════════════════════════════════════ */
     private enterSelectionMode(): void {
         this.selectionMode = true;
         this.selectedIds.clear();
@@ -344,7 +386,6 @@ export class TaskPanelView extends ItemView {
         this.render();
     }
 
-    /* ─── حذف گروهی ─── */
     private async handleBulkDelete(): Promise<void> {
         const lang = this.plugin.settings.language;
         const count = this.selectedIds.size;
@@ -365,7 +406,6 @@ export class TaskPanelView extends ItemView {
         }
     }
 
-    /* ─── ویرایش گروهی ─── */
     private handleBulkEdit(): void {
         if (this.selectedIds.size === 0) return;
         const ids = Array.from(this.selectedIds);
@@ -376,7 +416,6 @@ export class TaskPanelView extends ItemView {
         }).open();
     }
 
-    /* ─── انتقال گروهی به Desktop ─── */
     private async handleBulkMoveToDesktop(): Promise<void> {
         if (this.selectedIds.size === 0) return;
         const lang = this.plugin.settings.language;
@@ -521,7 +560,7 @@ export class TaskPanelView extends ItemView {
         };
     }
 
-    /* 🆕 کارت تسک Desktop */
+    /* کارت تسک Desktop */
     private renderDesktopTaskCard(parent: HTMLElement, task: DesktopTask, isCompleted: boolean = false): void {
         const lang = this.plugin.settings.language;
         const useJalali = this.plugin.settings.useJalaliDate;
@@ -554,14 +593,12 @@ export class TaskPanelView extends ItemView {
         };
     }
 
-    /* ─── حالت خالی ─── */
     private renderEmpty(parent: HTMLElement, title: string, hint: string): void {
         const empty = parent.createDiv({ cls: 'first-task-empty' });
         empty.createEl('p', { text: title, cls: 'first-task-empty-title' });
         if (hint) empty.createEl('p', { text: hint, cls: 'first-task-empty-hint' });
     }
 
-    /* ─── Rescan ─── */
     private async handleRescan(): Promise<void> {
         const lang = this.plugin.settings.language;
         this.plugin.toastManager.show(t(lang, 'panel_reloading'), 'info', 1500);
@@ -580,7 +617,6 @@ export class TaskPanelView extends ItemView {
 
     private handleNewTask(): void {
         new CreateTaskModal(this.app, this.plugin, () => {
-            /* 🆕 بعد از ساخت، همه پنل‌ها رفرش بشن */
             this.plugin.refreshPanel();
         }).open();
     }
