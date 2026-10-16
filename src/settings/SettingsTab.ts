@@ -1,7 +1,7 @@
 /* ════════════════════════════════════════════════════════════
-   ⚙️ تب تنظیمات — v0.4.0
-   ✅ Desktop + Recurring
-   ✅ 🆕 Suggestions + Archive
+   ⚙️ تب تنظیمات — v0.2.1
+   ✅ Desktop + Recurring + Suggestions + Archive
+   ✅ 🆕 حفظ موقعیت اسکرول در re-render
    ════════════════════════════════════════════════════════════ */
 
 import { App, PluginSettingTab, Setting, setIcon } from 'obsidian';
@@ -24,6 +24,23 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
         this.plugin = plugin;
     }
 
+    /* ─── 🆕 پیدا کردن scroll parent ─── */
+    private getScrollParent(el: HTMLElement): HTMLElement | null {
+        let parent: HTMLElement | null = el.parentElement;
+        while (parent) {
+            const style = window.getComputedStyle(parent);
+            const overflowY = style.overflowY;
+            if (
+                (overflowY === 'auto' || overflowY === 'scroll') &&
+                parent.scrollHeight > parent.clientHeight
+            ) {
+                return parent;
+            }
+            parent = parent.parentElement;
+        }
+        return null;
+    }
+
     private scheduleRefresh(): void {
         if (this.refreshTimer !== null) {
             window.clearTimeout(this.refreshTimer);
@@ -36,6 +53,11 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
 
     display(): void {
         const { containerEl } = this;
+
+        /* 🆕 ذخیره‌ی موقعیت اسکرول */
+        const scrollParent = this.getScrollParent(containerEl);
+        const savedScroll = scrollParent?.scrollTop ?? 0;
+
         containerEl.empty();
         containerEl.addClass('first-task-settings');
 
@@ -286,7 +308,7 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
             this.renderRecurringList(containerEl, lang);
         }
 
-        /* ═══════ 🆕 پیشنهادهای هوشمند ═══════ */
+        /* ═══════ پیشنهادهای هوشمند ═══════ */
         new Setting(containerEl)
             .setName(t(lang, 'settings_suggestions'))
             .setHeading();
@@ -302,7 +324,7 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
                     this.plugin.refreshPanel();
                 }));
 
-        /* ═══════ 🆕 آرشیو خودکار ═══════ */
+        /* ═══════ آرشیو خودکار ═══════ */
         new Setting(containerEl)
             .setName(t(lang, 'settings_archive'))
             .setHeading();
@@ -319,7 +341,6 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
                 }));
 
         if (this.plugin.settings.desktop.autoArchiveEnabled) {
-            /* ─── تعداد ─── */
             new Setting(containerEl)
                 .setName(t(lang, 'settings_archive_count'))
                 .setDesc(t(lang, 'settings_archive_count_desc'))
@@ -335,7 +356,6 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
                     });
                 });
 
-            /* ─── بازه ─── */
             new Setting(containerEl)
                 .setName(t(lang, 'settings_archive_days'))
                 .setDesc(t(lang, 'settings_archive_days_desc'))
@@ -352,7 +372,6 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
                     });
                 });
 
-            /* ─── حالت ─── */
             new Setting(containerEl)
                 .setName(t(lang, 'settings_archive_mode'))
                 .setDesc(t(lang, 'settings_archive_mode_desc'))
@@ -366,7 +385,6 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
                     });
                 });
 
-            /* ─── وضعیت ─── */
             const lastTs = this.plugin.archiveManager.getLastArchiveTs();
             const statusText = lastTs > 0
                 ? t(lang, 'archive_last_run', {
@@ -383,6 +401,13 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
                     .onClick(async () => {
                         await this.handleManualArchive();
                     }));
+        }
+
+        /* 🆕 بازگرداندن موقعیت اسکرول */
+        if (scrollParent) {
+            requestAnimationFrame(() => {
+                scrollParent.scrollTop = savedScroll;
+            });
         }
     }
 
@@ -405,6 +430,7 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
             }
         }
 
+        /* 🆕 دکمه تمام عرض */
         const addWrap = parent.createDiv({ cls: 'first-task-recurring-add-wrap' });
         const addBtn = addWrap.createEl('button', {
             cls: 'first-task-recurring-add-btn mod-cta',
@@ -555,23 +581,47 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
         switch (template.recurrence) {
             case 'daily':
                 return t(lang, 'recurring_type_daily');
+
             case 'weekly': {
-                if (template.weekDay === undefined) {
+                /* 🆕 حالت‌های هفتگی */
+                const mode = template.weeklyMode;
+
+                if (mode === 'every-day') {
+                    return t(lang, 'recurring_weekly_mode_every_day');
+                }
+
+                /* روزها */
+                let days: number[] = [];
+                if (template.weekDays && template.weekDays.length > 0) {
+                    days = template.weekDays;
+                } else if (template.weekDay !== undefined) {
+                    days = [template.weekDay];
+                }
+
+                if (days.length === 0) {
                     return t(lang, 'recurring_type_weekly');
                 }
-                const days = [
-                    'weekday_sunday', 'weekday_monday', 'weekday_tuesday',
-                    'weekday_wednesday', 'weekday_thursday', 'weekday_friday',
-                    'weekday_saturday',
-                ];
-                return t(lang, days[template.weekDay] as any);
+
+                if (days.length === 1) {
+                    const keys = [
+                        'weekday_sunday', 'weekday_monday', 'weekday_tuesday',
+                        'weekday_wednesday', 'weekday_thursday', 'weekday_friday',
+                        'weekday_saturday',
+                    ];
+                    return t(lang, keys[days[0]] as any);
+                }
+
+                /* چند روز */
+                return days.length + ' × ' + t(lang, 'recurring_type_weekly');
             }
+
             case 'monthly': {
                 if (template.monthDay === undefined) {
                     return t(lang, 'recurring_type_monthly');
                 }
                 return `${t(lang, 'recurring_type_monthly')} (${template.monthDay})`;
             }
+
             default:
                 return '';
         }
@@ -580,15 +630,9 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
     private formatDate(ts: number): string {
         const d = new Date(ts);
         if (this.plugin.settings.useJalaliDate) {
-            return displayString(
-                `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`,
-                this.plugin.settings.language
-            );
+            return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
         }
-        return displayString(
-            `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`,
-            this.plugin.settings.language
-        );
+        return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
     }
 
     private parseFolders(input: string): string[] {
