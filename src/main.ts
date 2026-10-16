@@ -1,8 +1,9 @@
 /* ════════════════════════════════════════════════════════════
-   🚀 First Task Plugin — v0.2.0
-   ✅ Desktop panel (میز من) اضافه شد
-   ✅ Notifier فقط بعد از initialize کامل شروع می‌شه
-   ✅ flush روی unload
+   🚀 First Task Plugin — v0.2.1
+   ✅ Desktop panel (میز من)
+   ✅ Import از نوت‌ها
+   ✅ Desktop enabled/disabled check
+   ✅ Notifier فقط بعد از initialize کامل
    ════════════════════════════════════════════════════════════ */
 
 import { Plugin, WorkspaceLeaf } from 'obsidian';
@@ -16,6 +17,7 @@ import { TaskExtractor } from './managers/TaskExtractor';
 import { IndexManager } from './managers/IndexManager';
 import { CategoriesManager } from './managers/CategoriesManager';
 import { DesktopStore } from './managers/DesktopStore';
+import { ImportManager } from './managers/ImportManager';
 import { Notifier } from './managers/Notifier';
 import { ToastManager } from './managers/ToastManager';
 import { FirstTaskSettingsTab } from './settings/SettingsTab';
@@ -31,6 +33,7 @@ export default class FirstTaskPlugin extends Plugin {
     indexManager: IndexManager;
     categoriesManager: CategoriesManager;
     desktopStore: DesktopStore;
+    importManager: ImportManager;
     scanner: VaultScanner;
     extractor: TaskExtractor;
     notifier: Notifier;
@@ -47,7 +50,6 @@ export default class FirstTaskPlugin extends Plugin {
         this.scanner = new VaultScanner(this.app, () => this.settings);
         this.extractor = new TaskExtractor();
 
-        /* 🆕 Desktop Store */
         this.desktopStore = new DesktopStore(
             this.app,
             () => this.settings.useJalaliDate
@@ -62,14 +64,23 @@ export default class FirstTaskPlugin extends Plugin {
             () => this.settings
         );
 
-        /* ─── راه‌اندازی Desktop Store (مستقل، سریع) ─── */
+        /* 🆕 ImportManager */
+        this.importManager = new ImportManager(
+            this.app,
+            this.taskManager,
+            this.desktopStore,
+            this.scanner,
+            this.extractor
+        );
+
+        /* ─── Desktop Store init ─── */
         this.desktopStore.initialize().then(() => {
             this.refreshPanel();
         }).catch((e) => {
             console.warn('[First Task] DesktopStore init failed:', e);
         });
 
-        /* ─── راه‌اندازی TaskManager (کندتر، بعدش Notifier) ─── */
+        /* ─── TaskManager init + Notifier ─── */
         this.taskManager
             .initialize()
             .then(() => {
@@ -118,10 +129,13 @@ export default class FirstTaskPlugin extends Plugin {
         this.addRibbonIcon('calendar-days', 'Planner', () => {
             this.activatePlannerView();
         });
-        /* 🆕 Desktop */
-        this.addRibbonIcon('layout-dashboard', 'My Desktop', () => {
-            this.activateDesktopView();
-        });
+
+        /* 🆕 Desktop ribbon — فقط اگه enabled */
+        if (this.settings.desktop.enabled) {
+            this.addRibbonIcon('layout-dashboard', 'My Desktop', () => {
+                this.activateDesktopView();
+            });
+        }
 
         this.addSettingTab(new FirstTaskSettingsTab(this.app, this));
 
@@ -136,7 +150,6 @@ export default class FirstTaskPlugin extends Plugin {
                 await this.indexManager.saveIndex();
                 await this.indexManager.saveFileCache();
             }
-            /* 🆕 ذخیره Desktop */
             if (this.desktopStore) {
                 await this.desktopStore.save();
             }
@@ -238,8 +251,19 @@ export default class FirstTaskPlugin extends Plugin {
         if (leaf) workspace.revealLeaf(leaf);
     }
 
-    /* 🆕 Desktop */
+    /* 🆕 Desktop — با چک enabled */
     async activateDesktopView(): Promise<void> {
+        const lang = this.settings.language;
+
+        /* ─── چک enabled ─── */
+        if (!this.settings.desktop.enabled) {
+            this.toastManager.show(
+                t(lang, 'desktop_disabled'),
+                'warning'
+            );
+            return;
+        }
+
         const { workspace } = this.app;
         let leaf: WorkspaceLeaf | null = null;
 
@@ -299,7 +323,6 @@ export default class FirstTaskPlugin extends Plugin {
                 DEFAULT_SETTINGS.plannerCards,
                 data?.plannerCards || {}
             );
-            /* 🆕 Desktop */
             this.settings.desktop = Object.assign(
                 {},
                 DEFAULT_SETTINGS.desktop,
