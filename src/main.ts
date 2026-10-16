@@ -1,8 +1,7 @@
 /* ════════════════════════════════════════════════════════════
-   🚀 First Task Plugin — v0.3.0
-   ✅ Desktop panel (میز من)
-   ✅ Import از نوت‌ها
-   ✅ 🆕 Recurring tasks
+   🚀 First Task Plugin — v0.4.0
+   ✅ Desktop + Import + Recurring
+   ✅ 🆕 Smart Suggestions + Auto-Archive + Stats
    ════════════════════════════════════════════════════════════ */
 
 import { Plugin, WorkspaceLeaf } from 'obsidian';
@@ -18,6 +17,9 @@ import { CategoriesManager } from './managers/CategoriesManager';
 import { DesktopStore } from './managers/DesktopStore';
 import { ImportManager } from './managers/ImportManager';
 import { RecurringManager } from './managers/RecurringManager';
+import { StatsManager } from './managers/StatsManager';
+import { ArchiveManager } from './managers/ArchiveManager';
+import { SuggestionEngine } from './managers/SuggestionEngine';
 import { Notifier } from './managers/Notifier';
 import { ToastManager } from './managers/ToastManager';
 import { FirstTaskSettingsTab } from './settings/SettingsTab';
@@ -35,6 +37,9 @@ export default class FirstTaskPlugin extends Plugin {
     desktopStore: DesktopStore;
     importManager: ImportManager;
     recurringManager: RecurringManager;
+    statsManager: StatsManager;
+    archiveManager: ArchiveManager;
+    suggestionEngine: SuggestionEngine;
     scanner: VaultScanner;
     extractor: TaskExtractor;
     notifier: Notifier;
@@ -46,6 +51,7 @@ export default class FirstTaskPlugin extends Plugin {
         this.toastManager = new ToastManager();
         this.toastManager.setRTL(this.settings.language === 'fa');
 
+        /* ─── Managers ─── */
         this.indexManager = new IndexManager(this.app);
         this.categoriesManager = new CategoriesManager(this.app);
         this.scanner = new VaultScanner(this.app, () => this.settings);
@@ -56,7 +62,14 @@ export default class FirstTaskPlugin extends Plugin {
             () => this.settings.useJalaliDate
         );
 
-        /* 🆕 RecurringManager */
+        this.statsManager = new StatsManager(this.app);
+
+        this.archiveManager = new ArchiveManager(
+            this.app,
+            this.desktopStore,
+            this.statsManager
+        );
+
         this.recurringManager = new RecurringManager(
             this.app,
             this.desktopStore
@@ -79,47 +92,13 @@ export default class FirstTaskPlugin extends Plugin {
             this.extractor
         );
 
-        /* ─── Desktop Store init ─── */
-        this.desktopStore.initialize().then(() => {
-            this.refreshPanel();
-        }).catch((e) => {
-            console.warn('[First Task] DesktopStore init failed:', e);
-        });
+        this.suggestionEngine = new SuggestionEngine(
+            this.taskManager,
+            this.desktopStore
+        );
 
-        /* 🆕 Recurring Manager init ─── */
-        this.recurringManager.initialize().then(() => {
-            this.refreshPanel();
-        }).catch((e) => {
-            console.warn('[First Task] RecurringManager init failed:', e);
-        });
-
-        /* ─── TaskManager init + Notifier ─── */
-        this.taskManager
-            .initialize()
-            .then(() => {
-                this.refreshPanel();
-
-                this.notifier = new Notifier(
-                    this.app,
-                    async (file) => {
-                        await this.taskManager.rescanFile(file);
-                        this.refreshPanel();
-                    },
-                    (path) => {
-                        this.taskManager.removeTasksForFile(path);
-                        this.refreshPanel();
-                    },
-                    async (oldPath, file) => {
-                        this.taskManager.removeTasksForFile(oldPath);
-                        await this.taskManager.rescanFile(file);
-                        this.refreshPanel();
-                    }
-                );
-                this.notifier.start();
-            })
-            .catch((e) => {
-                console.warn('[First Task] Initialization failed:', e);
-            });
+        /* ─── Initialize ─── */
+        this.initializeManagers();
 
         /* ─── Views ─── */
         this.registerView(
@@ -154,6 +133,68 @@ export default class FirstTaskPlugin extends Plugin {
         this.registerCommands();
     }
 
+    /* ═══════════════════════════════════════════════════════
+       Initialize
+       ═══════════════════════════════════════════════════════ */
+    private async initializeManagers(): Promise<void> {
+        try {
+            /* ─── ۱. Desktop Store + Stats + Archive ─── */
+            await this.desktopStore.initialize();
+            await this.statsManager.initialize();
+            await this.archiveManager.initialize();
+            await this.recurringManager.initialize();
+            this.refreshPanel();
+
+            /* ─── ۲. TaskManager + Notifier ─── */
+            await this.taskManager.initialize();
+            this.refreshPanel();
+
+            this.notifier = new Notifier(
+                this.app,
+                async (file) => {
+                    await this.taskManager.rescanFile(file);
+                    this.refreshPanel();
+                },
+                (path) => {
+                    this.taskManager.removeTasksForFile(path);
+                    this.refreshPanel();
+                },
+                async (oldPath, file) => {
+                    this.taskManager.removeTasksForFile(oldPath);
+                    await this.taskManager.rescanFile(file);
+                    this.refreshPanel();
+                }
+            );
+            this.notifier.start();
+
+            /* ─── ۳. Auto-Archive ─── */
+            await this.runStartupAutoArchive();
+        } catch (e) {
+            console.warn('[First Task] Initialization failed:', e);
+        }
+    }
+
+    /* ─── Auto-Archive در startup ─── */
+    private async runStartupAutoArchive(): Promise<void> {
+        if (!this.settings.desktop.autoArchiveEnabled) return;
+
+        try {
+            const result = await this.archiveManager.runAutoArchive(
+                this.settings.desktop
+            );
+
+            if (result.archived > 0) {
+                console.log(`[First Task] Auto-archived ${result.archived} task(s)`);
+                this.refreshPanel();
+            }
+        } catch (e) {
+            console.warn('[First Task] Startup auto-archive failed:', e);
+        }
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       onunload
+       ═══════════════════════════════════════════════════════ */
     async onunload(): Promise<void> {
         if (this.notifier) this.notifier.stop();
 
@@ -165,9 +206,14 @@ export default class FirstTaskPlugin extends Plugin {
             if (this.desktopStore) {
                 await this.desktopStore.save();
             }
-            /* 🆕 ذخیره recurring */
             if (this.recurringManager) {
                 await this.recurringManager.save();
+            }
+            if (this.statsManager) {
+                await this.statsManager.save();
+            }
+            if (this.archiveManager) {
+                await this.archiveManager.save();
             }
         } catch (e) {
             console.warn('[First Task] Failed to flush on unload:', e);
@@ -225,6 +271,33 @@ export default class FirstTaskPlugin extends Plugin {
                         view.refresh()
                     ).open();
                 }
+            },
+        });
+
+        /* 🆕 Run archive manually */
+        this.addCommand({
+            id: 'run-archive',
+            name: 'Run auto-archive now',
+            callback: async () => {
+                const result = await this.archiveManager.runAutoArchive(
+                    this.settings.desktop
+                );
+                const lang = this.settings.language;
+
+                if (result.archived > 0) {
+                    this.toastManager.show(
+                        t(lang, 'notice_archive_success', {
+                            count: String(result.archived),
+                        }),
+                        'success'
+                    );
+                } else {
+                    this.toastManager.show(
+                        t(lang, 'notice_archive_none'),
+                        'info'
+                    );
+                }
+                this.refreshPanel();
             },
         });
     }
