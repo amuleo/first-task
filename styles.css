@@ -1,8 +1,9 @@
 /* ════════════════════════════════════════════════════════════
-   🎨 First Task — Style Sheet v0.2.0
+   🎨 First Task — Style Sheet v0.2.1
    ✅ Standard, clean, RTL-friendly
-   ✅ Toggle flip in RTL (settings + modals)
+   ✅ Toggle flip in RTL
    ✅ Desktop panel
+   ✅ 🆕 Import modal
    ════════════════════════════════════════════════════════════ */
 
 /* ═══════════════════════════════════════════════════════════
@@ -443,6 +444,7 @@
     position: sticky;
     bottom: 0;
     z-index: 10;
+    flex-wrap: wrap;
 }
 
 .first-task-selection-count {
@@ -592,7 +594,7 @@
 }
 
 /* ═══════════════════════════════════════════════════════════
-   🎯 Action buttons (dynamic row/column)
+   🎯 Action buttons
    ═══════════════════════════════════════════════════════════ */
 .first-task-action-container {
     display: flex;
@@ -684,37 +686,13 @@
 }
 
 /* ═══════════════════════════════════════════════════════════
-   🆕 Desktop Panel (میز من)
+   🆕 Desktop Panel
    ═══════════════════════════════════════════════════════════ */
-.first-task-desktop {
-    /* همون استایل first-task-panel رو داره، فقط یه تمایز کوچیک */
-}
-
-/* ─── Desktop badge روی کارت ─── */
 .first-task-desktop .first-task-card-note {
     color: var(--text-accent);
     font-weight: 500;
 }
 
-/* ─── Empty state (Desktop) ─── */
-.first-task-desktop .first-task-empty {
-    text-align: center;
-    padding: 40px 20px;
-    color: var(--text-muted);
-}
-
-.first-task-desktop .first-task-empty-title {
-    font-size: var(--font-ui-medium);
-    font-weight: 500;
-    margin-bottom: 4px;
-}
-
-.first-task-desktop .first-task-empty-hint {
-    font-size: var(--font-ui-smaller);
-    opacity: 0.8;
-}
-
-/* ─── Stats (Desktop) ─── */
 .first-task-desktop .first-task-stats-grid {
     grid-template-columns: repeat(5, 1fr);
 }
@@ -732,21 +710,161 @@
 }
 
 /* ═══════════════════════════════════════════════════════════
-   ⚙️ Settings — RTL rules (toggle flip, inputs, dropdowns)
+   🆕 Import Modal
    ═══════════════════════════════════════════════════════════ */
+.first-task-import-modal {
+    /* max width */
+}
 
-/* ─── Toggle flip in RTL (Settings) ─── */
+.first-task-import-modal .modal-content,
+.first-task-import-modal {
+    min-width: 500px;
+    max-width: 700px;
+}
+
+.first-task-import-loading {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.first-task-import-filters {
+    margin-bottom: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.first-task-import-filters .setting-item {
+    padding: 6px 0;
+    border: none !important;
+}
+
+.first-task-import-filters .setting-item-name {
+    font-size: var(--font-ui-smaller);
+    font-weight: 500;
+}
+
+.first-task-import-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.first-task-import-list {
+    max-height: 400px;
+    overflow-y: auto;
+    padding: 4px 0;
+    margin-bottom: 12px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 8px;
+    background: var(--background-secondary);
+}
+
+.first-task-import-file-header {
+    padding: 8px 12px 6px 12px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    background: var(--background-secondary-alt);
+    border-bottom: 1px solid var(--background-modifier-border);
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+
+.first-task-import-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: background 0.1s ease;
+    border-bottom: 1px solid var(--background-modifier-border-hover);
+}
+
+.first-task-import-row:last-child {
+    border-bottom: none;
+}
+
+.first-task-import-row:hover {
+    background: var(--background-secondary-alt);
+}
+
+.first-task-import-row.is-selected {
+    background: var(--background-modifier-active-hover);
+}
+
+.first-task-import-row.is-imported {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.first-task-import-row input[type="checkbox"] {
+    flex-shrink: 0;
+    cursor: pointer;
+}
+
+.first-task-import-row.is-imported input[type="checkbox"] {
+    cursor: not-allowed;
+}
+
+.first-task-import-row-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.first-task-import-row-title {
+    font-size: var(--font-ui-small);
+    color: var(--text-normal);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.first-task-import-badge {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 8px;
+    background: rgba(46, 204, 113, 0.18);
+    color: #27ae60;
+    white-space: nowrap;
+}
+
+.first-task-import-options {
+    padding: 10px 0;
+    margin-bottom: 8px;
+    border-top: 1px solid var(--background-modifier-border);
+}
+
+.first-task-import-options .setting-item {
+    padding: 6px 0;
+    border: none !important;
+}
+
+.first-task-import-empty {
+    text-align: center;
+    padding: 30px 20px;
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ⚙️ Settings — RTL rules
+   ═══════════════════════════════════════════════════════════ */
 .first-task-settings[dir="rtl"] .checkbox-container,
 .first-task-rtl .checkbox-container {
     transform: scaleX(-1) !important;
 }
 
-/* ─── Toggle flip in RTL (Modals) ─── */
 .first-task-modal-content[dir="rtl"] .checkbox-container {
     transform: scaleX(-1) !important;
 }
 
-/* ─── Direction & text-align ─── */
 .first-task-settings[dir="rtl"] { direction: rtl; }
 
 .first-task-settings[dir="rtl"] .setting-item-info,
@@ -755,7 +873,6 @@
     text-align: right;
 }
 
-/* ─── Text inputs ─── */
 .first-task-settings[dir="rtl"] input[type="text"]:not([dir="ltr"]),
 .first-task-settings[dir="rtl"] textarea:not([dir="ltr"]) {
     direction: rtl;
@@ -768,7 +885,6 @@
     text-align: left !important;
 }
 
-/* ─── Dropdowns ─── */
 .first-task-settings[dir="rtl"] select.dropdown {
     direction: rtl !important;
     text-align: right !important;
@@ -782,7 +898,6 @@
     text-align: right !important;
 }
 
-/* ─── mod-cta buttons ─── */
 .first-task-settings button.mod-cta,
 .first-task-settings button.mod-cta:focus {
     background-color: var(--interactive-accent) !important;
@@ -795,7 +910,6 @@
     background-color: var(--interactive-accent-hover) !important;
 }
 
-/* ─── Setting headings ─── */
 .first-task-settings .setting-item-heading,
 .first-task-settings .setting-item-heading .setting-item-info,
 .first-task-settings .setting-item-heading .setting-item-name {
@@ -832,12 +946,10 @@
     text-align: right;
 }
 
-/* Modal buttons: right in LTR, left in RTL */
 .first-task-modal-content[dir="rtl"] .first-task-modal-buttons {
     justify-content: flex-start !important;
 }
 
-/* Modal dropdowns */
 .first-task-modal-content[dir="rtl"] select.dropdown {
     direction: rtl !important;
     text-align: right !important;
@@ -851,13 +963,20 @@
     text-align: right !important;
 }
 
-/* Suggest item */
 .first-task-modal-content[dir="rtl"] .first-task-suggest-item {
     text-align: right;
 }
 
-/* Details box */
 .first-task-modal-content[dir="rtl"] .first-task-details-box-content {
+    text-align: right;
+}
+
+/* Import modal — RTL */
+.first-task-modal-content[dir="rtl"] .first-task-import-file-header {
+    text-align: right;
+}
+
+.first-task-modal-content[dir="rtl"] .first-task-import-row-title {
     text-align: right;
 }
 
@@ -892,7 +1011,6 @@
         padding: 7px 10px;
     }
 
-    /* Selection bar on mobile */
     .first-task-selection-bar {
         flex-direction: column;
         align-items: stretch;
@@ -905,9 +1023,16 @@
         justify-content: center;
     }
 
-    /* 🆕 Desktop stats on mobile — 3 تا 2 تا 2 */
     .first-task-desktop .first-task-stats-grid {
         grid-template-columns: repeat(3, 1fr);
+    }
+
+    /* Import modal on mobile */
+    .first-task-import-modal {
+        min-width: auto;
+    }
+    .first-task-import-list {
+        max-height: 300px;
     }
 }
 
