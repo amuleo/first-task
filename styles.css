@@ -4,7 +4,8 @@
    ✅ Desktop panel + Import modal + Recurring
    ✅ Smart Suggestions + Global Stats + Weekly chips
    ✅ Auto-flow planner grid + Desktop cards
-   ✅ 🆕 Disabled sections (کم‌رنگ + غیرقابل کلیک)
+   ✅ Disabled sections (کم‌رنگ + غیرقابل کلیک)
+   ✅ 🆕 Category filter highlight
    ════════════════════════════════════════════════════════════ */
 
 /* ═══════════════════════════════════════════════════════════
@@ -111,6 +112,13 @@
     width: 100%;
 }
 
+/* 🆕 فیلتر فعال */
+.first-task-category-select.is-filtered {
+    border-color: var(--interactive-accent) !important;
+    background-color: rgba(var(--interactive-accent-rgb, 106, 82, 182), 0.08) !important;
+    font-weight: 600;
+}
+
 .first-task-tabs {
     display: flex;
     gap: 4px;
@@ -159,7 +167,7 @@
     margin-bottom: 8px;
 }
 
-/* 🆕 Auto-flow برای Planner */
+/* Auto-flow برای Planner */
 .first-task-stats-grid-auto {
     display: grid !important;
     grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)) !important;
@@ -330,7 +338,7 @@
     box-shadow: 0 0 0 1px var(--interactive-accent) inset;
 }
 
-/* 🆕 Desktop task card */
+/* Desktop task card */
 .first-task-card.is-desktop {
     border-inline-start: 3px solid var(--text-accent);
     background: rgba(var(--interactive-accent-rgb, 106, 82, 182), 0.05);
@@ -1558,14 +1566,13 @@
 }
 
 /* ═══════════════════════════════════════════════════════════
-   🆕 Disabled Sections (Recurring / Archive)
+   Disabled Sections (Recurring / Archive)
    ═══════════════════════════════════════════════════════════ */
 .first-task-settings .first-task-settings-dynamic {
     transition: opacity 0.2s ease;
     position: relative;
 }
 
-/* حالت disabled: کم‌رنگ + غیرقابل کلیک */
 .first-task-settings .first-task-settings-dynamic.is-hidden {
     display: block !important;
     opacity: 0.4;
@@ -1574,7 +1581,6 @@
     filter: grayscale(0.5);
 }
 
-/* overlay شفاف روی بخش disabled */
 .first-task-settings .first-task-settings-dynamic.is-hidden::after {
     content: '';
     position: absolute;
@@ -1584,7 +1590,6 @@
     z-index: 10;
 }
 
-/* Setting items داخل بخش disabled */
 .first-task-settings .first-task-settings-dynamic.is-hidden .setting-item {
     pointer-events: none;
     cursor: not-allowed;
@@ -1835,7 +1840,6 @@
         padding: 9px 14px;
     }
 
-    /* 🆕 Disabled sections on mobile */
     .first-task-settings .first-task-settings-dynamic.is-hidden {
         opacity: 0.35;
     }
