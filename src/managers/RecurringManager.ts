@@ -1,9 +1,8 @@
 /* ════════════════════════════════════════════════════════════
-   🔄 RecurringManager — تسک‌های تکرارشونده (v0.2.1)
+   🔄 RecurringManager — تسک‌های تکرارشونده (v0.2.3)
    ✅ ۳ نوع: روزانه / هفتگی / ماهانه
-   ✅ 🆕 هفتگی چندتایی (single / multiple / every-day)
-   ✅ منطق catch-up هوشمند
-   ✅ جلوگیری از تکرار بر اساس created_ts
+   ✅ هفتگی چندتایی
+   ✅ 🆕 جلوگیری از ساجست قبل از تاریخ شروع
    ════════════════════════════════════════════════════════════ */
 
 import { App, normalizePath } from 'obsidian';
@@ -219,7 +218,7 @@ export class RecurringManager {
     }
 
     /* ═══════════════════════════════════════════════════════
-       🎯 منطق هوشمند: Most Recent Due Date
+       منطق هوشمند: Most Recent Due Date
        ═══════════════════════════════════════════════════════ */
     private computeMostRecentDueDate(
         template: RecurringTemplate,
@@ -250,7 +249,7 @@ export class RecurringManager {
         const weekDays = this.resolveWeekDays(template);
         if (weekDays.length === 0) return null;
 
-        /* ─── اگه every-day: مثل روزانه ─── */
+        /* every-day → مثل روزانه */
         if (template.weeklyMode === 'every-day' || weekDays.length === 7) {
             return this.tsToDateResult(startOfDay(nowTs));
         }
@@ -258,12 +257,12 @@ export class RecurringManager {
         const todayDate = new Date(nowTs);
         const todayDay = todayDate.getDay();
 
-        /* ─── امروز توی لیست هست؟ ─── */
+        /* امروز توی لیست هست؟ */
         if (weekDays.includes(todayDay)) {
             return this.tsToDateResult(startOfDay(nowTs));
         }
 
-        /* ─── نزدیک‌ترین روز قبلی ─── */
+        /* نزدیک‌ترین روز قبلی */
         let minDiff = 8;
         for (const wd of weekDays) {
             const diff = (todayDay - wd + 7) % 7;
@@ -281,13 +280,10 @@ export class RecurringManager {
         return this.tsToDateResult(target.getTime());
     }
 
-    /* ─── تبدیل weekDay قدیمی → آرایه ─── */
     private resolveWeekDays(template: RecurringTemplate): number[] {
-        /* اگه weekDays هست، استفاده کن */
         if (template.weekDays && template.weekDays.length > 0) {
             return template.weekDays;
         }
-        /* اگه weekDay قدیمی هست، تبدیل کن */
         if (template.weekDay !== undefined) {
             return [template.weekDay];
         }
@@ -382,10 +378,14 @@ export class RecurringManager {
         const suggestions: RecurringSuggestion[] = [];
 
         for (const template of this.getActive()) {
+            /* اگه تاریخ شروع توی آینده‌ست، skip */
             if (template.start_date_ts > startOfDay(nowTs)) continue;
 
             const dueDate = this.computeMostRecentDueDate(template, nowTs);
             if (!dueDate) continue;
+
+            /* 🆕 اگه dueDate قبل از تاریخ شروع باشه، skip */
+            if (dueDate.ts < template.start_date_ts) continue;
 
             if (this.hasInstanceInCycle(template.id, dueDate.ts)) continue;
 
