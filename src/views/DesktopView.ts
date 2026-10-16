@@ -1,10 +1,11 @@
 /* ════════════════════════════════════════════════════════════
-   🖥️ Desktop View — میز من (v0.2.0)
+   🖥️ Desktop View — میز من (v0.2.1)
    ✅ پنل مستقل
    ✅ Tabs: در انتظار / انجام شده
    ✅ آمار
    ✅ انتخاب گروهی + Bulk Edit
    ✅ فیلتر دسته‌بندی
+   ✅ 🆕 دکمه Import از نوت‌ها
    ════════════════════════════════════════════════════════════ */
 
 import { ItemView, WorkspaceLeaf, setIcon } from 'obsidian';
@@ -14,6 +15,7 @@ import { t, applyDirection } from '../i18n';
 import { displayNumber, displayString } from '../utils/numberUtils';
 import { DesktopCreateModal, DesktopTaskDetailsModal } from './DesktopTaskModal';
 import { DesktopBulkEditModal } from './DesktopBulkEditModal';
+import { ImportModal } from './ImportModal';
 
 export const VIEW_TYPE_DESKTOP = 'first-task-desktop';
 
@@ -93,6 +95,14 @@ export class DesktopView extends ItemView {
         });
 
         const actions = topRow.createDiv({ cls: 'first-task-header-actions' });
+
+        /* 🆕 دکمه Import از نوت‌ها */
+        if (!this.selectionMode) {
+            const importBtn = actions.createEl('button', { cls: 'clickable-icon' });
+            setIcon(importBtn, 'download');
+            importBtn.setAttribute('aria-label', t(lang, 'import_title'));
+            importBtn.onclick = () => this.handleImport();
+        }
 
         if (!this.selectionMode) {
             const selectBtn = actions.createEl('button', { cls: 'clickable-icon' });
@@ -450,5 +460,10 @@ export class DesktopView extends ItemView {
     /* ─── New Task ─── */
     private handleNewTask(): void {
         new DesktopCreateModal(this.app, this.plugin, () => this.render()).open();
+    }
+
+    /* ─── 🆕 Import ─── */
+    private handleImport(): void {
+        new ImportModal(this.app, this.plugin, () => this.render()).open();
     }
 }
