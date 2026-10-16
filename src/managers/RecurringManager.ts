@@ -1,8 +1,9 @@
 /* ════════════════════════════════════════════════════════════
-   🔄 RecurringManager — تسک‌های تکرارشونده (v0.2.3)
+   🔄 RecurringManager — تسک‌های تکرارشونده (v0.3.1)
    ✅ ۳ نوع: روزانه / هفتگی / ماهانه
-   ✅ هفتگی چندتایی
-   ✅ 🆕 جلوگیری از ساجست قبل از تاریخ شروع
+   ✅ هفتگی چندتایی (single / multiple / every-day)
+   ✅ منطق catch-up هوشمند
+   ✅ چک دقیق تاریخ شروع (با startOfDay)
    ════════════════════════════════════════════════════════════ */
 
 import { App, normalizePath } from 'obsidian';
@@ -353,7 +354,7 @@ export class RecurringManager {
         return {
             jalali: `${jy}/${pad(jm)}/${pad(jd)}`,
             gregorian: `${gy}-${pad(gm)}-${pad(gd)}`,
-            ts,
+            ts: startOfDay(ts),
         };
     }
 
@@ -378,14 +379,17 @@ export class RecurringManager {
         const suggestions: RecurringSuggestion[] = [];
 
         for (const template of this.getActive()) {
-            /* اگه تاریخ شروع توی آینده‌ست، skip */
-            if (template.start_date_ts > startOfDay(nowTs)) continue;
+            /* ─── اگه تاریخ شروع توی آینده‌ست، skip ─── */
+            const startTs = startOfDay(template.start_date_ts);
+            const nowStart = startOfDay(nowTs);
+
+            if (startTs > nowStart) continue;
 
             const dueDate = this.computeMostRecentDueDate(template, nowTs);
             if (!dueDate) continue;
 
-            /* 🆕 اگه dueDate قبل از تاریخ شروع باشه، skip */
-            if (dueDate.ts < template.start_date_ts) continue;
+            /* 🆕 چک دقیق: تاریخ سررسید نباید قبل از تاریخ شروع باشه */
+            if (dueDate.ts < startTs) continue;
 
             if (this.hasInstanceInCycle(template.id, dueDate.ts)) continue;
 
@@ -407,6 +411,11 @@ export class RecurringManager {
         suggestion: RecurringSuggestion
     ): Promise<DesktopTask | null> {
         const template = suggestion.template;
+
+        /* 🆕 چک مجدد برای جلوگیری از تکرار (race condition) */
+        if (this.hasInstanceInCycle(template.id, suggestion.instance_date_ts)) {
+            return null;
+        }
 
         const result = await this.desktopStore.createTask({
             title: template.title,
