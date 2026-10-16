@@ -1,8 +1,9 @@
 /* ════════════════════════════════════════════════════════════
-   📦 تایپ‌های First Task v0.2.1
+   📦 تایپ‌های First Task v0.3.0
    ✅ _title و _source_file برای بازیابی خودکار متادیتا
    ✅ Desktop section
-   ✅ 🆕 Import section
+   ✅ Import section
+   ✅ 🆕 Recurring section
    ════════════════════════════════════════════════════════════ */
 
 export interface ExtractedTask {
@@ -201,6 +202,8 @@ export interface DesktopTask {
     completed_gregorian: string;
     completed_ts: number;
     modified_ts: number;
+    /* 🆕 اگه از یه الگوی تکرارشونده ساخته شده */
+    from_recurring?: string;
 }
 
 export const DEFAULT_DESKTOP_TASK: DesktopTask = {
@@ -220,6 +223,7 @@ export const DEFAULT_DESKTOP_TASK: DesktopTask = {
     completed_gregorian: '',
     completed_ts: 0,
     modified_ts: 0,
+    from_recurring: undefined,
 };
 
 export interface DesktopStoreFile {
@@ -239,6 +243,8 @@ export interface DesktopSettings {
     showInTasks: boolean;
     showInPlanner: boolean;
     defaultImportMode: 'copy' | 'move';
+    /* 🆕 Recurring settings */
+    recurringEnabled: boolean;
 }
 
 export const DEFAULT_DESKTOP_SETTINGS: DesktopSettings = {
@@ -246,6 +252,7 @@ export const DEFAULT_DESKTOP_SETTINGS: DesktopSettings = {
     showInTasks: false,
     showInPlanner: false,
     defaultImportMode: 'move',
+    recurringEnabled: true,
 };
 
 export interface DesktopStats {
@@ -261,14 +268,11 @@ export interface DesktopStats {
    ═══════════════════════════════════════════════════════════ */
 
 export interface DiscoveredTask {
-    /* ─── اطلاعات تسک ─── */
     task_id: string;
     title: string;
     completed: boolean;
     source_file: string;
     source_line: number;
-
-    /* ─── اطلاعات نمایشی ─── */
     file_display_name: string;
     already_imported: boolean;
 }
@@ -282,6 +286,68 @@ export interface ImportResult {
     imported: number;
     removedFromNotes: number;
     errors: string[];
+}
+
+/* ═══════════════════════════════════════════════════════════
+   🔄 Recurring Tasks — تسک‌های تکرارشونده
+   ═══════════════════════════════════════════════════════════ */
+
+export type RecurrenceType = 'daily' | 'weekly' | 'monthly';
+
+export interface RecurringTemplate {
+    id: string;
+    title: string;
+    description: string;
+    category: string;
+    recurrence: RecurrenceType;
+    /* ─── برای هفتگی: 0=یکشنبه، 1=دوشنبه، ... 6=شنبه ─── */
+    weekDay?: number;
+    /* ─── برای ماهانه: 1-31 ─── */
+    monthDay?: number;
+    /* ─── تاریخ شروع ─── */
+    start_date_jalali: string;
+    start_date_gregorian: string;
+    start_date_ts: number;
+    /* ─── وضعیت ─── */
+    active: boolean;
+    created_ts: number;
+    modified_ts: number;
+}
+
+export const DEFAULT_RECURRING_TEMPLATE: RecurringTemplate = {
+    id: '',
+    title: '',
+    description: '',
+    category: '',
+    recurrence: 'daily',
+    weekDay: undefined,
+    monthDay: undefined,
+    start_date_jalali: '',
+    start_date_gregorian: '',
+    start_date_ts: 0,
+    active: true,
+    created_ts: 0,
+    modified_ts: 0,
+};
+
+export interface RecurringStoreFile {
+    version: number;
+    last_updated: number;
+    templates: Record<string, RecurringTemplate>;
+}
+
+export const DEFAULT_RECURRING_STORE: RecurringStoreFile = {
+    version: 1,
+    last_updated: 0,
+    templates: {},
+};
+
+/* 🆕 ساجست برای امروز */
+export interface RecurringSuggestion {
+    template: RecurringTemplate;
+    instance_date_jalali: string;
+    instance_date_gregorian: string;
+    instance_date_ts: number;
 }
 
 /* ═══════════════════════════════════════════════════════════
