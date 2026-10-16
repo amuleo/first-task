@@ -1,9 +1,6 @@
 /* ════════════════════════════════════════════════════════════
-   ⚙️ تب تنظیمات — v0.1.2
-   ✅ شروع هفته (شنبه/یکشنبه/دوشنبه)
-   ✅ نمایش badge ها (پیش‌فرض خاموش)
-   ✅ پر کردن خودکار تاریخ ساخت
-   ✅ کارت‌های پلنر (قابل تنظیم) — ۹ کارت + بدون تاریخ + همه
+   ⚙️ تب تنظیمات — v0.2.0
+   ✅ Desktop section اضافه شد
    ════════════════════════════════════════════════════════════ */
 
 import { App, PluginSettingTab, Setting } from 'obsidian';
@@ -68,7 +65,6 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
                     this.plugin.refreshPanel();
                 }));
 
-        /* ─── شروع هفته ─── */
         new Setting(containerEl)
             .setName(t(lang, 'settings_week_start'))
             .setDesc(t(lang, 'settings_week_start_desc'))
@@ -114,7 +110,6 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
                     this.plugin.refreshPanel();
                 }));
 
-        /* 🆕 پر کردن خودکار تاریخ ساخت */
         new Setting(containerEl)
             .setName(t(lang, 'settings_auto_fill_created'))
             .setDesc(t(lang, 'settings_auto_fill_created_desc'))
@@ -213,6 +208,57 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
         mkCardToggle('next_month', 'settings_planner_cards_next_month');
         mkCardToggle('this_year', 'settings_planner_cards_this_year');
         mkCardToggle('next_year', 'settings_planner_cards_next_year');
+
+        /* ═══════ 🆕 میز من ═══════ */
+        new Setting(containerEl)
+            .setName(t(lang, 'settings_desktop'))
+            .setHeading();
+
+        new Setting(containerEl)
+            .setName(t(lang, 'settings_desktop_enabled'))
+            .setDesc(t(lang, 'settings_desktop_enabled_desc'))
+            .addToggle(tg => tg
+                .setValue(this.plugin.settings.desktop.enabled)
+                .onChange(async (v) => {
+                    this.plugin.settings.desktop.enabled = v;
+                    await this.plugin.saveSettings();
+                    this.plugin.refreshPanel();
+                }));
+
+        new Setting(containerEl)
+            .setName(t(lang, 'settings_desktop_show_in_tasks'))
+            .setDesc(t(lang, 'settings_desktop_show_in_tasks_desc'))
+            .addToggle(tg => tg
+                .setValue(this.plugin.settings.desktop.showInTasks)
+                .onChange(async (v) => {
+                    this.plugin.settings.desktop.showInTasks = v;
+                    await this.plugin.saveSettings();
+                    this.plugin.refreshPanel();
+                }));
+
+        new Setting(containerEl)
+            .setName(t(lang, 'settings_desktop_show_in_planner'))
+            .setDesc(t(lang, 'settings_desktop_show_in_planner_desc'))
+            .addToggle(tg => tg
+                .setValue(this.plugin.settings.desktop.showInPlanner)
+                .onChange(async (v) => {
+                    this.plugin.settings.desktop.showInPlanner = v;
+                    await this.plugin.saveSettings();
+                    this.plugin.refreshPanel();
+                }));
+
+        new Setting(containerEl)
+            .setName(t(lang, 'settings_desktop_import_mode'))
+            .setDesc(t(lang, 'settings_desktop_import_mode_desc'))
+            .addDropdown(dd => {
+                dd.addOption('move', t(lang, 'settings_desktop_import_move'));
+                dd.addOption('copy', t(lang, 'settings_desktop_import_copy'));
+                dd.setValue(this.plugin.settings.desktop.defaultImportMode);
+                dd.onChange(async (v) => {
+                    this.plugin.settings.desktop.defaultImportMode = v as 'copy' | 'move';
+                    await this.plugin.saveSettings();
+                });
+            });
     }
 
     private parseFolders(input: string): string[] {
