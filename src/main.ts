@@ -1,7 +1,8 @@
 /* ════════════════════════════════════════════════════════════
-   🚀 First Task Plugin — v0.3.0
-   ✅ Flush save در unload
-   ✅ Debounced save
+   🚀 First Task Plugin — v0.2.1
+   ✅ Flush save در unload (debounced saves)
+   ✅ ترتیب درست initialize
+   ✅ Notifier بعد از initialize کامل
    ════════════════════════════════════════════════════════════ */
 
 import { Plugin, WorkspaceLeaf } from 'obsidian';
@@ -134,7 +135,7 @@ export default class FirstTaskPlugin extends Plugin {
     }
 
     /* ═══════════════════════════════════════════════════════
-       Initialize
+       Initialize — ترتیب مهم
        ═══════════════════════════════════════════════════════ */
     private async initializeManagers(): Promise<void> {
         try {
@@ -145,10 +146,11 @@ export default class FirstTaskPlugin extends Plugin {
             await this.recurringManager.initialize();
             this.refreshPanel();
 
-            /* ─── ۲. TaskManager + Notifier ─── */
+            /* ─── ۲. TaskManager (اسکن کامل اولیه) ─── */
             await this.taskManager.initialize();
             this.refreshPanel();
 
+            /* ─── ۳. Notifier (فقط بعد از آماده بودن) ─── */
             this.notifier = new Notifier(
                 this.app,
                 async (file) => {
@@ -167,13 +169,14 @@ export default class FirstTaskPlugin extends Plugin {
             );
             this.notifier.start();
 
-            /* ─── ۳. Auto-Archive ─── */
+            /* ─── ۴. Auto-Archive در startup ─── */
             await this.runStartupAutoArchive();
         } catch (e) {
             console.warn('[First Task] Initialization failed:', e);
         }
     }
 
+    /* ─── Auto-Archive در startup ─── */
     private async runStartupAutoArchive(): Promise<void> {
         if (!this.settings.desktop.autoArchiveEnabled) return;
 
@@ -192,16 +195,19 @@ export default class FirstTaskPlugin extends Plugin {
     }
 
     /* ═══════════════════════════════════════════════════════
-       onunload — 🆕 flushSave
+       onunload — flush debounced saves
        ═══════════════════════════════════════════════════════ */
     async onunload(): Promise<void> {
+        /* ─── توقف Notifier ─── */
         if (this.notifier) this.notifier.stop();
 
         try {
-            /* 🆕 flush همه saveهای debounced */
+            /* 🆕 flush تمام saveهای debounced index + cache */
             if (this.indexManager) {
                 await this.indexManager.flushSave();
             }
+
+            /* ─── ذخیره‌ی بقیه storeها ─── */
             if (this.desktopStore) {
                 await this.desktopStore.save();
             }
