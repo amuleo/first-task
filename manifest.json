@@ -1,9 +1,9 @@
 {
     "id": "first-task",
     "name": "First Task",
-    "version": "0.2.0",
+    "version": "0.2.1",
     "minAppVersion": "1.4.0",
-    "description": "Extract all tasks from your vault notes and manage them in one place. Supports categories, due dates, pinning, and Persian calendar. Works completely offline.",
+    "description": "Complete task management for Obsidian. Extract tasks from notes, manage them on a dedicated Desktop, import from notes, set recurring schedules, get smart suggestions, and auto-archive old tasks. Supports categories, due dates, pinning, and Persian calendar. Works completely offline.",
     "author": "amooLeo",
     "authorUrl": "https://github.com/amuleo",
     "isDesktopOnly": false
