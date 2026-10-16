@@ -1,9 +1,7 @@
 /* ════════════════════════════════════════════════════════════
-   📦 تایپ‌های First Task v0.4.0
-   ✅ Desktop section
-   ✅ Import section
-   ✅ Recurring section
-   ✅ 🆕 Suggestions + Archive + Stats
+   📦 تایپ‌های First Task v0.2.1
+   ✅ Desktop + Import + Recurring + Suggestions + Archive
+   ✅ 🆕 دسته‌بندی «میز من»
    ════════════════════════════════════════════════════════════ */
 
 export interface ExtractedTask {
@@ -91,6 +89,7 @@ export interface CategoriesFile {
     categories: CategoryDef[];
 }
 
+/* 🆕 دسته‌ی «میز من» بین سلامتی و مهم */
 export const DEFAULT_CATEGORIES: CategoriesFile = {
     version: 1,
     categories: [
@@ -101,6 +100,7 @@ export const DEFAULT_CATEGORIES: CategoriesFile = {
         { id: 'shopping',  name: 'Shopping',  name_fa: 'خرید' },
         { id: 'finance',   name: 'Finance',   name_fa: 'مالی' },
         { id: 'health',    name: 'Health',    name_fa: 'سلامتی' },
+        { id: 'desktop',   name: 'Desktop',   name_fa: 'میز من' },
         { id: 'important', name: 'Important', name_fa: 'مهم' },
         { id: 'other',     name: 'Other',     name_fa: 'سایر' },
     ],
@@ -243,9 +243,7 @@ export interface DesktopSettings {
     showInPlanner: boolean;
     defaultImportMode: 'copy' | 'move';
     recurringEnabled: boolean;
-    /* 🆕 Suggestions */
     suggestionsEnabled: boolean;
-    /* 🆕 Archive */
     autoArchiveEnabled: boolean;
     autoArchiveCount: number;
     autoArchiveDays: 30 | 60 | 90 | 180 | 365;
@@ -304,14 +302,24 @@ export interface ImportResult {
 
 export type RecurrenceType = 'daily' | 'weekly' | 'monthly';
 
+/* 🆕 برای هفتگی چندتایی */
+export type WeeklyMode = 'single' | 'multiple' | 'every-day';
+
 export interface RecurringTemplate {
     id: string;
     title: string;
     description: string;
     category: string;
     recurrence: RecurrenceType;
+    /* 🆕 weekDay قدیمی (single) — برای backward compat */
     weekDay?: number;
+    /* 🆕 آرایه‌ی روزهای هفته */
+    weekDays?: number[];
+    /* 🆕 حالت هفتگی */
+    weeklyMode?: WeeklyMode;
+    /* ماهانه */
     monthDay?: number;
+    /* تاریخ شروع */
     start_date_jalali: string;
     start_date_gregorian: string;
     start_date_ts: number;
@@ -327,6 +335,8 @@ export const DEFAULT_RECURRING_TEMPLATE: RecurringTemplate = {
     category: '',
     recurrence: 'daily',
     weekDay: undefined,
+    weekDays: undefined,
+    weeklyMode: undefined,
     monthDay: undefined,
     start_date_jalali: '',
     start_date_gregorian: '',
@@ -356,39 +366,33 @@ export interface RecurringSuggestion {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   💡 Smart Suggestions — 🆕
+   💡 Smart Suggestions
    ═══════════════════════════════════════════════════════════ */
 
 export type SuggestionType =
-    | 'from_notes'         /* تسک‌های جدید توی نوت‌ها */
-    | 'from_pattern'       /* الگوی تکراری شناسایی‌شده */
-    | 'from_old_task'      /* تسک قدیمی که فراموش شده */
-    | 'random_pick';       /* تسک رندوم از تسک‌های اخیر */
+    | 'from_notes'
+    | 'from_pattern'
+    | 'from_old_task'
+    | 'random_pick';
 
 export interface SmartSuggestion {
     id: string;
     type: SuggestionType;
     title: string;
     description?: string;
-    /* برای from_notes: فایل مبدأ */
     source_file?: string;
     source_line?: number;
-    /* برای from_pattern: عنوان و تعداد تکرار */
     pattern_count?: number;
-    /* برای رندوم و از نوت: task_id */
     task_id?: string;
-    /* برای from_old_task: ts آخرین بار */
     last_seen_ts?: number;
-    /* داده‌ی کپی */
     category?: string;
 }
 
 /* ═══════════════════════════════════════════════════════════
-   🗄️ Archive — فایل مرده + آمار
+   🗄️ Archive
    ═══════════════════════════════════════════════════════════ */
 
 export interface DeadTask {
-    /* کپی کامل از DesktopTask + زمان archive */
     id: string;
     title: string;
     description: string;
@@ -406,7 +410,6 @@ export interface DeadTask {
     completed_ts: number;
     modified_ts: number;
     from_recurring?: string;
-    /* 🆕 */
     archived_at: number;
     archive_reason: 'auto' | 'manual';
 }
@@ -423,8 +426,6 @@ export const DEFAULT_DEAD_STORE: DeadStoreFile = {
     tasks: [],
 };
 
-/* ─── Stats (آمار انباشته — هرگز پاک نمی‌شه) ─── */
-
 export interface MonthlyStats {
     completed: number;
     created: number;
@@ -433,13 +434,10 @@ export interface MonthlyStats {
 export interface StatsFile {
     version: number;
     last_updated: number;
-    /* ─── کل ─── */
     total_completed: number;
     total_created: number;
     total_archived: number;
-    /* ─── ماهانه (کلید: "1405/07") ─── */
     monthly: Record<string, MonthlyStats>;
-    /* ─── آخرین auto-archive ─── */
     last_archive_ts: number;
     last_archive_count: number;
 }
@@ -456,7 +454,7 @@ export const DEFAULT_STATS_STORE: StatsFile = {
 };
 
 /* ═══════════════════════════════════════════════════════════
-   ⚙️ تنظیمات کلی
+   ⚙️ Settings
    ═══════════════════════════════════════════════════════════ */
 
 export interface FirstTaskSettings {
