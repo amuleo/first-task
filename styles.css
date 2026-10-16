@@ -1850,3 +1850,12 @@
         top: calc(max(14px, env(safe-area-inset-top)) + 24px) !important;
     }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   🆕 v0.2.1 — Category filter active highlight
+   ═══════════════════════════════════════════════════════════ */
+.first-task-category-select.is-filtered {
+    border-color: var(--interactive-accent) !important;
+    background-color: rgba(var(--interactive-accent-rgb, 106, 82, 182), 0.08) !important;
+    font-weight: 600;
+}
