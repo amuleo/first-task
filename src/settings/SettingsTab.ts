@@ -1,12 +1,15 @@
 /* ════════════════════════════════════════════════════════════
-   ⚙️ تب تنظیمات — v0.2.0
-   ✅ Desktop section اضافه شد
+   ⚙️ تب تنظیمات — v0.3.0
+   ✅ Desktop section
+   ✅ 🆕 Recurring section (مدیریت الگوها)
    ════════════════════════════════════════════════════════════ */
 
-import { App, PluginSettingTab, Setting } from 'obsidian';
+import { App, PluginSettingTab, Setting, setIcon } from 'obsidian';
 import type FirstTaskPlugin from '../main';
-import type { Language, WeekStartDay } from '../types';
+import type { Language, WeekStartDay, RecurringTemplate } from '../types';
 import { t, applyDirection } from '../i18n';
+import { RecurringModal } from '../views/RecurringModal';
+import { displayString } from '../utils/numberUtils';
 
 export class FirstTaskSettingsTab extends PluginSettingTab {
     plugin: FirstTaskPlugin;
@@ -259,6 +262,210 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 });
             });
+
+        /* ═══════ 🆕 تسک‌های تکرارشونده ═══════ */
+        new Setting(containerEl)
+            .setName(t(lang, 'settings_recurring'))
+            .setHeading();
+
+        new Setting(containerEl)
+            .setName(t(lang, 'settings_recurring_enabled'))
+            .setDesc(t(lang, 'settings_recurring_enabled_desc'))
+            .addToggle(tg => tg
+                .setValue(this.plugin.settings.desktop.recurringEnabled)
+                .onChange(async (v) => {
+                    this.plugin.settings.desktop.recurringEnabled = v;
+                    await this.plugin.saveSettings();
+                    this.plugin.refreshPanel();
+                    this.scheduleRefresh();
+                }));
+
+        /* ─── لیست الگوها ─── */
+        if (this.plugin.settings.desktop.recurringEnabled) {
+            this.renderRecurringList(containerEl, lang);
+        }
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       🆕 لیست الگوهای تکرارشونده
+       ═══════════════════════════════════════════════════════ */
+    private renderRecurringList(parent: HTMLElement, lang: Language): void {
+        const templates = this.plugin.recurringManager.getAll();
+
+        /* ─── اگه خالیه ─── */
+        if (templates.length === 0) {
+            const emptyBox = parent.createDiv({ cls: 'first-task-recurring-empty' });
+            emptyBox.createEl('p', {
+                text: t(lang, 'recurring_empty'),
+                cls: 'first-task-recurring-empty-text',
+            });
+        } else {
+            /* ─── لیست ─── */
+            const listWrap = parent.createDiv({ cls: 'first-task-recurring-list' });
+
+            for (const template of templates) {
+                this.renderRecurringRow(listWrap, template, lang);
+            }
+        }
+
+        /* ─── دکمه‌ی افزودن ─── */
+        const addWrap = parent.createDiv({ cls: 'first-task-recurring-add-wrap' });
+        const addBtn = addWrap.createEl('button', {
+            cls: 'first-task-recurring-add-btn mod-cta',
+        });
+        setIcon(addBtn.createSpan({ cls: 'first-task-recurring-add-icon' }), 'plus');
+        addBtn.createSpan({ text: ' ' + t(lang, 'recurring_add') });
+
+        addBtn.onclick = () => {
+            new RecurringModal(
+                this.app,
+                this.plugin,
+                null,
+                () => this.scheduleRefresh()
+            ).open();
+        };
+    }
+
+    /* ─── ردیف هر الگو ─── */
+    private renderRecurringRow(
+        parent: HTMLElement,
+        template: RecurringTemplate,
+        lang: Language
+    ): void {
+        const row = parent.createDiv({
+            cls: 'first-task-recurring-row' +
+                (template.active ? '' : ' is-inactive'),
+        });
+
+        /* ─── آیکون وضعیت ─── */
+        const iconWrap = row.createDiv({ cls: 'first-task-recurring-row-icon' });
+        const recIcon = this.getRecurrenceIcon(template.recurrence);
+        setIcon(iconWrap, recIcon);
+
+        /* ─── بدنه ─── */
+        const body = row.createDiv({ cls: 'first-task-recurring-row-body' });
+
+        const titleRow = body.createDiv({ cls: 'first-task-recurring-row-title' });
+        titleRow.setText(template.title);
+
+        const meta = body.createDiv({ cls: 'first-task-recurring-row-meta' });
+
+        /* نوع تکرار */
+        const typeLabel = this.getRecurrenceLabel(template, lang);
+        meta.createSpan({ cls: 'first-task-recurring-type-badge', text: typeLabel });
+
+        /* تاریخ شروع */
+        if (template.start_date_jalali || template.start_date_gregorian) {
+            const startDisplay = this.plugin.settings.useJalaliDate
+                ? template.start_date_jalali
+                : template.start_date_gregorian;
+            meta.createSpan({
+                text: ' · ' + displayString(startDisplay, lang),
+            });
+        }
+
+        /* دسته */
+        if (template.category) {
+            const catName = this.plugin.taskManager.getCategoryDisplayName(template.category);
+            meta.createSpan({ text: ' · ' + catName });
+        }
+
+        /* ─── اکشن‌ها ─── */
+        const actions = row.createDiv({ cls: 'first-task-recurring-row-actions' });
+
+        /* Toggle active */
+        const toggleBtn = actions.createEl('button', {
+            cls: 'clickable-icon',
+        });
+        setIcon(toggleBtn, template.active ? 'pause-circle' : 'play-circle');
+        toggleBtn.setAttribute(
+            'aria-label',
+            template.active
+                ? t(lang, 'recurring_deactivate')
+                : t(lang, 'recurring_activate')
+        );
+        toggleBtn.onclick = async () => {
+            await this.plugin.recurringManager.toggleActive(template.id);
+            this.plugin.refreshPanel();
+            this.scheduleRefresh();
+        };
+
+        /* Edit */
+        const editBtn = actions.createEl('button', {
+            cls: 'clickable-icon',
+        });
+        setIcon(editBtn, 'pencil');
+        editBtn.setAttribute('aria-label', t(lang, 'btn_edit'));
+        editBtn.onclick = () => {
+            new RecurringModal(
+                this.app,
+                this.plugin,
+                template,
+                () => this.scheduleRefresh()
+            ).open();
+        };
+
+        /* Delete */
+        const delBtn = actions.createEl('button', {
+            cls: 'clickable-icon mod-warning',
+        });
+        setIcon(delBtn, 'trash-2');
+        delBtn.setAttribute('aria-label', t(lang, 'btn_delete'));
+        delBtn.onclick = async () => {
+            const msg = t(lang, 'recurring_delete_confirm', {
+                title: template.title,
+            });
+            if (!window.confirm(msg)) return;
+
+            await this.plugin.recurringManager.remove(template.id);
+            this.plugin.toastManager.show(t(lang, 'recurring_deleted'), 'success');
+            this.plugin.refreshPanel();
+            this.scheduleRefresh();
+        };
+    }
+
+    /* ─── آیکون نوع تکرار ─── */
+    private getRecurrenceIcon(type: string): string {
+        switch (type) {
+            case 'daily': return 'sun';
+            case 'weekly': return 'calendar-days';
+            case 'monthly': return 'calendar';
+            default: return 'repeat';
+        }
+    }
+
+    /* ─── لیبل نوع تکرار ─── */
+    private getRecurrenceLabel(
+        template: RecurringTemplate,
+        lang: Language
+    ): string {
+        switch (template.recurrence) {
+            case 'daily':
+                return t(lang, 'recurring_type_daily');
+            case 'weekly': {
+                if (template.weekDay === undefined) {
+                    return t(lang, 'recurring_type_weekly');
+                }
+                const days = [
+                    'weekday_sunday',
+                    'weekday_monday',
+                    'weekday_tuesday',
+                    'weekday_wednesday',
+                    'weekday_thursday',
+                    'weekday_friday',
+                    'weekday_saturday',
+                ];
+                return t(lang, days[template.weekDay] as any);
+            }
+            case 'monthly': {
+                if (template.monthDay === undefined) {
+                    return t(lang, 'recurring_type_monthly');
+                }
+                return `${t(lang, 'recurring_type_monthly')} (${template.monthDay})`;
+            }
+            default:
+                return '';
+        }
     }
 
     private parseFolders(input: string): string[] {
