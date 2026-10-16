@@ -1,5 +1,5 @@
 /* ════════════════════════════════════════════════════════════
-   📋 TaskPanel View — v0.3.0
+   📋 TaskPanel View — v0.2.1
    ✅ شمارش تب‌ها با Desktop tasks
    ✅ فیلتر نامعتبر → ریست خودکار
    ✅ Highlight فیلتر فعال
@@ -59,27 +59,23 @@ export class TaskPanelView extends ItemView {
         return cat;
     }
 
-    /* 🆕 گرفتن تعداد کل با Desktop */
+    /* 🆕 شمارش با Desktop */
     private getTotalPendingCount(category: string): number {
         const noteTasks = this.plugin.taskManager.getPendingByCategory(category).length;
-
         if (!this.plugin.settings.desktop.enabled ||
             !this.plugin.settings.desktop.showInTasks) {
             return noteTasks;
         }
-
         const desktopTasks = this.plugin.desktopStore.getByCategory(category).length;
         return noteTasks + desktopTasks;
     }
 
     private getTotalCompletedCount(category: string): number {
         const noteTasks = this.plugin.taskManager.getCompletedByCategory(category).length;
-
         if (!this.plugin.settings.desktop.enabled ||
             !this.plugin.settings.desktop.showInTasks) {
             return noteTasks;
         }
-
         const desktopTasks = this.plugin.desktopStore.getCompletedByCategory(category).length;
         return noteTasks + desktopTasks;
     }
@@ -155,7 +151,6 @@ export class TaskPanelView extends ItemView {
         const lang = this.plugin.settings.language;
         const cats = this.plugin.taskManager.getCategories();
         const hasUncategorized = this.plugin.taskManager.hasTasksWithoutCategory();
-        const validCategory = this.getValidCategory();
 
         const row = parent.createDiv({ cls: 'first-task-category-row' });
         const select = row.createEl('select', { cls: 'dropdown first-task-category-select' });
@@ -177,9 +172,9 @@ export class TaskPanelView extends ItemView {
             select.createEl('option', { value: c.id, text: label });
         }
 
-        select.value = validCategory;
-
         /* 🆕 highlight فیلتر فعال */
+        const validCategory = this.getValidCategory();
+        select.value = validCategory;
         if (validCategory) {
             select.classList.add('is-filtered');
         }
@@ -198,9 +193,10 @@ export class TaskPanelView extends ItemView {
         const lang = this.plugin.settings.language;
         const tabs = parent.createDiv({ cls: 'first-task-tabs' });
 
-        const category = this.getValidCategory();
-        const pendingCount = this.getTotalPendingCount(category);
-        const completedCount = this.getTotalCompletedCount(category);
+        /* 🆕 شمارش با Desktop */
+        const validCategory = this.getValidCategory();
+        const pendingCount = this.getTotalPendingCount(validCategory);
+        const completedCount = this.getTotalCompletedCount(validCategory);
 
         const mkTab = (id: TabType, icon: string, label: string, count: number) => {
             const btn = tabs.createEl('button', {
