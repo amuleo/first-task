@@ -1,13 +1,12 @@
 /* ════════════════════════════════════════════════════════════
-   📅 Planner — v0.2.0
-   ✅ ۹ کارت زمانی + بدون تاریخ + همه
-   ✅ حالت انتخاب گروهی
-   ✅ انتقال گروهی به Desktop
+   📅 Planner — v0.3.0
+   ✅ رفع باگ layout وقتی کارت‌ها غیرفعال می‌شن
+   ✅ نمایش تسک‌های Desktop
    ════════════════════════════════════════════════════════════ */
 
 import { ItemView, WorkspaceLeaf, setIcon } from 'obsidian';
 import type FirstTaskPlugin from '../main';
-import type { ExtractedTask, PlannerCard } from '../types';
+import type { ExtractedTask, PlannerCard, DesktopTask } from '../types';
 import { t, applyDirection } from '../i18n';
 import { displayNumber, displayString } from '../utils/numberUtils';
 import { TaskDetailsModal } from './TaskDetailsModal';
@@ -130,7 +129,9 @@ export class PlannerView extends ItemView {
         };
     }
 
-    /* ─── کارت‌های آماری ─── */
+    /* ═══════════════════════════════════════════════════════
+       کارت‌های آماری — 🆕 layout درست
+       ═══════════════════════════════════════════════════════ */
     private renderStatCards(parent: HTMLElement): void {
         const lang = this.plugin.settings.language;
         const stats = this.plugin.taskManager.getCategoryStats(
@@ -139,39 +140,28 @@ export class PlannerView extends ItemView {
         const activeCard = this.plugin.settings.plannerCard || 'all';
         const visibility = this.plugin.settings.plannerCards;
 
-        const row1: PlannerCard[] = [];
-        if (visibility.past) row1.push('past');
-        if (visibility.today) row1.push('today');
-        if (visibility.tomorrow) row1.push('tomorrow');
-        if (row1.length > 0) {
-            const r = parent.createDiv({ cls: 'first-task-stats-grid' });
-            for (const c of row1) {
-                this.mkStatCard(r, c, this.getCardLabel(c, lang), this.getCount(stats, c), activeCard);
+        /* 🆕 همه کارت‌های فعال رو توی یه آرایه جمع کن */
+        const allCards: PlannerCard[] = [];
+
+        if (visibility.past) allCards.push('past');
+        if (visibility.today) allCards.push('today');
+        if (visibility.tomorrow) allCards.push('tomorrow');
+        if (visibility.this_week) allCards.push('this_week');
+        if (visibility.next_week) allCards.push('next_week');
+        if (visibility.this_month) allCards.push('this_month');
+        if (visibility.next_month) allCards.push('next_month');
+        if (visibility.this_year) allCards.push('this_year');
+        if (visibility.next_year) allCards.push('next_year');
+
+        /* 🆕 grid با auto-flow — با هر تعداد کارت */
+        if (allCards.length > 0) {
+            const grid = parent.createDiv({ cls: 'first-task-stats-grid first-task-stats-grid-auto' });
+            for (const c of allCards) {
+                this.mkStatCard(grid, c, this.getCardLabel(c, lang), this.getCount(stats, c), activeCard);
             }
         }
 
-        const row2: PlannerCard[] = [];
-        if (visibility.this_week) row2.push('this_week');
-        if (visibility.this_month) row2.push('this_month');
-        if (visibility.this_year) row2.push('this_year');
-        if (row2.length > 0) {
-            const r = parent.createDiv({ cls: 'first-task-stats-grid' });
-            for (const c of row2) {
-                this.mkStatCard(r, c, this.getCardLabel(c, lang), this.getCount(stats, c), activeCard);
-            }
-        }
-
-        const row3: PlannerCard[] = [];
-        if (visibility.next_week) row3.push('next_week');
-        if (visibility.next_month) row3.push('next_month');
-        if (visibility.next_year) row3.push('next_year');
-        if (row3.length > 0) {
-            const r = parent.createDiv({ cls: 'first-task-stats-grid' });
-            for (const c of row3) {
-                this.mkStatCard(r, c, this.getCardLabel(c, lang), this.getCount(stats, c), activeCard);
-            }
-        }
-
+        /* ─── no_date و all ─── */
         const row4 = parent.createDiv({ cls: 'first-task-planner-stats-row-3' });
         this.mkStatCard(row4, 'no_date', t(lang, 'planner_stat_no_date'), stats.no_date, activeCard);
         this.mkStatCard(row4, 'all', t(lang, 'planner_stat_all'), stats.all, activeCard);
@@ -245,10 +235,22 @@ export class PlannerView extends ItemView {
         );
         const filtered = this.plugin.taskManager.filterByCard(allTasks, card);
 
-        const countSpan = headerRow.createEl('span', { cls: 'first-task-planner-tasks-count' });
-        countSpan.setText(`(${displayNumber(filtered.length, lang)})`);
+        /* 🆕 Desktop tasks */
+        const desktopTasks: DesktopTask[] = [];
+        if (this.plugin.settings.desktop.enabled &&
+            this.plugin.settings.desktop.showInPlanner) {
+            const dt = this.plugin.desktopStore.getByCategory(
+                this.plugin.settings.plannerCategory || ''
+            );
+            const filteredDt = this.filterDesktopByCard(dt, card);
+            desktopTasks.push(...filteredDt);
+        }
 
-        if (filtered.length === 0) {
+        const totalCount = filtered.length + desktopTasks.length;
+        const countSpan = headerRow.createEl('span', { cls: 'first-task-planner-tasks-count' });
+        countSpan.setText(`(${displayNumber(totalCount, lang)})`);
+
+        if (totalCount === 0) {
             const empty = parent.createDiv({ cls: 'first-task-empty' });
             empty.createEl('p', {
                 text: t(lang, 'planner_no_tasks'),
@@ -262,16 +264,54 @@ export class PlannerView extends ItemView {
 
         for (const task of visible) this.renderTaskCard(body, task);
 
-        if (filtered.length > this.visibleCount) {
-            const remaining = filtered.length - this.visibleCount;
+        /* 🆕 Desktop tasks */
+        const remaining = Math.max(0, this.visibleCount - filtered.length);
+        const desktopVisible = desktopTasks.slice(0, remaining);
+        for (const task of desktopVisible) this.renderDesktopTaskCard(body, task);
+
+        if (totalCount > this.visibleCount) {
+            const remainingCount = totalCount - this.visibleCount;
             const moreBtn = body.createEl('button', {
                 cls: 'first-task-show-more',
-                text: `${t(lang, 'panel_show_more')} (${displayNumber(remaining, lang)})`,
+                text: `${t(lang, 'panel_show_more')} (${displayNumber(remainingCount, lang)})`,
             });
             moreBtn.onclick = () => {
                 this.visibleCount += this.plugin.settings.tasksPerPage;
                 this.render();
             };
+        }
+    }
+
+    /* 🆕 فیلتر Desktop tasks بر اساس card */
+    private filterDesktopByCard(tasks: DesktopTask[], card: PlannerCard): DesktopTask[] {
+        const now = Date.now();
+        const todayStart = new Date(now);
+        todayStart.setHours(0, 0, 0, 0);
+        const tomorrowStart = todayStart.getTime() + 86400000;
+
+        switch (card) {
+            case 'today':
+                return tasks.filter(t => {
+                    const ts = t.due_date_ts;
+                    if (!ts) return false;
+                    const tsStart = new Date(ts);
+                    tsStart.setHours(0, 0, 0, 0);
+                    return tsStart.getTime() === todayStart.getTime();
+                });
+            case 'tomorrow':
+                return tasks.filter(t => {
+                    const ts = t.due_date_ts;
+                    if (!ts) return false;
+                    const tsStart = new Date(ts);
+                    tsStart.setHours(0, 0, 0, 0);
+                    return tsStart.getTime() === tomorrowStart;
+                });
+            case 'no_date':
+                return tasks.filter(t => !t.due_date_ts);
+            case 'all':
+                return tasks;
+            default:
+                return tasks;
         }
     }
 
@@ -305,7 +345,7 @@ export class PlannerView extends ItemView {
                 const ok = await this.plugin.taskManager.toggleComplete(task._id);
                 if (ok) {
                     this.plugin.toastManager.show(t(lang, 'notice_task_completed'), 'success');
-                    this.render();
+                    this.plugin.refreshPanel();
                 } else {
                     cb.disabled = false;
                 }
@@ -348,8 +388,43 @@ export class PlannerView extends ItemView {
             if (this.selectionMode) {
                 this.toggleTaskSelection(task._id);
             } else {
-                new TaskDetailsModal(this.app, this.plugin, task, () => this.render()).open();
+                new TaskDetailsModal(this.app, this.plugin, task, () => {
+                    this.plugin.refreshPanel();
+                }).open();
             }
+        };
+    }
+
+    /* 🆕 کارت تسک Desktop */
+    private renderDesktopTaskCard(parent: HTMLElement, task: DesktopTask): void {
+        const lang = this.plugin.settings.language;
+        const useJalali = this.plugin.settings.useJalaliDate;
+
+        const card = parent.createDiv({ cls: 'first-task-card is-desktop' });
+
+        const cbWrap = card.createDiv({ cls: 'first-task-card-checkbox' });
+        const cb = cbWrap.createEl('input', { type: 'checkbox' });
+        cb.checked = false;
+
+        const bodyCard = card.createDiv({ cls: 'first-task-card-body' });
+        const titleRow = bodyCard.createDiv({ cls: 'first-task-card-title-row' });
+        titleRow.createDiv({ cls: 'first-task-card-title', text: task.title });
+
+        const meta = bodyCard.createDiv({ cls: 'first-task-card-meta' });
+
+        const dateDisplay = useJalali ? task.due_date_jalali : task.due_date_gregorian;
+        if (dateDisplay) {
+            const dateEl = meta.createSpan({ cls: 'first-task-card-date' });
+            setIcon(dateEl.createSpan({ cls: 'first-task-icon' }), 'calendar');
+            dateEl.createSpan({ text: ' ' + displayString(dateDisplay, lang) });
+        }
+
+        const desktopEl = meta.createSpan({ cls: 'first-task-card-note' });
+        setIcon(desktopEl.createSpan({ cls: 'first-task-icon' }), 'layout-dashboard');
+        desktopEl.createSpan({ text: ' ' + t(lang, 'desktop_badge') });
+
+        bodyCard.onclick = () => {
+            this.plugin.activateDesktopView();
         };
     }
 
@@ -367,7 +442,6 @@ export class PlannerView extends ItemView {
 
         const actions = bar.createDiv({ cls: 'first-task-selection-actions' });
 
-        /* ─── دکمه انتقال به Desktop ─── */
         const moveBtn = actions.createEl('button', {
             cls: 'first-task-selection-btn',
         });
@@ -436,6 +510,7 @@ export class PlannerView extends ItemView {
         if (ok) {
             this.plugin.toastManager.show(t(lang, 'notice_bulk_deleted'), 'success');
             this.exitSelectionMode();
+            this.plugin.refreshPanel();
         }
     }
 
@@ -445,10 +520,10 @@ export class PlannerView extends ItemView {
 
         new BulkEditModal(this.app, this.plugin, ids, () => {
             this.exitSelectionMode();
+            this.plugin.refreshPanel();
         }).open();
     }
 
-    /* ─── انتقال گروهی به Desktop ─── */
     private async handleBulkMoveToDesktop(): Promise<void> {
         if (this.selectedIds.size === 0) return;
         const lang = this.plugin.settings.language;
@@ -494,7 +569,6 @@ export class PlannerView extends ItemView {
         }
     }
 
-    /* ─── Rescan ─── */
     private async handleRescan(): Promise<void> {
         const lang = this.plugin.settings.language;
         this.plugin.toastManager.show(t(lang, 'panel_reloading'), 'info', 1500);
@@ -502,7 +576,7 @@ export class PlannerView extends ItemView {
             await this.plugin.taskManager.rescanAll();
             this.visibleCount = this.plugin.settings.tasksPerPage;
             this.plugin.toastManager.show(t(lang, 'notice_rescan_ok'), 'success');
-            this.render();
+            this.plugin.refreshPanel();
         } catch (e: any) {
             this.plugin.toastManager.show(
                 t(lang, 'notice_rescan_failed', { error: e?.message || 'unknown' }),
