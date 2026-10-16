@@ -1,9 +1,9 @@
 /* ════════════════════════════════════════════════════════════
-   🎨 First Task — Style Sheet v0.2.1
+   🎨 First Task — Style Sheet v0.3.0
    ✅ Standard, clean, RTL-friendly
-   ✅ Toggle flip in RTL
    ✅ Desktop panel
-   ✅ 🆕 Import modal
+   ✅ Import modal
+   ✅ 🆕 Recurring suggestions + settings
    ════════════════════════════════════════════════════════════ */
 
 /* ═══════════════════════════════════════════════════════════
@@ -25,8 +25,6 @@
     padding: 0 12px !important;
     box-sizing: border-box !important;
     margin: 0 !important;
-    visibility: visible !important;
-    opacity: 1 !important;
 }
 
 .first-task-toast-container.first-task-toast-rtl {
@@ -101,7 +99,6 @@
 
 .first-task-header-actions { display: flex; gap: 2px; }
 
-/* ─── Category dropdown ─── */
 .first-task-category-row {
     display: flex;
     gap: 6px;
@@ -113,7 +110,6 @@
     width: 100%;
 }
 
-/* ─── Tabs ─── */
 .first-task-tabs {
     display: flex;
     gap: 4px;
@@ -366,7 +362,6 @@
 
 .first-task-icon svg { width: 12px; height: 12px; }
 
-/* ─── Dynamic badges ─── */
 .first-task-card-badges {
     display: flex;
     flex-wrap: wrap;
@@ -391,7 +386,6 @@
 .first-task-dynamic-this_month { background-color: rgba(241, 196, 15, 0.18); color: #d4ac0d; }
 .first-task-dynamic-this_year { background-color: rgba(230, 126, 34, 0.18); color: #d35400; }
 
-/* ─── Empty state ─── */
 .first-task-empty {
     text-align: center;
     padding: 40px 20px;
@@ -409,7 +403,6 @@
     opacity: 0.8;
 }
 
-/* ─── Show more ─── */
 .first-task-show-more {
     padding: 9px;
     margin-top: 4px;
@@ -429,7 +422,7 @@
 }
 
 /* ═══════════════════════════════════════════════════════════
-   🆕 Selection bar (bulk operations)
+   Selection bar
    ═══════════════════════════════════════════════════════════ */
 .first-task-selection-bar {
     display: flex;
@@ -502,7 +495,7 @@
 }
 
 /* ═══════════════════════════════════════════════════════════
-   🪟 Modals
+   Modals
    ═══════════════════════════════════════════════════════════ */
 .first-task-modal-content {
     padding-top: 12px;
@@ -519,10 +512,7 @@
     line-height: 1.4;
 }
 
-/* ─── Readonly boxes ─── */
-.first-task-details-box {
-    margin-bottom: 12px;
-}
+.first-task-details-box { margin-bottom: 12px; }
 
 .first-task-details-box-label {
     font-size: var(--font-ui-smaller);
@@ -582,7 +572,6 @@
     margin-top: 4px;
 }
 
-/* ─── Bulk edit summary ─── */
 .first-task-bulk-summary {
     padding: 8px 12px;
     margin-bottom: 12px;
@@ -594,7 +583,7 @@
 }
 
 /* ═══════════════════════════════════════════════════════════
-   🎯 Action buttons
+   Action buttons
    ═══════════════════════════════════════════════════════════ */
 .first-task-action-container {
     display: flex;
@@ -630,7 +619,6 @@
     flex: 1 1 100%;
 }
 
-/* ─── Modal buttons ─── */
 .first-task-modal-buttons {
     display: flex;
     justify-content: flex-end;
@@ -659,7 +647,7 @@
 }
 
 /* ═══════════════════════════════════════════════════════════
-   🎯 Suggest
+   Suggest
    ═══════════════════════════════════════════════════════════ */
 .first-task-suggest-item {
     display: flex;
@@ -686,7 +674,7 @@
 }
 
 /* ═══════════════════════════════════════════════════════════
-   🆕 Desktop Panel
+   Desktop Panel
    ═══════════════════════════════════════════════════════════ */
 .first-task-desktop .first-task-card-note {
     color: var(--text-accent);
@@ -710,12 +698,8 @@
 }
 
 /* ═══════════════════════════════════════════════════════════
-   🆕 Import Modal
+   Import Modal
    ═══════════════════════════════════════════════════════════ */
-.first-task-import-modal {
-    /* max width */
-}
-
 .first-task-import-modal .modal-content,
 .first-task-import-modal {
     min-width: 500px;
@@ -854,7 +838,322 @@
 }
 
 /* ═══════════════════════════════════════════════════════════
-   ⚙️ Settings — RTL rules
+   🆕 Recurring Suggestions (Desktop panel)
+   ═══════════════════════════════════════════════════════════ */
+.first-task-suggestions {
+    margin-bottom: 14px;
+    background: linear-gradient(
+        135deg,
+        rgba(var(--interactive-accent-rgb, 106, 82, 182), 0.08),
+        rgba(var(--interactive-accent-rgb, 106, 82, 182), 0.04)
+    );
+    border: 1px solid rgba(var(--interactive-accent-rgb, 106, 82, 182), 0.3);
+    border-radius: 10px;
+    padding: 10px 12px;
+}
+
+.first-task-suggestions-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px dashed rgba(var(--interactive-accent-rgb, 106, 82, 182), 0.25);
+}
+
+.first-task-suggestions-header-left {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.first-task-suggestions-header-icon {
+    display: inline-flex;
+    align-items: center;
+    color: var(--text-accent);
+}
+
+.first-task-suggestions-header-icon svg {
+    width: 15px;
+    height: 15px;
+}
+
+.first-task-suggestions-header-title {
+    font-size: var(--font-ui-smaller);
+    font-weight: 700;
+    color: var(--text-accent);
+}
+
+.first-task-suggestions-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border-radius: 9px;
+    font-size: 10.5px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.first-task-suggestions-add-all {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 10px;
+    font-size: var(--font-ui-smaller);
+    font-weight: 600;
+    border-radius: 6px;
+    cursor: pointer;
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border: 1px solid var(--interactive-accent);
+    transition: all 0.15s ease;
+}
+
+.first-task-suggestions-add-all:hover {
+    background: var(--interactive-accent-hover);
+    transform: translateY(-1px);
+}
+
+.first-task-suggestions-add-all-icon svg {
+    width: 12px;
+    height: 12px;
+}
+
+.first-task-suggestions-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.first-task-suggestion-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 8px;
+    border-radius: 6px;
+    background: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    transition: all 0.12s ease;
+}
+
+.first-task-suggestion-row:hover {
+    border-color: var(--interactive-accent);
+    background: var(--background-primary-alt);
+}
+
+.first-task-suggestion-icon {
+    display: inline-flex;
+    align-items: center;
+    color: var(--text-accent);
+    flex-shrink: 0;
+}
+
+.first-task-suggestion-icon svg {
+    width: 14px;
+    height: 14px;
+}
+
+.first-task-suggestion-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.first-task-suggestion-title {
+    font-size: var(--font-ui-smaller);
+    font-weight: 500;
+    color: var(--text-normal);
+    line-height: 1.3;
+    margin-bottom: 2px;
+    word-wrap: break-word;
+}
+
+.first-task-suggestion-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px;
+    font-size: 10.5px;
+    color: var(--text-muted);
+}
+
+.first-task-suggestion-date-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 6px;
+    border-radius: 8px;
+    background: rgba(52, 152, 219, 0.15);
+    color: #2980b9;
+    font-weight: 600;
+    font-size: 10px;
+}
+
+.first-task-suggestion-date-badge.is-overdue {
+    background: rgba(231, 76, 60, 0.15);
+    color: #c0392b;
+}
+
+.first-task-suggestion-cat {
+    font-size: 10.5px;
+    color: var(--text-muted);
+}
+
+.first-task-suggestion-add-btn {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border-radius: 6px;
+    cursor: pointer;
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border: none;
+    transition: all 0.15s ease;
+}
+
+.first-task-suggestion-add-btn:hover {
+    background: var(--interactive-accent-hover);
+    transform: scale(1.08);
+}
+
+.first-task-suggestion-add-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   🆕 Recurring Settings (SettingsTab)
+   ═══════════════════════════════════════════════════════════ */
+.first-task-recurring-empty {
+    padding: 20px;
+    text-align: center;
+    background: var(--background-secondary);
+    border-radius: 8px;
+    margin: 8px 0;
+}
+
+.first-task-recurring-empty-text {
+    margin: 0;
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.first-task-recurring-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 8px 0;
+}
+
+.first-task-recurring-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 8px;
+    transition: all 0.15s ease;
+}
+
+.first-task-recurring-row:hover {
+    border-color: var(--interactive-accent);
+}
+
+.first-task-recurring-row.is-inactive {
+    opacity: 0.55;
+}
+
+.first-task-recurring-row-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: rgba(var(--interactive-accent-rgb, 106, 82, 182), 0.12);
+    color: var(--text-accent);
+    flex-shrink: 0;
+}
+
+.first-task-recurring-row-icon svg {
+    width: 16px;
+    height: 16px;
+}
+
+.first-task-recurring-row-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.first-task-recurring-row-title {
+    font-size: var(--font-ui-small);
+    font-weight: 600;
+    color: var(--text-normal);
+    margin-bottom: 3px;
+    word-wrap: break-word;
+}
+
+.first-task-recurring-row-meta {
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+}
+
+.first-task-recurring-type-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 8px;
+    border-radius: 10px;
+    background: rgba(var(--interactive-accent-rgb, 106, 82, 182), 0.15);
+    color: var(--text-accent);
+    font-weight: 600;
+    font-size: 10.5px;
+    white-space: nowrap;
+}
+
+.first-task-recurring-row-actions {
+    display: flex;
+    gap: 2px;
+    flex-shrink: 0;
+}
+
+.first-task-recurring-add-wrap {
+    margin-top: 10px;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.first-task-recurring-add-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 14px;
+    font-size: var(--font-ui-smaller);
+    font-weight: 600;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.first-task-recurring-add-icon svg {
+    width: 13px;
+    height: 13px;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Settings — RTL rules
    ═══════════════════════════════════════════════════════════ */
 .first-task-settings[dir="rtl"] .checkbox-container,
 .first-task-rtl .checkbox-container {
@@ -932,7 +1231,7 @@
 }
 
 /* ═══════════════════════════════════════════════════════════
-   🔥 Modal — RTL rules
+   Modal — RTL rules
    ═══════════════════════════════════════════════════════════ */
 .first-task-modal-content[dir="rtl"] .setting-item-info,
 .first-task-modal-content[dir="rtl"] .setting-item-name,
@@ -971,7 +1270,6 @@
     text-align: right;
 }
 
-/* Import modal — RTL */
 .first-task-modal-content[dir="rtl"] .first-task-import-file-header {
     text-align: right;
 }
@@ -981,7 +1279,7 @@
 }
 
 /* ═══════════════════════════════════════════════════════════
-   📱 Mobile
+   Mobile
    ═══════════════════════════════════════════════════════════ */
 @media (max-width: 600px) {
     .first-task-panel { padding: 8px 10px; }
@@ -1027,12 +1325,24 @@
         grid-template-columns: repeat(3, 1fr);
     }
 
-    /* Import modal on mobile */
-    .first-task-import-modal {
-        min-width: auto;
+    .first-task-import-modal { min-width: auto; }
+    .first-task-import-list { max-height: 300px; }
+
+    /* 🆕 Recurring suggestions on mobile */
+    .first-task-suggestions-header {
+        flex-wrap: wrap;
     }
-    .first-task-import-list {
-        max-height: 300px;
+    .first-task-suggestions-add-all {
+        font-size: 10.5px;
+        padding: 4px 8px;
+    }
+    .first-task-recurring-row {
+        flex-wrap: wrap;
+    }
+    .first-task-recurring-row-actions {
+        width: 100%;
+        justify-content: flex-end;
+        margin-top: 4px;
     }
 }
 
