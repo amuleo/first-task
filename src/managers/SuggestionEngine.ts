@@ -1,440 +1,268 @@
 /* ════════════════════════════════════════════════════════════
-   🔄 RecurringManager — تسک‌های تکرارشونده (v0.2.1)
-   ✅ ۳ نوع: روزانه / هفتگی / ماهانه
-   ✅ 🆕 هفتگی چندتایی (single / multiple / every-day)
-   ✅ منطق catch-up هوشمند
-   ✅ جلوگیری از تکرار بر اساس created_ts
+   💡 SuggestionEngine — پیشنهادهای هوشمند (v0.2.1)
+   ✅ ۴ نوع ساجست
+   ✅ 🆕 skip تسک‌های تازه اضافه‌شده (با created_ts یا modified_ts)
+   ✅ 🆕 random_pick رو فقط بعد از ۷ روز پیشنهاد می‌ده
    ════════════════════════════════════════════════════════════ */
 
-import { App, normalizePath } from 'obsidian';
-import type {
-    RecurringTemplate,
-    RecurringStoreFile,
-    RecurringSuggestion,
-    DesktopTask,
-} from '../types';
-import { DEFAULT_RECURRING_STORE } from '../types';
+import type { SmartSuggestion } from '../types';
+import { TaskManager } from './TaskManager';
 import { DesktopStore } from './DesktopStore';
-import { generateRecurringId } from '../utils/hash';
-import {
-    startOfDay,
-    toJalali,
-    toGregorian,
-    pad,
-} from '../utils/jalaliDate';
 
-const FOLDER_NAME = 'FirstTask';
-const RECURRING_FILE = 'recurring.json';
+const MAX_SUGGESTIONS = 5;
+const MAX_FROM_NOTES = 2;
+const MAX_FROM_PATTERN = 1;
+const MAX_FROM_OLD = 1;
+const MAX_RANDOM = 1;
 
-interface DueDateResult {
-    jalali: string;
-    gregorian: string;
-    ts: number;
-}
+const OLD_TASK_DAYS = 14;
+const PATTERN_MIN_OCCURRENCES = 3;
+const PATTERN_WINDOW_DAYS = 30;
 
-export class RecurringManager {
-    private app: App;
-    private filePath: string;
-    private store: RecurringStoreFile = { ...DEFAULT_RECURRING_STORE };
-    private desktopStore: DesktopStore;
+/* 🆕 تسک‌هایی که کمتر از این مدت از آخرین تغییرشون گذشته، پیشنهاد نشمن */
+const SKIP_RECENT_DAYS = 7;
 
-    constructor(app: App, desktopStore: DesktopStore) {
-        this.app = app;
-        this.desktopStore = desktopStore;
-        this.filePath = normalizePath(`${FOLDER_NAME}/${RECURRING_FILE}`);
-    }
+export class SuggestionEngine {
+    constructor(
+        private taskManager: TaskManager,
+        private desktopStore: DesktopStore
+    ) {}
 
     /* ═══════════════════════════════════════════════════════
-       راه‌اندازی
+       متد اصلی
        ═══════════════════════════════════════════════════════ */
-    async initialize(): Promise<void> {
-        try {
-            const adapter = this.app.vault.adapter;
-            const folderPath = normalizePath(FOLDER_NAME);
+    async generateSuggestions(): Promise<SmartSuggestion[]> {
+        const suggestions: SmartSuggestion[] = [];
+        const seenTitles = new Set<string>();
 
-            if (!(await adapter.exists(folderPath))) {
-                await this.app.vault.createFolder(folderPath);
-            }
-
-            if (!(await adapter.exists(this.filePath))) {
-                this.store = { ...DEFAULT_RECURRING_STORE };
-                await this.save();
-                return;
-            }
-
-            await this.load();
-        } catch (e) {
-            console.warn('[First Task] RecurringManager init failed:', e);
-            this.store = { ...DEFAULT_RECURRING_STORE };
-        }
-    }
-
-    private async load(): Promise<void> {
-        try {
-            const content = await this.app.vault.adapter.read(this.filePath);
-
-            let parsed: any;
-            try {
-                parsed = JSON.parse(content);
-            } catch {
-                const backup = normalizePath(
-                    `${FOLDER_NAME}/recurring.corrupted-${Date.now()}.json`
-                );
-                await this.app.vault.adapter.write(backup, content);
-                console.warn(
-                    `[First Task] Corrupted recurring.json backed up to: ${backup}`
-                );
-                this.store = { ...DEFAULT_RECURRING_STORE };
-                return;
-            }
-
-            this.store = {
-                version: parsed.version || 1,
-                last_updated: parsed.last_updated || 0,
-                templates: parsed.templates || {},
-            };
-        } catch (e) {
-            console.warn('[First Task] RecurringManager load failed:', e);
-            this.store = { ...DEFAULT_RECURRING_STORE };
-        }
-    }
-
-    async save(): Promise<void> {
-        try {
-            this.store.last_updated = Date.now();
-            const content = JSON.stringify(this.store, null, 2);
-            await this.app.vault.adapter.write(this.filePath, content);
-        } catch (e) {
-            console.warn('[First Task] RecurringManager save failed:', e);
-        }
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       CRUD
-       ═══════════════════════════════════════════════════════ */
-    getAll(): RecurringTemplate[] {
-        return Object.values(this.store.templates).sort((a, b) => {
-            if (a.active && !b.active) return -1;
-            if (!a.active && b.active) return 1;
-            return a.title.localeCompare(b.title, 'fa');
-        });
-    }
-
-    getActive(): RecurringTemplate[] {
-        return this.getAll().filter(t => t.active);
-    }
-
-    getById(id: string): RecurringTemplate | null {
-        return this.store.templates[id] || null;
-    }
-
-    async add(template: RecurringTemplate): Promise<boolean> {
-        try {
-            this.store.templates[template.id] = template;
-            await this.save();
-            return true;
-        } catch (e) {
-            console.warn('[First Task] RecurringManager add failed:', e);
-            return false;
-        }
-    }
-
-    async createTemplate(data: {
-        title: string;
-        description?: string;
-        category?: string;
-        recurrence: 'daily' | 'weekly' | 'monthly';
-        weekDay?: number;
-        weekDays?: number[];
-        weeklyMode?: 'single' | 'multiple' | 'every-day';
-        monthDay?: number;
-        startDateJalali: string;
-        startDateGregorian: string;
-        startDateTs: number;
-    }): Promise<RecurringTemplate | null> {
-        try {
-            const now = Date.now();
-            const template: RecurringTemplate = {
-                id: generateRecurringId(),
-                title: data.title.trim(),
-                description: data.description?.trim() || '',
-                category: data.category || '',
-                recurrence: data.recurrence,
-                weekDay: data.weekDay,
-                weekDays: data.weekDays,
-                weeklyMode: data.weeklyMode,
-                monthDay: data.monthDay,
-                start_date_jalali: data.startDateJalali,
-                start_date_gregorian: data.startDateGregorian,
-                start_date_ts: data.startDateTs,
-                active: true,
-                created_ts: now,
-                modified_ts: now,
-            };
-
-            this.store.templates[template.id] = template;
-            await this.save();
-            return template;
-        } catch (e) {
-            console.warn('[First Task] RecurringManager createTemplate failed:', e);
-            return null;
-        }
-    }
-
-    async update(id: string, patch: Partial<RecurringTemplate>): Promise<boolean> {
-        const existing = this.store.templates[id];
-        if (!existing) return false;
-
-        try {
-            this.store.templates[id] = {
-                ...existing,
-                ...patch,
-                modified_ts: Date.now(),
-            };
-            await this.save();
-            return true;
-        } catch (e) {
-            console.warn('[First Task] RecurringManager update failed:', e);
-            return false;
-        }
-    }
-
-    async remove(id: string): Promise<boolean> {
-        if (!this.store.templates[id]) return false;
-
-        try {
-            delete this.store.templates[id];
-            await this.save();
-            return true;
-        } catch (e) {
-            console.warn('[First Task] RecurringManager remove failed:', e);
-            return false;
-        }
-    }
-
-    async toggleActive(id: string): Promise<boolean> {
-        const existing = this.store.templates[id];
-        if (!existing) return false;
-        return this.update(id, { active: !existing.active });
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       🎯 منطق هوشمند: Most Recent Due Date
-       ═══════════════════════════════════════════════════════ */
-    private computeMostRecentDueDate(
-        template: RecurringTemplate,
-        nowTs: number
-    ): DueDateResult | null {
-        const todayStart = startOfDay(nowTs);
-
-        switch (template.recurrence) {
-            case 'daily':
-                return this.tsToDateResult(todayStart);
-
-            case 'weekly':
-                return this.computeWeeklyDueDate(template, nowTs);
-
-            case 'monthly':
-                return this.computeMonthlyDueDate(template, nowTs);
-
-            default:
-                return null;
-        }
-    }
-
-    /* ─── هفتگی ─── */
-    private computeWeeklyDueDate(
-        template: RecurringTemplate,
-        nowTs: number
-    ): DueDateResult | null {
-        const weekDays = this.resolveWeekDays(template);
-        if (weekDays.length === 0) return null;
-
-        /* ─── اگه every-day: مثل روزانه ─── */
-        if (template.weeklyMode === 'every-day' || weekDays.length === 7) {
-            return this.tsToDateResult(startOfDay(nowTs));
+        const fromNotes = this.getFromNotesSuggestions(seenTitles);
+        for (const s of fromNotes) {
+            if (suggestions.length >= MAX_SUGGESTIONS) break;
+            suggestions.push(s);
         }
 
-        const todayDate = new Date(nowTs);
-        const todayDay = todayDate.getDay();
-
-        /* ─── امروز توی لیست هست؟ ─── */
-        if (weekDays.includes(todayDay)) {
-            return this.tsToDateResult(startOfDay(nowTs));
+        const fromPattern = this.getFromPatternSuggestions(seenTitles);
+        for (const s of fromPattern) {
+            if (suggestions.length >= MAX_SUGGESTIONS) break;
+            suggestions.push(s);
         }
 
-        /* ─── نزدیک‌ترین روز قبلی ─── */
-        let minDiff = 8;
-        for (const wd of weekDays) {
-            const diff = (todayDay - wd + 7) % 7;
-            if (diff > 0 && diff < minDiff) {
-                minDiff = diff;
-            }
+        const fromOld = this.getFromOldTaskSuggestions(seenTitles);
+        for (const s of fromOld) {
+            if (suggestions.length >= MAX_SUGGESTIONS) break;
+            suggestions.push(s);
         }
 
-        if (minDiff === 8) return null;
-
-        const target = new Date(nowTs);
-        target.setDate(target.getDate() - minDiff);
-        target.setHours(0, 0, 0, 0);
-
-        return this.tsToDateResult(target.getTime());
-    }
-
-    /* ─── تبدیل weekDay قدیمی → آرایه ─── */
-    private resolveWeekDays(template: RecurringTemplate): number[] {
-        /* اگه weekDays هست، استفاده کن */
-        if (template.weekDays && template.weekDays.length > 0) {
-            return template.weekDays;
-        }
-        /* اگه weekDay قدیمی هست، تبدیل کن */
-        if (template.weekDay !== undefined) {
-            return [template.weekDay];
-        }
-        return [];
-    }
-
-    /* ─── ماهانه ─── */
-    private computeMonthlyDueDate(
-        template: RecurringTemplate,
-        nowTs: number
-    ): DueDateResult | null {
-        if (template.monthDay === undefined) return null;
-
-        const todayDate = new Date(nowTs);
-        const todayDay = todayDate.getDate();
-        const currentMonth = todayDate.getMonth();
-        const currentYear = todayDate.getFullYear();
-
-        const lastDayThisMonth = new Date(
-            currentYear,
-            currentMonth + 1,
-            0
-        ).getDate();
-
-        const targetDayThisMonth = Math.min(
-            template.monthDay,
-            lastDayThisMonth
-        );
-
-        if (todayDay >= targetDayThisMonth) {
-            const target = new Date(
-                currentYear,
-                currentMonth,
-                targetDayThisMonth
-            );
-            return this.tsToDateResult(target.getTime());
-        }
-
-        const lastDayLastMonth = new Date(
-            currentYear,
-            currentMonth,
-            0
-        ).getDate();
-
-        const targetDayLastMonth = Math.min(
-            template.monthDay,
-            lastDayLastMonth
-        );
-
-        const target = new Date(
-            currentYear,
-            currentMonth - 1,
-            targetDayLastMonth
-        );
-        return this.tsToDateResult(target.getTime());
-    }
-
-    private tsToDateResult(ts: number): DueDateResult {
-        const d = new Date(ts);
-        const [jy, jm, jd] = toJalali(
-            d.getFullYear(),
-            d.getMonth() + 1,
-            d.getDate()
-        );
-        const [gy, gm, gd] = toGregorian(jy, jm, jd);
-
-        return {
-            jalali: `${jy}/${pad(jm)}/${pad(jd)}`,
-            gregorian: `${gy}-${pad(gm)}-${pad(gd)}`,
-            ts,
-        };
-    }
-
-    private hasInstanceInCycle(
-        templateId: string,
-        cycleStartTs: number
-    ): boolean {
-        const allTasks = this.desktopStore.getAll();
-
-        for (const task of allTasks) {
-            if (task.from_recurring !== templateId) continue;
-            if (task.created_ts >= cycleStartTs) return true;
-        }
-        return false;
-    }
-
-    /* ═══════════════════════════════════════════════════════
-       ساجست‌های امروز
-       ═══════════════════════════════════════════════════════ */
-    getTodaysSuggestions(): RecurringSuggestion[] {
-        const nowTs = Date.now();
-        const suggestions: RecurringSuggestion[] = [];
-
-        for (const template of this.getActive()) {
-            if (template.start_date_ts > startOfDay(nowTs)) continue;
-
-            const dueDate = this.computeMostRecentDueDate(template, nowTs);
-            if (!dueDate) continue;
-
-            if (this.hasInstanceInCycle(template.id, dueDate.ts)) continue;
-
-            suggestions.push({
-                template,
-                instance_date_jalali: dueDate.jalali,
-                instance_date_gregorian: dueDate.gregorian,
-                instance_date_ts: dueDate.ts,
-            });
+        const random = this.getRandomPickSuggestions(seenTitles);
+        for (const s of random) {
+            if (suggestions.length >= MAX_SUGGESTIONS) break;
+            suggestions.push(s);
         }
 
         return suggestions;
     }
 
     /* ═══════════════════════════════════════════════════════
-       ساخت instance
+       ۱️⃣ from_notes — تسک‌های نوت که هنوز به Desktop نیومدن
        ═══════════════════════════════════════════════════════ */
-    async createInstanceFromSuggestion(
-        suggestion: RecurringSuggestion
-    ): Promise<DesktopTask | null> {
-        const template = suggestion.template;
+    private getFromNotesSuggestions(seen: Set<string>): SmartSuggestion[] {
+        const result: SmartSuggestion[] = [];
 
-        const result = await this.desktopStore.createTask({
-            title: template.title,
-            description: template.description,
-            category: template.category,
-            dueDateJalali: suggestion.instance_date_jalali,
-            dueDateGregorian: suggestion.instance_date_gregorian,
-            dueDateTs: suggestion.instance_date_ts,
-        });
+        try {
+            const pendingTasks = this.taskManager.getPendingTasks();
 
-        if (result) {
-            await this.desktopStore.update(result.id, {
-                from_recurring: template.id,
-            });
-            return { ...result, from_recurring: template.id };
+            /* ─── چک: تسک توی Desktop هست یا نه؟ ─── */
+            const desktopTitles = new Set<string>();
+            for (const t of this.desktopStore.getAll()) {
+                desktopTitles.add(t.title);
+            }
+
+            const candidates = pendingTasks
+                .filter(t => !desktopTitles.has(t.title))
+                .sort((a, b) => b.created_ts - a.created_ts);
+
+            let count = 0;
+            for (const task of candidates) {
+                if (count >= MAX_FROM_NOTES) break;
+                if (seen.has(task.title)) continue;
+
+                seen.add(task.title);
+                result.push({
+                    id: `notes-${task._id}`,
+                    type: 'from_notes',
+                    title: task.title,
+                    description: task.description || '',
+                    source_file: task._source_file,
+                    source_line: task._source_line,
+                    task_id: task._id,
+                    category: task.category,
+                });
+                count++;
+            }
+        } catch (e) {
+            console.warn('[First Task] from_notes failed:', e);
         }
 
-        return null;
+        return result;
     }
 
     /* ═══════════════════════════════════════════════════════
-       کمکی
+       ۲️⃣ from_pattern — الگوی تکراری
        ═══════════════════════════════════════════════════════ */
-    getCount(): number {
-        return Object.keys(this.store.templates).length;
+    private getFromPatternSuggestions(seen: Set<string>): SmartSuggestion[] {
+        const result: SmartSuggestion[] = [];
+
+        try {
+            const cutoff = Date.now() - PATTERN_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+
+            const recentCompleted = this.desktopStore
+                .getAll()
+                .filter(t => {
+                    if (!t.completed) return false;
+                    const ts = t.completed_ts || t.created_ts;
+                    return ts >= cutoff;
+                });
+
+            const titleCount = new Map<string, { count: number; task: typeof recentCompleted[0] }>();
+            for (const t of recentCompleted) {
+                const existing = titleCount.get(t.title);
+                if (existing) {
+                    existing.count++;
+                } else {
+                    titleCount.set(t.title, { count: 1, task: t });
+                }
+            }
+
+            const patterns = Array.from(titleCount.entries())
+                .filter(([_, data]) => data.count >= PATTERN_MIN_OCCURRENCES)
+                .sort((a, b) => b[1].count - a[1].count);
+
+            for (const [title, data] of patterns) {
+                if (seen.has(title)) continue;
+
+                const alreadyPending = this.desktopStore
+                    .getPending()
+                    .some(t => t.title === title);
+                if (alreadyPending) continue;
+
+                seen.add(title);
+                result.push({
+                    id: `pattern-${title}`,
+                    type: 'from_pattern',
+                    title,
+                    description: '',
+                    pattern_count: data.count,
+                    category: data.task.category,
+                });
+                break;
+            }
+        } catch (e) {
+            console.warn('[First Task] from_pattern failed:', e);
+        }
+
+        return result;
     }
 
-    getActiveCount(): number {
-        return this.getActive().length;
+    /* ═══════════════════════════════════════════════════════
+       ۳️⃣ from_old_task — تسک قدیمی (۷+ روزه)
+       ═══════════════════════════════════════════════════════ */
+    private getFromOldTaskSuggestions(seen: Set<string>): SmartSuggestion[] {
+        const result: SmartSuggestion[] = [];
+
+        try {
+            /* ─── باید ۱۴+ روز از آخرین تغییرش گذشته باشه ─── */
+            const oldCutoff = Date.now() - OLD_TASK_DAYS * 24 * 60 * 60 * 1000;
+
+            const oldPending = this.desktopStore
+                .getPending()
+                .filter(t => {
+                    /* 🆕 زمان مؤثر = جدیدترین زمان (created یا modified) */
+                    const effectiveTs = Math.max(
+                        t.created_ts || 0,
+                        t.modified_ts || 0
+                    );
+                    /* باید قدیمی‌تر از ۱۴ روز باشه */
+                    return effectiveTs > 0 && effectiveTs <= oldCutoff;
+                })
+                .sort((a, b) => {
+                    const ta = Math.max(a.created_ts || 0, a.modified_ts || 0);
+                    const tb = Math.max(b.created_ts || 0, b.modified_ts || 0);
+                    return ta - tb;
+                });
+
+            for (const task of oldPending) {
+                if (seen.has(task.title)) continue;
+
+                seen.add(task.title);
+                result.push({
+                    id: `old-${task.id}`,
+                    type: 'from_old_task',
+                    title: task.title,
+                    description: task.description || '',
+                    task_id: task.id,
+                    last_seen_ts: task.created_ts,
+                    category: task.category,
+                });
+                break;
+            }
+        } catch (e) {
+            console.warn('[First Task] from_old_task failed:', e);
+        }
+
+        return result;
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       ۴️⃣ random_pick — 🆕 fix باگ
+       فقط تسک‌هایی که حداقل ۷ روز از آخرین تغییرشون گذشته
+       ═══════════════════════════════════════════════════════ */
+    private getRandomPickSuggestions(seen: Set<string>): SmartSuggestion[] {
+        const result: SmartSuggestion[] = [];
+
+        try {
+            /* 🆕 cut-off: ۷ روز پیش */
+            const recentCutoff = Date.now() - SKIP_RECENT_DAYS * 24 * 60 * 60 * 1000;
+
+            const candidates = this.desktopStore
+                .getPending()
+                .filter(t => {
+                    /* بدون تاریخ انجام */
+                    if (t.due_date_ts) return false;
+                    /* عنوان داشته باشه */
+                    if (t.title.length === 0) return false;
+
+                    /* 🆕 مهم‌ترین چک: آخرین تغییر باید ۷+ روز پیش باشه */
+                    const effectiveTs = Math.max(
+                        t.created_ts || 0,
+                        t.modified_ts || 0
+                    );
+                    if (effectiveTs === 0) return false;
+                    if (effectiveTs > recentCutoff) return false;
+
+                    return true;
+                });
+
+            /* ─── فیلتر تکراری‌ها ─── */
+            const unique = candidates.filter(t => !seen.has(t.title));
+            if (unique.length === 0) return result;
+
+            /* ─── انتخاب deterministic بر اساس روز ─── */
+            const daySeed = Math.floor(Date.now() / (24 * 60 * 60 * 1000));
+            const pick = unique[daySeed % unique.length];
+
+            seen.add(pick.title);
+            result.push({
+                id: `random-${pick.id}`,
+                type: 'random_pick',
+                title: pick.title,
+                description: pick.description || '',
+                task_id: pick.id,
+                category: pick.category,
+            });
+        } catch (e) {
+            console.warn('[First Task] random_pick failed:', e);
+        }
+
+        return result;
     }
 }
