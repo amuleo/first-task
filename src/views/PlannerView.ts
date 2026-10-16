@@ -1,7 +1,8 @@
 /* ════════════════════════════════════════════════════════════
-   📅 Planner — v0.3.0
-   ✅ رفع باگ layout وقتی کارت‌ها غیرفعال می‌شن
-   ✅ نمایش تسک‌های Desktop
+   📅 Planner — v0.2.1
+   ✅ شمارش با Desktop tasks
+   ✅ فیلتر نامعتبر → ریست خودکار
+   ✅ Layout درست
    ════════════════════════════════════════════════════════════ */
 
 import { ItemView, WorkspaceLeaf, setIcon } from 'obsidian';
@@ -38,6 +39,24 @@ export class PlannerView extends ItemView {
     async onClose(): Promise<void> {}
 
     refresh(): void { this.render(); }
+
+    /* 🆕 چک معتبر بودن دسته */
+    private getValidCategory(): string {
+        const cat = this.plugin.settings.plannerCategory || '';
+        if (!cat) return '';
+        if (cat === 'none') return 'none';
+
+        const categories = this.plugin.taskManager.getCategories();
+        const exists = categories.some(c => c.id === cat);
+
+        if (!exists) {
+            this.plugin.settings.plannerCategory = '';
+            this.plugin.saveSettings();
+            return '';
+        }
+
+        return cat;
+    }
 
     /* ═══════════════════════════════════════════════════════
        رندر
@@ -97,6 +116,7 @@ export class PlannerView extends ItemView {
         const lang = this.plugin.settings.language;
         const cats = this.plugin.taskManager.getCategories();
         const hasUncategorized = this.plugin.taskManager.hasTasksWithoutCategory();
+        const validCategory = this.getValidCategory();
 
         const row = parent.createDiv({ cls: 'first-task-category-row' });
         const select = row.createEl('select', { cls: 'dropdown first-task-category-select' });
@@ -118,7 +138,13 @@ export class PlannerView extends ItemView {
             select.createEl('option', { value: c.id, text: label });
         }
 
-        select.value = this.plugin.settings.plannerCategory || '';
+        select.value = validCategory;
+
+        /* 🆕 highlight فیلتر فعال */
+        if (validCategory) {
+            select.classList.add('is-filtered');
+        }
+
         select.onchange = async () => {
             this.plugin.settings.plannerCategory = select.value;
             this.plugin.settings.plannerCard = 'all';
@@ -130,17 +156,18 @@ export class PlannerView extends ItemView {
     }
 
     /* ═══════════════════════════════════════════════════════
-       کارت‌های آماری — 🆕 layout درست
+       کارت‌های آماری — با Desktop tasks
        ═══════════════════════════════════════════════════════ */
     private renderStatCards(parent: HTMLElement): void {
         const lang = this.plugin.settings.language;
-        const stats = this.plugin.taskManager.getCategoryStats(
-            this.plugin.settings.plannerCategory || ''
-        );
+        const category = this.getValidCategory();
+        const stats = this.plugin.taskManager.getCategoryStats(category);
         const activeCard = this.plugin.settings.plannerCard || 'all';
         const visibility = this.plugin.settings.plannerCards;
 
-        /* 🆕 همه کارت‌های فعال رو توی یه آرایه جمع کن */
+        /* 🆕 شمارش Desktop tasks */
+        const desktopStats = this.getDesktopStatsForCategory(category);
+
         const allCards: PlannerCard[] = [];
 
         if (visibility.past) allCards.push('past');
@@ -153,18 +180,94 @@ export class PlannerView extends ItemView {
         if (visibility.this_year) allCards.push('this_year');
         if (visibility.next_year) allCards.push('next_year');
 
-        /* 🆕 grid با auto-flow — با هر تعداد کارت */
         if (allCards.length > 0) {
             const grid = parent.createDiv({ cls: 'first-task-stats-grid first-task-stats-grid-auto' });
             for (const c of allCards) {
-                this.mkStatCard(grid, c, this.getCardLabel(c, lang), this.getCount(stats, c), activeCard);
+                const noteCount = this.getCount(stats, c);
+                const desktopCount = desktopStats[c] || 0;
+                this.mkStatCard(grid, c, this.getCardLabel(c, lang), noteCount + desktopCount, activeCard);
             }
         }
 
         /* ─── no_date و all ─── */
         const row4 = parent.createDiv({ cls: 'first-task-planner-stats-row-3' });
-        this.mkStatCard(row4, 'no_date', t(lang, 'planner_stat_no_date'), stats.no_date, activeCard);
-        this.mkStatCard(row4, 'all', t(lang, 'planner_stat_all'), stats.all, activeCard);
+        this.mkStatCard(row4, 'no_date',
+            t(lang, 'planner_stat_no_date'),
+            stats.no_date + (desktopStats['no_date'] || 0),
+            activeCard);
+        this.mkStatCard(row4, 'all',
+            t(lang, 'planner_stat_all'),
+            stats.all + (desktopStats['all'] || 0),
+            activeCard);
+    }
+
+    /* 🆕 محاسبه‌ی Desktop stats بر اساس card */
+    private getDesktopStatsForCategory(category: string): Record<string, number> {
+        const result: Record<string, number> = {};
+
+        if (!this.plugin.settings.desktop.enabled ||
+            !this.plugin.settings.desktop.showInPlanner) {
+            return result;
+        }
+
+        const desktopTasks = this.plugin.desktopStore.getByCategory(category);
+
+        const now = Date.now();
+        const todayStart = new Date(now);
+        todayStart.setHours(0, 0, 0, 0);
+        const tomorrowStart = todayStart.getTime() + 86400000;
+        const weekStart = todayStart.getTime() - 6 * 86400000;
+        const weekEnd = todayStart.getTime() + 7 * 86400000;
+        const nextWeekStart = weekEnd;
+        const nextWeekEnd = nextWeekStart + 7 * 86400000;
+
+        const todayTs = todayStart.getTime();
+
+        const countByCard = (card: string): number => {
+            switch (card) {
+                case 'past':
+                    return desktopTasks.filter(t =>
+                        t.due_date_ts > 0 && t.due_date_ts < todayTs
+                    ).length;
+                case 'today':
+                    return desktopTasks.filter(t => {
+                        if (!t.due_date_ts) return false;
+                        const d = new Date(t.due_date_ts);
+                        d.setHours(0, 0, 0, 0);
+                        return d.getTime() === todayTs;
+                    }).length;
+                case 'tomorrow':
+                    return desktopTasks.filter(t => {
+                        if (!t.due_date_ts) return false;
+                        const d = new Date(t.due_date_ts);
+                        d.setHours(0, 0, 0, 0);
+                        return d.getTime() === tomorrowStart;
+                    }).length;
+                case 'this_week':
+                    return desktopTasks.filter(t =>
+                        t.due_date_ts >= weekStart &&
+                        t.due_date_ts < weekEnd &&
+                        t.due_date_ts >= todayTs
+                    ).length;
+                case 'next_week':
+                    return desktopTasks.filter(t =>
+                        t.due_date_ts >= nextWeekStart &&
+                        t.due_date_ts < nextWeekEnd
+                    ).length;
+                case 'no_date':
+                    return desktopTasks.filter(t => !t.due_date_ts).length;
+                case 'all':
+                    return desktopTasks.length;
+                default:
+                    return 0;
+            }
+        };
+
+        for (const card of ['past', 'today', 'tomorrow', 'this_week', 'next_week', 'no_date', 'all']) {
+            result[card] = countByCard(card);
+        }
+
+        return result;
     }
 
     private getCardLabel(card: PlannerCard, lang: 'en' | 'fa'): string {
@@ -225,23 +328,20 @@ export class PlannerView extends ItemView {
     private renderTasksList(parent: HTMLElement): void {
         const lang = this.plugin.settings.language;
         const card = this.plugin.settings.plannerCard || 'all';
+        const category = this.getValidCategory();
 
         const headerRow = parent.createDiv({ cls: 'first-task-planner-tasks-header' });
         const titleSpan = headerRow.createEl('span', { cls: 'first-task-planner-tasks-title' });
         titleSpan.setText(`${t(lang, 'planner_tasks_in')} ${this.getCardLabel(card, lang)}`);
 
-        const allTasks = this.plugin.taskManager.getTasksByCategory(
-            this.plugin.settings.plannerCategory || ''
-        );
+        const allTasks = this.plugin.taskManager.getTasksByCategory(category);
         const filtered = this.plugin.taskManager.filterByCard(allTasks, card);
 
         /* 🆕 Desktop tasks */
         const desktopTasks: DesktopTask[] = [];
         if (this.plugin.settings.desktop.enabled &&
             this.plugin.settings.desktop.showInPlanner) {
-            const dt = this.plugin.desktopStore.getByCategory(
-                this.plugin.settings.plannerCategory || ''
-            );
+            const dt = this.plugin.desktopStore.getByCategory(category);
             const filteredDt = this.filterDesktopByCard(dt, card);
             desktopTasks.push(...filteredDt);
         }
@@ -287,16 +387,25 @@ export class PlannerView extends ItemView {
         const now = Date.now();
         const todayStart = new Date(now);
         todayStart.setHours(0, 0, 0, 0);
-        const tomorrowStart = todayStart.getTime() + 86400000;
+        const todayTs = todayStart.getTime();
+        const tomorrowStart = todayTs + 86400000;
+        const weekStart = todayTs - 6 * 86400000;
+        const weekEnd = todayTs + 7 * 86400000;
+        const nextWeekStart = weekEnd;
+        const nextWeekEnd = nextWeekStart + 7 * 86400000;
 
         switch (card) {
+            case 'past':
+                return tasks.filter(t =>
+                    t.due_date_ts > 0 && t.due_date_ts < todayTs
+                );
             case 'today':
                 return tasks.filter(t => {
                     const ts = t.due_date_ts;
                     if (!ts) return false;
                     const tsStart = new Date(ts);
                     tsStart.setHours(0, 0, 0, 0);
-                    return tsStart.getTime() === todayStart.getTime();
+                    return tsStart.getTime() === todayTs;
                 });
             case 'tomorrow':
                 return tasks.filter(t => {
@@ -306,6 +415,17 @@ export class PlannerView extends ItemView {
                     tsStart.setHours(0, 0, 0, 0);
                     return tsStart.getTime() === tomorrowStart;
                 });
+            case 'this_week':
+                return tasks.filter(t =>
+                    t.due_date_ts >= weekStart &&
+                    t.due_date_ts < weekEnd &&
+                    t.due_date_ts >= todayTs
+                );
+            case 'next_week':
+                return tasks.filter(t =>
+                    t.due_date_ts >= nextWeekStart &&
+                    t.due_date_ts < nextWeekEnd
+                );
             case 'no_date':
                 return tasks.filter(t => !t.due_date_ts);
             case 'all':
