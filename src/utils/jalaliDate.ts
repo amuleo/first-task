@@ -1,8 +1,6 @@
 /* ════════════════════════════════════════════════════════════
-   📅 ابزارهای تاریخ — شمسی + میلادی (v0.3.1)
-   ✅ تبدیل شمسی ↔ میلادی
-   ✅ محاسبات روز/هفته/ماه/سال
-   ✅ DST-safe startOfDay
+   📅 ابزارهای تاریخ — شمسی + میلادی (v0.2.2)
+   ✅ DST-safe startOfDay (روش درست)
    ✅ نرمال‌سازی اسلش‌های فارسی/عربی
    ✅ محدوده‌ی سال گسترده‌تر
    ════════════════════════════════════════════════════════════ */
@@ -68,7 +66,7 @@ export function getJalaliMonthDays(jy: number, jm: number): number {
     return isJalaliLeapYear(jy) ? 30 : 29;
 }
 
-/* 🆕 محدوده‌ی گسترده‌تر (۱۲۵۰ تا ۱۵۵۰) */
+/* 🆕 محدوده‌ی گسترده‌تر */
 export function isValidJalaliYear(jy: number): boolean {
     return jy >= 1250 && jy <= 1550;
 }
@@ -215,20 +213,12 @@ export function getWeekdayName(date: Date, lang: 'en' | 'fa'): string {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   🆕 نرمال‌سازی اسلش‌ها (فارسی، عربی، انگلیسی)
+   نرمال‌سازی اسلش‌ها (فارسی، عربی، انگلیسی)
    ═══════════════════════════════════════════════════════════ */
 function normalizeSlashes(input: string): string {
-    /* یو+002F: / (latin)
-       یو+0660: ... عربی
-       یو+06F0: ... فارسی
-       یو+FF0F: ／ (full-width)
-       یو+2044: ⁄ (fraction slash)
-       یو+2215: ∕ (division slash) */
     return input
         .replace(/[／⁄∕]/g, '/')
-        .replace(/[﹣－−]/g, '-')
-        .replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))
-        .replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)));
+        .replace(/[﹣－−]/g, '-');
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -247,7 +237,6 @@ export function parseDateInput(
 ): ParsedDate | null {
     if (!input) return null;
 
-    /* 🆕 نرمال‌سازی کامل: ارقام + اسلش‌ها */
     const normalized = normalizeSlashes(normalizeNumbers(input)).trim();
     if (!normalized) return null;
 
@@ -294,8 +283,8 @@ export function parseDateInput(
     }
 
     const [gy, gm, gd] = toGregorian(jy, jm, jd);
-    /* 🆕 UTC noon — DST-safe */
-    const date = new Date(Date.UTC(gy, gm - 1, gd, 12, 0, 0, 0));
+    /* local timezone — نصف‌شب محلی */
+    const date = new Date(gy, gm - 1, gd, 0, 0, 0, 0);
 
     return {
         jalali: `${jy}/${pad(jm)}/${pad(jd)}`,
@@ -305,22 +294,22 @@ export function parseDateInput(
 }
 
 /* ═══════════════════════════════════════════════════════════
-   🆕 DST-safe startOfDay
-   از UTC noon استفاده می‌کنیم و بعد local startOfDay رو حساب می‌کنیم
+   ✅ startOfDay — برمی‌گردیم به روش ساده و درست
+   setHours(0,0,0,0) توی local timezone کار می‌کنه
+   ایران DST نداره از ۱۴۰۱، پس این روش کافیه
    ═══════════════════════════════════════════════════════════ */
 
 export function startOfDay(ts: number): number {
     const d = new Date(ts);
-    /* 🆕 offset local timezone */
-    const offset = d.getTimezoneOffset();
-    const localTs = ts - offset * 60 * 1000;
-    const dayTs = Math.floor(localTs / 86400000) * 86400000;
-    return dayTs + offset * 60 * 1000;
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
 }
 
 export function startOfDaysAgo(ts: number, days: number): number {
-    const dayStart = startOfDay(ts);
-    return dayStart - days * 86400000;
+    const d = new Date(ts);
+    d.setDate(d.getDate() - days);
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
 }
 
 export function startOfYesterday(ts: number): number {
@@ -328,30 +317,33 @@ export function startOfYesterday(ts: number): number {
 }
 
 export function startOfWeek(ts: number, weekStartDay: WeekStartDay): number {
-    const dayStart = startOfDay(ts);
-    const d = new Date(dayStart);
+    const d = new Date(ts);
     const currentDay = d.getDay();
     const diff = (currentDay - weekStartDay + 7) % 7;
-    return dayStart - diff * 86400000;
+    d.setDate(d.getDate() - diff);
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
 }
 
 export function endOfWeek(ts: number, weekStartDay: WeekStartDay): number {
-    const start = startOfWeek(ts, weekStartDay);
-    return start + 7 * 86400000 - 1;
+    const d = new Date(startOfWeek(ts, weekStartDay));
+    d.setDate(d.getDate() + 6);
+    d.setHours(23, 59, 59, 999);
+    return d.getTime();
 }
 
 export function startOfGregorianMonth(ts: number): number {
     const d = new Date(ts);
-    const year = d.getFullYear();
-    const month = d.getMonth();
-    return new Date(year, month, 1, 0, 0, 0, 0).getTime();
+    d.setDate(1);
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
 }
 
 export function endOfGregorianMonth(ts: number): number {
     const d = new Date(ts);
-    const year = d.getFullYear();
-    const month = d.getMonth();
-    return new Date(year, month + 1, 0, 23, 59, 59, 999).getTime();
+    d.setMonth(d.getMonth() + 1, 0);
+    d.setHours(23, 59, 59, 999);
+    return d.getTime();
 }
 
 export function startOfJalaliMonth(ts: number): number {
@@ -371,12 +363,16 @@ export function endOfJalaliMonth(ts: number): number {
 
 export function startOfGregorianYear(ts: number): number {
     const d = new Date(ts);
-    return new Date(d.getFullYear(), 0, 1, 0, 0, 0, 0).getTime();
+    d.setMonth(0, 1);
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
 }
 
 export function endOfGregorianYear(ts: number): number {
     const d = new Date(ts);
-    return new Date(d.getFullYear(), 11, 31, 23, 59, 59, 999).getTime();
+    d.setMonth(11, 31);
+    d.setHours(23, 59, 59, 999);
+    return d.getTime();
 }
 
 export function startOfJalaliYear(ts: number): number {
@@ -448,13 +444,17 @@ export function isThisYearTs(ts: number, useJalali: boolean): boolean {
    ═══════════════════════════════════════════════════════════ */
 
 export function startOfNextWeek(ts: number, weekStartDay: WeekStartDay): number {
-    const thisWeekStart = startOfWeek(ts, weekStartDay);
-    return thisWeekStart + 7 * 86400000;
+    const d = new Date(startOfWeek(ts, weekStartDay));
+    d.setDate(d.getDate() + 7);
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
 }
 
 export function endOfNextWeek(ts: number, weekStartDay: WeekStartDay): number {
-    const start = startOfNextWeek(ts, weekStartDay);
-    return start + 7 * 86400000 - 1;
+    const d = new Date(startOfNextWeek(ts, weekStartDay));
+    d.setDate(d.getDate() + 6);
+    d.setHours(23, 59, 59, 999);
+    return d.getTime();
 }
 
 export function isNextWeekTs(ts: number, weekStartDay: WeekStartDay): boolean {
@@ -491,12 +491,18 @@ export function endOfNextJalaliMonth(ts: number): number {
 
 export function startOfNextGregorianMonth(ts: number): number {
     const d = new Date(ts);
-    return new Date(d.getFullYear(), d.getMonth() + 1, 1, 0, 0, 0, 0).getTime();
+    d.setDate(1);
+    d.setMonth(d.getMonth() + 1);
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
 }
 
 export function endOfNextGregorianMonth(ts: number): number {
     const d = new Date(ts);
-    return new Date(d.getFullYear(), d.getMonth() + 2, 0, 23, 59, 59, 999).getTime();
+    d.setDate(1);
+    d.setMonth(d.getMonth() + 2, 0);
+    d.setHours(23, 59, 59, 999);
+    return d.getTime();
 }
 
 export function isNextMonthTs(ts: number, useJalali: boolean): boolean {
@@ -528,12 +534,18 @@ export function endOfNextJalaliYear(ts: number): number {
 
 export function startOfNextGregorianYear(ts: number): number {
     const d = new Date(ts);
-    return new Date(d.getFullYear() + 1, 0, 1, 0, 0, 0, 0).getTime();
+    d.setMonth(0, 1);
+    d.setFullYear(d.getFullYear() + 1);
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
 }
 
 export function endOfNextGregorianYear(ts: number): number {
     const d = new Date(ts);
-    return new Date(d.getFullYear() + 1, 11, 31, 23, 59, 59, 999).getTime();
+    d.setMonth(11, 31);
+    d.setFullYear(d.getFullYear() + 1);
+    d.setHours(23, 59, 59, 999);
+    return d.getTime();
 }
 
 export function isNextYearTs(ts: number, useJalali: boolean): boolean {
@@ -573,7 +585,10 @@ export function getGregorianYearStart(ts: number): number {
 
 export function getGregorianPrevMonthStart(ts: number): number {
     const d = new Date(ts);
-    return new Date(d.getFullYear(), d.getMonth() - 1, 1, 0, 0, 0, 0).getTime();
+    d.setDate(1);
+    d.setMonth(d.getMonth() - 1);
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
 }
 
 /* ═══════════════════════════════════════════════════════════
