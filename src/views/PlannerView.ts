@@ -1,8 +1,8 @@
 /* ════════════════════════════════════════════════════════════
-   📅 Planner — v0.1.2
+   📅 Planner — v0.2.1
    ✅ ۹ کارت زمانی + بدون تاریخ + همه
    ✅ حالت انتخاب گروهی
-   ✅ رفع باگ "تسک های undefined"
+   ✅ 🆕 انتقال گروهی به Desktop
    ════════════════════════════════════════════════════════════ */
 
 import { ItemView, WorkspaceLeaf, setIcon } from 'obsidian';
@@ -18,8 +18,6 @@ export const VIEW_TYPE_PLANNER = 'first-task-planner';
 export class PlannerView extends ItemView {
     plugin: FirstTaskPlugin;
     private visibleCount: number = 0;
-
-    /* 🆕 حالت انتخاب گروهی */
     private selectionMode: boolean = false;
     private selectedIds: Set<string> = new Set();
 
@@ -87,7 +85,6 @@ export class PlannerView extends ItemView {
         syncBtn.setAttribute('aria-label', t(lang, 'panel_reload'));
         syncBtn.onclick = () => this.handleRescan();
 
-        /* 🆕 دکمه انتخاب */
         if (!this.selectionMode) {
             const selectBtn = actions.createEl('button', { cls: 'clickable-icon' });
             setIcon(selectBtn, 'check-square');
@@ -142,7 +139,6 @@ export class PlannerView extends ItemView {
         const activeCard = this.plugin.settings.plannerCard || 'all';
         const visibility = this.plugin.settings.plannerCards;
 
-        /* ─── ردیف ۱: گذشته، امروز، فردا ─── */
         const row1: PlannerCard[] = [];
         if (visibility.past) row1.push('past');
         if (visibility.today) row1.push('today');
@@ -154,7 +150,6 @@ export class PlannerView extends ItemView {
             }
         }
 
-        /* ─── ردیف ۲: این هفته، این ماه، امسال ─── */
         const row2: PlannerCard[] = [];
         if (visibility.this_week) row2.push('this_week');
         if (visibility.this_month) row2.push('this_month');
@@ -166,7 +161,6 @@ export class PlannerView extends ItemView {
             }
         }
 
-        /* ─── ردیف ۳: هفته آینده، ماه آینده، سال آینده 🆕 ─── */
         const row3: PlannerCard[] = [];
         if (visibility.next_week) row3.push('next_week');
         if (visibility.next_month) row3.push('next_month');
@@ -178,13 +172,11 @@ export class PlannerView extends ItemView {
             }
         }
 
-        /* ─── ردیف ۴: بدون تاریخ، همه ─── */
         const row4 = parent.createDiv({ cls: 'first-task-planner-stats-row-3' });
         this.mkStatCard(row4, 'no_date', t(lang, 'planner_stat_no_date'), stats.no_date, activeCard);
         this.mkStatCard(row4, 'all', t(lang, 'planner_stat_all'), stats.all, activeCard);
     }
 
-    /* 🆕 getCardLabel — کامل با همه‌ی کارت‌ها */
     private getCardLabel(card: PlannerCard, lang: 'en' | 'fa'): string {
         const map: Record<PlannerCard, any> = {
             past: 'planner_stat_past',
@@ -289,6 +281,7 @@ export class PlannerView extends ItemView {
         const useJalali = this.plugin.settings.useJalaliDate;
         const isSelected = this.selectedIds.has(task._id);
         const selectedClass = isSelected ? ' is-selected' : '';
+
         const card = parent.createDiv({
             cls: 'first-task-card' + (task.pinned ? ' is-pinned' : '') + selectedClass,
         });
@@ -296,7 +289,6 @@ export class PlannerView extends ItemView {
 
         const cbWrap = card.createDiv({ cls: 'first-task-card-checkbox' });
 
-        /* ─── چک‌باکس: انتخاب یا انجام ─── */
         if (this.selectionMode) {
             const selCb = cbWrap.createEl('input', { type: 'checkbox' });
             selCb.checked = isSelected;
@@ -320,7 +312,6 @@ export class PlannerView extends ItemView {
             };
         }
 
-        /* ─── بدنه ─── */
         const bodyCard = card.createDiv({ cls: 'first-task-card-body' });
 
         const titleRow = bodyCard.createDiv({ cls: 'first-task-card-title-row' });
@@ -330,7 +321,6 @@ export class PlannerView extends ItemView {
         }
         titleRow.createDiv({ cls: 'first-task-card-title', text: task.title });
 
-        /* ─── متادیتا ─── */
         const meta = bodyCard.createDiv({ cls: 'first-task-card-meta' });
 
         const dateDisplay = useJalali ? task.due_date_jalali : task.due_date_gregorian;
@@ -354,7 +344,6 @@ export class PlannerView extends ItemView {
             text: ' ' + this.plugin.taskManager.getDisplayNoteName(task._source_file),
         });
 
-        /* ─── کلیک روی کارت ─── */
         bodyCard.onclick = () => {
             if (this.selectionMode) {
                 this.toggleTaskSelection(task._id);
@@ -365,30 +354,47 @@ export class PlannerView extends ItemView {
     }
 
     /* ═══════════════════════════════════════════════════════
-       🆕 نوار انتخاب
+       نوار انتخاب
        ═══════════════════════════════════════════════════════ */
     private renderSelectionBar(parent: HTMLElement): void {
         const lang = this.plugin.settings.language;
         const bar = parent.createDiv({ cls: 'first-task-selection-bar' });
 
         const countEl = bar.createDiv({ cls: 'first-task-selection-count' });
-        countEl.setText(t(lang, 'bulk_selected_count', { count: displayNumber(this.selectedIds.size, lang) }));
+        countEl.setText(t(lang, 'bulk_selected_count', {
+            count: displayNumber(this.selectedIds.size, lang),
+        }));
 
         const actions = bar.createDiv({ cls: 'first-task-selection-actions' });
 
-        const delBtn = actions.createEl('button', { cls: 'first-task-selection-btn mod-warning' });
+        /* 🆕 دکمه انتقال به Desktop */
+        const moveBtn = actions.createEl('button', {
+            cls: 'first-task-selection-btn',
+        });
+        setIcon(moveBtn.createSpan({ cls: 'first-task-selection-icon' }), 'layout-dashboard');
+        moveBtn.createSpan({ text: ' ' + t(lang, 'bulk_move_to_desktop') });
+        moveBtn.disabled = this.selectedIds.size === 0;
+        moveBtn.onclick = () => this.handleBulkMoveToDesktop();
+
+        const delBtn = actions.createEl('button', {
+            cls: 'first-task-selection-btn mod-warning',
+        });
         setIcon(delBtn.createSpan({ cls: 'first-task-selection-icon' }), 'trash-2');
         delBtn.createSpan({ text: ' ' + t(lang, 'bulk_delete') });
         delBtn.disabled = this.selectedIds.size === 0;
         delBtn.onclick = () => this.handleBulkDelete();
 
-        const editBtn = actions.createEl('button', { cls: 'first-task-selection-btn mod-cta' });
+        const editBtn = actions.createEl('button', {
+            cls: 'first-task-selection-btn mod-cta',
+        });
         setIcon(editBtn.createSpan({ cls: 'first-task-selection-icon' }), 'edit');
         editBtn.createSpan({ text: ' ' + t(lang, 'bulk_edit') });
         editBtn.disabled = this.selectedIds.size === 0;
         editBtn.onclick = () => this.handleBulkEdit();
 
-        const cancelBtn = actions.createEl('button', { cls: 'first-task-selection-btn' });
+        const cancelBtn = actions.createEl('button', {
+            cls: 'first-task-selection-btn',
+        });
         cancelBtn.setText(t(lang, 'bulk_cancel'));
         cancelBtn.onclick = () => this.exitSelectionMode();
     }
@@ -419,11 +425,14 @@ export class PlannerView extends ItemView {
         const count = this.selectedIds.size;
         if (count === 0) return;
 
-        const confirmMsg = t(lang, 'bulk_delete_confirm', { count: displayNumber(count, lang) });
+        const confirmMsg = t(lang, 'bulk_delete_confirm', {
+            count: displayNumber(count, lang),
+        });
         if (!window.confirm(confirmMsg)) return;
 
         const ids = Array.from(this.selectedIds);
         const ok = await this.plugin.taskManager.bulkDelete(ids);
+
         if (ok) {
             this.plugin.toastManager.show(t(lang, 'notice_bulk_deleted'), 'success');
             this.exitSelectionMode();
@@ -432,11 +441,57 @@ export class PlannerView extends ItemView {
 
     private handleBulkEdit(): void {
         if (this.selectedIds.size === 0) return;
-
         const ids = Array.from(this.selectedIds);
+
         new BulkEditModal(this.app, this.plugin, ids, () => {
             this.exitSelectionMode();
         }).open();
+    }
+
+    /* ─── 🆕 انتقال گروهی به Desktop ─── */
+    private async handleBulkMoveToDesktop(): Promise<void> {
+        if (this.selectedIds.size === 0) return;
+        const lang = this.plugin.settings.language;
+        const count = this.selectedIds.size;
+
+        const msg = t(lang, 'bulk_move_to_desktop_confirm', {
+            count: displayNumber(count, lang),
+        });
+        if (!window.confirm(msg)) return;
+
+        const ids = Array.from(this.selectedIds);
+
+        try {
+            const result = await this.plugin.importManager.moveTasksFromNotes(
+                ids,
+                {
+                    deleteFromNote: true,
+                    assignCategory: '',
+                }
+            );
+
+            if (result.imported > 0) {
+                this.plugin.toastManager.show(
+                    t(lang, 'notice_bulk_moved', {
+                        count: displayNumber(result.imported, lang),
+                    }),
+                    'success'
+                );
+                this.exitSelectionMode();
+                this.plugin.refreshPanel();
+            } else {
+                this.plugin.toastManager.show(
+                    lang === 'fa' ? 'انتقال ناموفق' : 'Move failed',
+                    'error'
+                );
+            }
+        } catch (e) {
+            console.warn('[First Task] Bulk move failed:', e);
+            this.plugin.toastManager.show(
+                lang === 'fa' ? 'خطا در انتقال' : 'Move error',
+                'error'
+            );
+        }
     }
 
     /* ─── Rescan ─── */
