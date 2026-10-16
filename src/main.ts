@@ -1,9 +1,8 @@
 /* ════════════════════════════════════════════════════════════
-   🚀 First Task Plugin — v0.2.1
+   🚀 First Task Plugin — v0.3.0
    ✅ Desktop panel (میز من)
    ✅ Import از نوت‌ها
-   ✅ Desktop enabled/disabled check
-   ✅ Notifier فقط بعد از initialize کامل
+   ✅ 🆕 Recurring tasks
    ════════════════════════════════════════════════════════════ */
 
 import { Plugin, WorkspaceLeaf } from 'obsidian';
@@ -18,6 +17,7 @@ import { IndexManager } from './managers/IndexManager';
 import { CategoriesManager } from './managers/CategoriesManager';
 import { DesktopStore } from './managers/DesktopStore';
 import { ImportManager } from './managers/ImportManager';
+import { RecurringManager } from './managers/RecurringManager';
 import { Notifier } from './managers/Notifier';
 import { ToastManager } from './managers/ToastManager';
 import { FirstTaskSettingsTab } from './settings/SettingsTab';
@@ -34,6 +34,7 @@ export default class FirstTaskPlugin extends Plugin {
     categoriesManager: CategoriesManager;
     desktopStore: DesktopStore;
     importManager: ImportManager;
+    recurringManager: RecurringManager;
     scanner: VaultScanner;
     extractor: TaskExtractor;
     notifier: Notifier;
@@ -55,6 +56,12 @@ export default class FirstTaskPlugin extends Plugin {
             () => this.settings.useJalaliDate
         );
 
+        /* 🆕 RecurringManager */
+        this.recurringManager = new RecurringManager(
+            this.app,
+            this.desktopStore
+        );
+
         this.taskManager = new TaskManager(
             this.app,
             this.scanner,
@@ -64,7 +71,6 @@ export default class FirstTaskPlugin extends Plugin {
             () => this.settings
         );
 
-        /* 🆕 ImportManager */
         this.importManager = new ImportManager(
             this.app,
             this.taskManager,
@@ -78,6 +84,13 @@ export default class FirstTaskPlugin extends Plugin {
             this.refreshPanel();
         }).catch((e) => {
             console.warn('[First Task] DesktopStore init failed:', e);
+        });
+
+        /* 🆕 Recurring Manager init ─── */
+        this.recurringManager.initialize().then(() => {
+            this.refreshPanel();
+        }).catch((e) => {
+            console.warn('[First Task] RecurringManager init failed:', e);
         });
 
         /* ─── TaskManager init + Notifier ─── */
@@ -130,7 +143,6 @@ export default class FirstTaskPlugin extends Plugin {
             this.activatePlannerView();
         });
 
-        /* 🆕 Desktop ribbon — فقط اگه enabled */
         if (this.settings.desktop.enabled) {
             this.addRibbonIcon('layout-dashboard', 'My Desktop', () => {
                 this.activateDesktopView();
@@ -152,6 +164,10 @@ export default class FirstTaskPlugin extends Plugin {
             }
             if (this.desktopStore) {
                 await this.desktopStore.save();
+            }
+            /* 🆕 ذخیره recurring */
+            if (this.recurringManager) {
+                await this.recurringManager.save();
             }
         } catch (e) {
             console.warn('[First Task] Failed to flush on unload:', e);
@@ -176,7 +192,6 @@ export default class FirstTaskPlugin extends Plugin {
             callback: () => this.activatePlannerView(),
         });
 
-        /* 🆕 Desktop */
         this.addCommand({
             id: 'open-desktop',
             name: 'Open Desktop',
@@ -251,11 +266,9 @@ export default class FirstTaskPlugin extends Plugin {
         if (leaf) workspace.revealLeaf(leaf);
     }
 
-    /* 🆕 Desktop — با چک enabled */
     async activateDesktopView(): Promise<void> {
         const lang = this.settings.language;
 
-        /* ─── چک enabled ─── */
         if (!this.settings.desktop.enabled) {
             this.toastManager.show(
                 t(lang, 'desktop_disabled'),
