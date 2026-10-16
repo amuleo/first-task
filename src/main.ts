@@ -1,5 +1,6 @@
 /* ════════════════════════════════════════════════════════════
-   🚀 First Task Plugin — v0.1.3
+   🚀 First Task Plugin — v0.2.0
+   ✅ Desktop panel (میز من) اضافه شد
    ✅ Notifier فقط بعد از initialize کامل شروع می‌شه
    ✅ flush روی unload
    ════════════════════════════════════════════════════════════ */
@@ -14,11 +15,13 @@ import { VaultScanner } from './managers/VaultScanner';
 import { TaskExtractor } from './managers/TaskExtractor';
 import { IndexManager } from './managers/IndexManager';
 import { CategoriesManager } from './managers/CategoriesManager';
+import { DesktopStore } from './managers/DesktopStore';
 import { Notifier } from './managers/Notifier';
 import { ToastManager } from './managers/ToastManager';
 import { FirstTaskSettingsTab } from './settings/SettingsTab';
 import { TaskPanelView, VIEW_TYPE_FIRST_TASK } from './views/TaskPanelView';
 import { PlannerView, VIEW_TYPE_PLANNER } from './views/PlannerView';
+import { DesktopView, VIEW_TYPE_DESKTOP } from './views/DesktopView';
 import { CreateTaskModal } from './views/CreateTaskModal';
 import { t } from './i18n';
 
@@ -27,6 +30,7 @@ export default class FirstTaskPlugin extends Plugin {
     taskManager: TaskManager;
     indexManager: IndexManager;
     categoriesManager: CategoriesManager;
+    desktopStore: DesktopStore;
     scanner: VaultScanner;
     extractor: TaskExtractor;
     notifier: Notifier;
@@ -42,6 +46,13 @@ export default class FirstTaskPlugin extends Plugin {
         this.categoriesManager = new CategoriesManager(this.app);
         this.scanner = new VaultScanner(this.app, () => this.settings);
         this.extractor = new TaskExtractor();
+
+        /* 🆕 Desktop Store */
+        this.desktopStore = new DesktopStore(
+            this.app,
+            () => this.settings.useJalaliDate
+        );
+
         this.taskManager = new TaskManager(
             this.app,
             this.scanner,
@@ -51,31 +62,29 @@ export default class FirstTaskPlugin extends Plugin {
             () => this.settings
         );
 
-        /* ═══════════════════════════════════════════════════
-           🆕 اول initialize، بعد Notifier
-           این ترتیب حیاتیه! اگه Notifier قبل از آماده شدن
-           TaskManager شروع کنه، cleanupOrphans با یه لیست
-           ناقص صدا زده می‌شه و متادیتای همه پاک می‌شه.
-           ═══════════════════════════════════════════════════ */
+        /* ─── راه‌اندازی Desktop Store (مستقل، سریع) ─── */
+        this.desktopStore.initialize().then(() => {
+            this.refreshPanel();
+        }).catch((e) => {
+            console.warn('[First Task] DesktopStore init failed:', e);
+        });
+
+        /* ─── راه‌اندازی TaskManager (کندتر، بعدش Notifier) ─── */
         this.taskManager
             .initialize()
             .then(() => {
                 this.refreshPanel();
 
-                /* 🆕 حالا که TaskManager آماده‌ست، Notifier رو شروع کن */
                 this.notifier = new Notifier(
                     this.app,
-                    /* onFileChanged */
                     async (file) => {
                         await this.taskManager.rescanFile(file);
                         this.refreshPanel();
                     },
-                    /* onFileDeleted */
                     (path) => {
                         this.taskManager.removeTasksForFile(path);
                         this.refreshPanel();
                     },
-                    /* onFileRenamed */
                     async (oldPath, file) => {
                         this.taskManager.removeTasksForFile(oldPath);
                         await this.taskManager.rescanFile(file);
@@ -88,6 +97,7 @@ export default class FirstTaskPlugin extends Plugin {
                 console.warn('[First Task] Initialization failed:', e);
             });
 
+        /* ─── Views ─── */
         this.registerView(
             VIEW_TYPE_FIRST_TASK,
             (leaf) => new TaskPanelView(leaf, this)
@@ -96,12 +106,21 @@ export default class FirstTaskPlugin extends Plugin {
             VIEW_TYPE_PLANNER,
             (leaf) => new PlannerView(leaf, this)
         );
+        this.registerView(
+            VIEW_TYPE_DESKTOP,
+            (leaf) => new DesktopView(leaf, this)
+        );
 
+        /* ─── Ribbons ─── */
         this.addRibbonIcon('check-square', 'First Task', () => {
             this.activateView();
         });
         this.addRibbonIcon('calendar-days', 'Planner', () => {
             this.activatePlannerView();
+        });
+        /* 🆕 Desktop */
+        this.addRibbonIcon('layout-dashboard', 'My Desktop', () => {
+            this.activateDesktopView();
         });
 
         this.addSettingTab(new FirstTaskSettingsTab(this.app, this));
@@ -110,14 +129,16 @@ export default class FirstTaskPlugin extends Plugin {
     }
 
     async onunload(): Promise<void> {
-        /* ─── توقف Notifier ─── */
         if (this.notifier) this.notifier.stop();
 
-        /* 🆕 flush نهایی — ذخیره‌ی همه چیز قبل از بستن */
         try {
             if (this.indexManager) {
                 await this.indexManager.saveIndex();
                 await this.indexManager.saveFileCache();
+            }
+            /* 🆕 ذخیره Desktop */
+            if (this.desktopStore) {
+                await this.desktopStore.save();
             }
         } catch (e) {
             console.warn('[First Task] Failed to flush on unload:', e);
@@ -127,7 +148,7 @@ export default class FirstTaskPlugin extends Plugin {
     }
 
     /* ═══════════════════════════════════════════════════════
-       کامندها
+       Commands
        ═══════════════════════════════════════════════════════ */
     registerCommands(): void {
         this.addCommand({
@@ -140,6 +161,13 @@ export default class FirstTaskPlugin extends Plugin {
             id: 'open-planner',
             name: 'Open planner',
             callback: () => this.activatePlannerView(),
+        });
+
+        /* 🆕 Desktop */
+        this.addCommand({
+            id: 'open-desktop',
+            name: 'Open Desktop',
+            callback: () => this.activateDesktopView(),
         });
 
         this.addCommand({
@@ -174,7 +202,7 @@ export default class FirstTaskPlugin extends Plugin {
     }
 
     /* ═══════════════════════════════════════════════════════
-       باز کردن پنل‌ها
+       Activate Views
        ═══════════════════════════════════════════════════════ */
     async activateView(): Promise<void> {
         const { workspace } = this.app;
@@ -210,37 +238,51 @@ export default class FirstTaskPlugin extends Plugin {
         if (leaf) workspace.revealLeaf(leaf);
     }
 
+    /* 🆕 Desktop */
+    async activateDesktopView(): Promise<void> {
+        const { workspace } = this.app;
+        let leaf: WorkspaceLeaf | null = null;
+
+        const leaves = workspace.getLeavesOfType(VIEW_TYPE_DESKTOP);
+        if (leaves.length > 0) {
+            leaf = leaves[0];
+        } else {
+            leaf = workspace.getRightLeaf(false);
+            await leaf?.setViewState({
+                type: VIEW_TYPE_DESKTOP,
+                active: true,
+            });
+        }
+        if (leaf) workspace.revealLeaf(leaf);
+    }
+
     /* ═══════════════════════════════════════════════════════
-       رفرش همه پنل‌ها
+       Refresh Panels
        ═══════════════════════════════════════════════════════ */
     refreshPanel(): void {
-        const mainLeaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_FIRST_TASK);
-        for (const leaf of mainLeaves) {
-            const view = leaf.view as any;
-            if (view && typeof view.refresh === 'function') {
-                try {
-                    view.refresh();
-                } catch (e) {
-                    console.warn('[First Task] Main panel refresh failed:', e);
-                }
-            }
-        }
+        const views = [
+            VIEW_TYPE_FIRST_TASK,
+            VIEW_TYPE_PLANNER,
+            VIEW_TYPE_DESKTOP,
+        ];
 
-        const plannerLeaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_PLANNER);
-        for (const leaf of plannerLeaves) {
-            const view = leaf.view as any;
-            if (view && typeof view.refresh === 'function') {
-                try {
-                    view.refresh();
-                } catch (e) {
-                    console.warn('[First Task] Planner refresh failed:', e);
+        for (const viewType of views) {
+            const leaves = this.app.workspace.getLeavesOfType(viewType);
+            for (const leaf of leaves) {
+                const view = leaf.view as any;
+                if (view && typeof view.refresh === 'function') {
+                    try {
+                        view.refresh();
+                    } catch (e) {
+                        console.warn(`[First Task] ${viewType} refresh failed:`, e);
+                    }
                 }
             }
         }
     }
 
     /* ═══════════════════════════════════════════════════════
-       تنظیمات
+       Settings
        ═══════════════════════════════════════════════════════ */
     async loadSettings(): Promise<void> {
         try {
@@ -256,6 +298,12 @@ export default class FirstTaskPlugin extends Plugin {
                 {},
                 DEFAULT_SETTINGS.plannerCards,
                 data?.plannerCards || {}
+            );
+            /* 🆕 Desktop */
+            this.settings.desktop = Object.assign(
+                {},
+                DEFAULT_SETTINGS.desktop,
+                data?.desktop || {}
             );
         } catch (e) {
             console.debug('[First Task] No settings file, using defaults');
