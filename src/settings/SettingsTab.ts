@@ -1,7 +1,7 @@
 /* ════════════════════════════════════════════════════════════
-   ⚙️ تب تنظیمات — v0.2.2
-   ✅ حفظ دقیق موقعیت اسکرول
-   ✅ Debounced re-render
+   ⚙️ تب تنظیمات — v0.2.3
+   ✅ حفظ دقیق موقعیت اسکرول با minHeight موقت
+   ✅ scrollTo برای بازگردانی مطمئن
    ════════════════════════════════════════════════════════════ */
 
 import { App, PluginSettingTab, Setting, setIcon } from 'obsidian';
@@ -55,13 +55,21 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
     display(): void {
         const { containerEl } = this;
 
-        /* 🆕 ذخیره‌ی موقعیت اسکرول (فقط اگه render اول نباشه) */
+        /* 🆕 ذخیره‌ی موقعیت اسکرول */
         const scrollParent = this.getScrollParent(containerEl);
         const savedScroll = scrollParent?.scrollTop ?? 0;
         const shouldRestoreScroll = !this.isFirstRender && savedScroll > 0;
 
+        /* 🆕 ذخیره‌ی ارتفاع قبلی */
+        const prevHeight = shouldRestoreScroll ? containerEl.offsetHeight : 0;
+
         containerEl.empty();
         containerEl.addClass('first-task-settings');
+
+        /* 🆕 ست کردن minHeight موقت برای جلوگیری از پرش */
+        if (shouldRestoreScroll && prevHeight > 0) {
+            containerEl.style.minHeight = prevHeight + 'px';
+        }
 
         const lang = this.plugin.settings.language;
         applyDirection(containerEl, lang);
@@ -405,22 +413,33 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
                     }));
         }
 
-        /* 🆕 بازگرداندن موقعیت اسکرول — دقیق‌تر */
+        /* 🆕 بازگرداندن موقعیت اسکرول */
         this.isFirstRender = false;
 
         if (shouldRestoreScroll && scrollParent) {
-            /* ─── سه بار تلاش کن تا مطمئن بشیم layout آماده‌ست ─── */
+            /* sync restoration */
+            scrollParent.scrollTop = savedScroll;
+
             const restore = () => {
                 if (scrollParent.isConnected) {
-                    scrollParent.scrollTop = savedScroll;
+                    scrollParent.scrollTo({
+                        top: savedScroll,
+                        behavior: 'instant' as ScrollBehavior,
+                    });
                 }
             };
 
             requestAnimationFrame(restore);
             requestAnimationFrame(() => requestAnimationFrame(restore));
-            setTimeout(restore, 10);
-            setTimeout(restore, 30);
-            setTimeout(restore, 80);
+            setTimeout(restore, 0);
+            setTimeout(restore, 16);
+            setTimeout(restore, 50);
+            setTimeout(restore, 100);
+
+            /* پاک کردن minHeight بعد از آماده شدن */
+            setTimeout(() => {
+                containerEl.style.minHeight = '';
+            }, 150);
         }
     }
 
