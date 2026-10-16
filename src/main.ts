@@ -1,7 +1,7 @@
 /* ════════════════════════════════════════════════════════════
-   🚀 First Task Plugin — v0.4.0
-   ✅ Desktop + Import + Recurring
-   ✅ 🆕 Smart Suggestions + Auto-Archive + Stats
+   🚀 First Task Plugin — v0.3.0
+   ✅ Flush save در unload
+   ✅ Debounced save
    ════════════════════════════════════════════════════════════ */
 
 import { Plugin, WorkspaceLeaf } from 'obsidian';
@@ -138,7 +138,7 @@ export default class FirstTaskPlugin extends Plugin {
        ═══════════════════════════════════════════════════════ */
     private async initializeManagers(): Promise<void> {
         try {
-            /* ─── ۱. Desktop Store + Stats + Archive ─── */
+            /* ─── ۱. Desktop + Stats + Archive + Recurring ─── */
             await this.desktopStore.initialize();
             await this.statsManager.initialize();
             await this.archiveManager.initialize();
@@ -174,7 +174,6 @@ export default class FirstTaskPlugin extends Plugin {
         }
     }
 
-    /* ─── Auto-Archive در startup ─── */
     private async runStartupAutoArchive(): Promise<void> {
         if (!this.settings.desktop.autoArchiveEnabled) return;
 
@@ -193,15 +192,15 @@ export default class FirstTaskPlugin extends Plugin {
     }
 
     /* ═══════════════════════════════════════════════════════
-       onunload
+       onunload — 🆕 flushSave
        ═══════════════════════════════════════════════════════ */
     async onunload(): Promise<void> {
         if (this.notifier) this.notifier.stop();
 
         try {
+            /* 🆕 flush همه saveهای debounced */
             if (this.indexManager) {
-                await this.indexManager.saveIndex();
-                await this.indexManager.saveFileCache();
+                await this.indexManager.flushSave();
             }
             if (this.desktopStore) {
                 await this.desktopStore.save();
@@ -274,7 +273,6 @@ export default class FirstTaskPlugin extends Plugin {
             },
         });
 
-        /* 🆕 Run archive manually */
         this.addCommand({
             id: 'run-archive',
             name: 'Run auto-archive now',
