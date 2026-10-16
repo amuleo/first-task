@@ -1,13 +1,7 @@
 /* ════════════════════════════════════════════════════════════
-   🖥️ Desktop View — میز من (v0.4.0)
-   ✅ پنل مستقل
-   ✅ Tabs: در انتظار / انجام شده
-   ✅ آمار (Desktop + انباشته از Stats)
-   ✅ انتخاب گروهی + Bulk Edit
-   ✅ Import از نوت‌ها
-   ✅ ساجست‌های تکرارشونده
-   ✅ 🆕 Smart Suggestions (۴ نوع)
-   ✅ 🆕 Auto-Archive در startup
+   🖥️ Desktop View — میز من (v0.2.1)
+   ✅ Persistent dismiss برای ساجست‌ها
+   ✅ Badge کوتاه «تکرارشونده»
    ════════════════════════════════════════════════════════════ */
 
 import { ItemView, WorkspaceLeaf, setIcon } from 'obsidian';
@@ -32,10 +26,13 @@ export class DesktopView extends ItemView {
     private selectedIds: Set<string> = new Set();
     private currentTab: 'pending' | 'completed' = 'pending';
 
-    /* ─── ساجست‌های کش‌شده (برای رندر سریع) ─── */
     private smartSuggestions: SmartSuggestion[] = [];
     private recurringSuggestions: RecurringSuggestion[] = [];
     private suggestionsLoading = false;
+
+    /* 🆕 Dismissهای پایدار (per session) */
+    private dismissedSuggestionIds: Set<string> = new Set();
+    private dismissedRecurringTemplateIds: Set<string> = new Set();
 
     constructor(leaf: WorkspaceLeaf, plugin: FirstTaskPlugin) {
         super(leaf);
@@ -60,28 +57,32 @@ export class DesktopView extends ItemView {
     async onClose(): Promise<void> {}
 
     refresh(): void {
-        /* ─── Refetch ساجست‌ها ─── */
         this.loadSuggestions().then(() => this.render());
     }
 
-    /* ─── بارگذاری ساجست‌ها (async) ─── */
+    /* ═══════════════════════════════════════════════════════
+       Load Suggestions
+       ═══════════════════════════════════════════════════════ */
     private async loadSuggestions(): Promise<void> {
         if (this.suggestionsLoading) return;
         this.suggestionsLoading = true;
 
         try {
-            /* ─── Recurring ─── */
             if (this.plugin.settings.desktop.recurringEnabled) {
-                this.recurringSuggestions =
-                    this.plugin.recurringManager.getTodaysSuggestions();
+                const raw = this.plugin.recurringManager.getTodaysSuggestions();
+                /* 🆕 فیلتر dismissها */
+                this.recurringSuggestions = raw.filter(
+                    s => !this.dismissedRecurringTemplateIds.has(s.template.id)
+                );
             } else {
                 this.recurringSuggestions = [];
             }
 
-            /* ─── Smart ─── */
             if (this.plugin.settings.desktop.suggestionsEnabled) {
-                this.smartSuggestions =
-                    await this.plugin.suggestionEngine.generateSuggestions();
+                const all = await this.plugin.suggestionEngine.generateSuggestions();
+                this.smartSuggestions = all.filter(
+                    s => !this.dismissedSuggestionIds.has(s.id)
+                );
             } else {
                 this.smartSuggestions = [];
             }
@@ -111,17 +112,11 @@ export class DesktopView extends ItemView {
         this.renderCategoryDropdown(contentEl);
         this.renderTabs(contentEl);
 
-        /* ─── توی تب pending: ساجست‌ها ─── */
         if (this.currentTab === 'pending') {
-            /* Recurring اول */
             this.renderRecurringSuggestions(contentEl);
-
-            /* Smart بعدش */
             this.renderSmartSuggestions(contentEl);
-
             this.renderPending(contentEl);
         } else {
-            /* تب completed: آمار انباشته */
             this.renderCompleted(contentEl);
         }
 
@@ -243,7 +238,7 @@ export class DesktopView extends ItemView {
     }
 
     /* ═══════════════════════════════════════════════════════
-       🔄 Recurring Suggestions
+       Recurring Suggestions
        ═══════════════════════════════════════════════════════ */
     private renderRecurringSuggestions(parent: HTMLElement): void {
         if (!this.plugin.settings.desktop.recurringEnabled) return;
@@ -254,7 +249,6 @@ export class DesktopView extends ItemView {
 
         const wrap = parent.createDiv({ cls: 'first-task-suggestions' });
 
-        /* ─── هدر ─── */
         const header = wrap.createDiv({ cls: 'first-task-suggestions-header' });
 
         const headerLeft = header.createDiv({ cls: 'first-task-suggestions-header-left' });
@@ -278,7 +272,6 @@ export class DesktopView extends ItemView {
         addAllBtn.createSpan({ text: ' ' + t(lang, 'recurring_add_all') });
         addAllBtn.onclick = () => this.handleAddAllRecurring();
 
-        /* ─── لیست ─── */
         const list = wrap.createDiv({ cls: 'first-task-suggestions-list' });
 
         for (const suggestion of this.recurringSuggestions) {
@@ -334,7 +327,10 @@ export class DesktopView extends ItemView {
             });
         }
 
-        const addBtn = row.createEl('button', {
+        const actions = row.createDiv({ cls: 'first-task-suggestion-actions' });
+
+        /* ─── دکمه Add ─── */
+        const addBtn = actions.createEl('button', {
             cls: 'first-task-suggestion-add-btn',
         });
         setIcon(addBtn, 'plus');
@@ -342,6 +338,17 @@ export class DesktopView extends ItemView {
         addBtn.onclick = (e) => {
             e.stopPropagation();
             this.handleAddRecurring(suggestion);
+        };
+
+        /* ─── دکمه Dismiss ─── */
+        const dismissBtn = actions.createEl('button', {
+            cls: 'first-task-suggestion-dismiss-btn',
+        });
+        setIcon(dismissBtn, 'x');
+        dismissBtn.setAttribute('aria-label', t(lang, 'smart_action_dismiss'));
+        dismissBtn.onclick = (e) => {
+            e.stopPropagation();
+            this.handleDismissRecurring(suggestion);
         };
     }
 
@@ -351,7 +358,6 @@ export class DesktopView extends ItemView {
         const result = await this.plugin.recurringManager.createInstanceFromSuggestion(suggestion);
 
         if (result) {
-            /* ثبت در آمار */
             await this.plugin.statsManager.recordCreation(result);
 
             this.plugin.toastManager.show(t(lang, 'recurring_added_one'), 'success');
@@ -389,8 +395,17 @@ export class DesktopView extends ItemView {
         }
     }
 
+    /* 🆕 dismiss پایدار برای recurring */
+    private handleDismissRecurring(suggestion: RecurringSuggestion): void {
+        this.dismissedRecurringTemplateIds.add(suggestion.template.id);
+        this.recurringSuggestions = this.recurringSuggestions.filter(
+            s => s.template.id !== suggestion.template.id
+        );
+        this.render();
+    }
+
     /* ═══════════════════════════════════════════════════════
-       💡 Smart Suggestions
+       Smart Suggestions
        ═══════════════════════════════════════════════════════ */
     private renderSmartSuggestions(parent: HTMLElement): void {
         if (!this.plugin.settings.desktop.suggestionsEnabled) return;
@@ -399,7 +414,6 @@ export class DesktopView extends ItemView {
         const lang = this.plugin.settings.language;
         const wrap = parent.createDiv({ cls: 'first-task-smart-suggestions' });
 
-        /* ─── هدر ─── */
         const header = wrap.createDiv({ cls: 'first-task-smart-header' });
 
         const headerLeft = header.createDiv({ cls: 'first-task-smart-header-left' });
@@ -416,7 +430,6 @@ export class DesktopView extends ItemView {
             text: displayNumber(this.smartSuggestions.length, lang),
         });
 
-        /* ─── لیست ─── */
         const list = wrap.createDiv({ cls: 'first-task-smart-list' });
 
         for (const suggestion of this.smartSuggestions) {
@@ -431,12 +444,10 @@ export class DesktopView extends ItemView {
         const lang = this.plugin.settings.language;
         const row = parent.createDiv({ cls: 'first-task-smart-row' });
 
-        /* ─── آیکون ─── */
         const iconWrap = row.createDiv({ cls: 'first-task-smart-icon' });
         const iconName = this.getSuggestionIcon(suggestion.type);
         setIcon(iconWrap, iconName);
 
-        /* ─── بدنه ─── */
         const body = row.createDiv({ cls: 'first-task-smart-body' });
 
         const titleRow = body.createDiv({ cls: 'first-task-smart-title' });
@@ -444,11 +455,9 @@ export class DesktopView extends ItemView {
 
         const meta = body.createDiv({ cls: 'first-task-smart-meta' });
 
-        /* ─── نوع ساجست ─── */
         const typeBadge = meta.createSpan({ cls: 'first-task-smart-type-badge' });
         typeBadge.setText(t(lang, `smart_type_${suggestion.type}` as any));
 
-        /* ─── توضیحات اضافی ─── */
         if (suggestion.type === 'from_pattern' && suggestion.pattern_count) {
             meta.createSpan({
                 cls: 'first-task-smart-extra',
@@ -466,11 +475,9 @@ export class DesktopView extends ItemView {
             });
         }
 
-        /* ─── دکمه اکشن ─── */
         const actions = row.createDiv({ cls: 'first-task-smart-actions' });
 
         if (suggestion.type === 'from_notes') {
-            /* ─── دکمه: انتقال به Desktop ─── */
             const moveBtn = actions.createEl('button', {
                 cls: 'first-task-smart-action-btn mod-cta',
             });
@@ -481,7 +488,6 @@ export class DesktopView extends ItemView {
                 this.handleSmartMoveFromNotes(suggestion);
             };
         } else if (suggestion.type === 'from_pattern') {
-            /* ─── دکمه: ایجاد الگوی تکراری ─── */
             const createBtn = actions.createEl('button', {
                 cls: 'first-task-smart-action-btn',
             });
@@ -493,7 +499,6 @@ export class DesktopView extends ItemView {
             };
         }
 
-        /* ─── دکمه Dismiss ─── */
         const dismissBtn = actions.createEl('button', {
             cls: 'first-task-smart-action-btn is-dismiss',
         });
@@ -515,13 +520,12 @@ export class DesktopView extends ItemView {
         }
     }
 
-    /* ─── Dismiss (کش موقت — بعد از refresh برمی‌گرده) ─── */
     private handleSmartDismiss(suggestion: SmartSuggestion): void {
+        this.dismissedSuggestionIds.add(suggestion.id);
         this.smartSuggestions = this.smartSuggestions.filter(s => s.id !== suggestion.id);
         this.render();
     }
 
-    /* ─── Smart: انتقال از نوت به Desktop ─── */
     private async handleSmartMoveFromNotes(suggestion: SmartSuggestion): Promise<void> {
         if (!suggestion.task_id) return;
         const lang = this.plugin.settings.language;
@@ -550,11 +554,7 @@ export class DesktopView extends ItemView {
         }
     }
 
-    /* ─── Smart: ایجاد الگو تکراری از pattern ─── */
     private handleSmartCreateRecurring(suggestion: SmartSuggestion): void {
-        /* ─── باز کردن RecurringModal با پیش‌فرض ─── */
-        /* فعلاً فقط toast نشون می‌دیم که کاربر باید از تنظیمات بسازه */
-        /* می‌تونیم توی نسخه بعد مستقیم modal رو باز کنیم */
         const lang = this.plugin.settings.language;
         this.plugin.toastManager.show(
             t(lang, 'smart_pattern_hint'),
@@ -562,12 +562,11 @@ export class DesktopView extends ItemView {
             4000
         );
 
-        /* ─── حذف از لیست ─── */
+        this.dismissedSuggestionIds.add(suggestion.id);
         this.smartSuggestions = this.smartSuggestions.filter(s => s.id !== suggestion.id);
         this.render();
     }
 
-    /* ─── آیکون نوع تکرار ─── */
     private getRecurrenceIcon(type: string): string {
         switch (type) {
             case 'daily': return 'sun';
@@ -588,7 +587,6 @@ export class DesktopView extends ItemView {
         const tasks = this.plugin.desktopStore.getByCategory(category);
 
         if (tasks.length === 0) {
-            /* اگه ساجست هست، پیام خالی نشون نده */
             const hasSuggestions =
                 (this.plugin.settings.desktop.recurringEnabled && this.recurringSuggestions.length > 0) ||
                 (this.plugin.settings.desktop.suggestionsEnabled && this.smartSuggestions.length > 0);
@@ -621,13 +619,10 @@ export class DesktopView extends ItemView {
         }
     }
 
-    /* ═══════════════════════════════════════════════════════
-       Completed + Stats
-       ═══════════════════════════════════════════════════════ */
+    /* ─── Completed + Stats ─── */
     private renderCompleted(parent: HTMLElement): void {
         const lang = this.plugin.settings.language;
 
-        /* ─── آمار Desktop (فعال) ─── */
         const stats = this.plugin.desktopStore.getStats();
         const statsGrid = parent.createDiv({ cls: 'first-task-stats-grid' });
 
@@ -643,7 +638,6 @@ export class DesktopView extends ItemView {
         mkCard(t(lang, 'desktop_stats_this_year'), stats.this_year);
         mkCard(t(lang, 'desktop_stats_total'), stats.total);
 
-        /* 🆕 آمار انباشته */
         const totalCompleted = this.plugin.statsManager.getTotalCompleted();
         const totalArchived = this.plugin.statsManager.getTotalArchived();
 
@@ -667,7 +661,6 @@ export class DesktopView extends ItemView {
             mkGlobal(t(lang, 'stats_global_total_archived'), totalArchived, 'archive');
         }
 
-        /* ─── لیست ─── */
         const body = parent.createDiv({ cls: 'first-task-body' });
         const category = this.plugin.settings.panelCategory || '';
         const tasks = this.plugin.desktopStore.getCompletedByCategory(category);
@@ -727,7 +720,6 @@ export class DesktopView extends ItemView {
                 const res = await this.plugin.desktopStore.toggleComplete(task.id);
 
                 if (res.ok) {
-                    /* 🆕 ثبت در آمار */
                     const updatedTask = this.plugin.desktopStore.getById(task.id);
                     if (updatedTask) {
                         if (res.completed) {
@@ -775,10 +767,11 @@ export class DesktopView extends ItemView {
             });
         }
 
+        /* 🆕 Badge کوتاه */
         const badgeEl = meta.createSpan({ cls: 'first-task-card-note' });
         if (task.from_recurring) {
             setIcon(badgeEl.createSpan({ cls: 'first-task-icon' }), 'repeat');
-            badgeEl.createSpan({ text: ' ' + t(lang, 'recurring_title') });
+            badgeEl.createSpan({ text: ' ' + t(lang, 'badge_recurring') });
         } else {
             setIcon(badgeEl.createSpan({ cls: 'first-task-icon' }), 'layout-dashboard');
             badgeEl.createSpan({ text: ' ' + t(lang, 'desktop_badge') });
@@ -798,7 +791,6 @@ export class DesktopView extends ItemView {
         };
     }
 
-    /* ─── Empty ─── */
     private renderEmpty(parent: HTMLElement, title: string, hint: string): void {
         const empty = parent.createDiv({ cls: 'first-task-empty' });
         empty.createEl('p', { text: title, cls: 'first-task-empty-title' });
@@ -875,7 +867,6 @@ export class DesktopView extends ItemView {
 
         const ids = Array.from(this.selectedIds);
 
-        /* 🆕 ثبت در آمار قبل از حذف */
         for (const id of ids) {
             const task = this.plugin.desktopStore.getById(id);
             if (task) {
@@ -900,10 +891,8 @@ export class DesktopView extends ItemView {
         }).open();
     }
 
-    /* ─── New Task ─── */
     private handleNewTask(): void {
         new DesktopCreateModal(this.app, this.plugin, async () => {
-            /* 🆕 ثبت در آمار */
             const latest = this.plugin.desktopStore.getPending().slice(-1)[0];
             if (latest) {
                 await this.plugin.statsManager.recordCreation(latest);
@@ -912,7 +901,6 @@ export class DesktopView extends ItemView {
         }).open();
     }
 
-    /* ─── Import ─── */
     private handleImport(): void {
         new ImportModal(this.app, this.plugin, () => this.render()).open();
     }
