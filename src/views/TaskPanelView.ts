@@ -1,8 +1,8 @@
 /* ════════════════════════════════════════════════════════════
-   📋 TaskPanel View — v0.2.1
+   📋 TaskPanel View — v0.2.0
    ✅ ۹ کارت زمانی + بدون تاریخ + همه
    ✅ حالت انتخاب گروهی
-   ✅ 🆕 انتقال گروهی به Desktop
+   ✅ انتقال گروهی به Desktop
    ════════════════════════════════════════════════════════════ */
 
 import { ItemView, WorkspaceLeaf, setIcon, TFile } from 'obsidian';
@@ -262,7 +262,7 @@ export class TaskPanelView extends ItemView {
 
         const actions = bar.createDiv({ cls: 'first-task-selection-actions' });
 
-        /* 🆕 دکمه انتقال به Desktop */
+        /* ─── دکمه انتقال به Desktop ─── */
         const moveBtn = actions.createEl('button', {
             cls: 'first-task-selection-btn',
         });
@@ -348,13 +348,12 @@ export class TaskPanelView extends ItemView {
         }).open();
     }
 
-    /* ─── 🆕 انتقال گروهی به Desktop ─── */
+    /* ─── انتقال گروهی به Desktop ─── */
     private async handleBulkMoveToDesktop(): Promise<void> {
         if (this.selectedIds.size === 0) return;
         const lang = this.plugin.settings.language;
         const count = this.selectedIds.size;
 
-        /* ─── confirm ─── */
         const msg = t(lang, 'bulk_move_to_desktop_confirm', {
             count: displayNumber(count, lang),
         });
@@ -478,7 +477,7 @@ export class TaskPanelView extends ItemView {
                     const badge = badgesRow.createSpan({
                         cls: `first-task-dynamic-badge first-task-dynamic-${c}`,
                     });
-                    badge.setText(t(lang, `category_${c}`));
+                    badge.setText(t(lang, `category_${c}` as any));
                 }
             }
         }
