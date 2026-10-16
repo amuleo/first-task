@@ -1,10 +1,9 @@
 /* ════════════════════════════════════════════════════════════
-   🔄 RecurringManager — تسک‌های تکرارشونده
+   🔄 RecurringManager — تسک‌های تکرارشونده (v0.3.0)
    ✅ فایل جدا: FirstTask/recurring.json
    ✅ ۳ نوع: روزانه / هفتگی / ماهانه
-   ✅ محاسبه‌ی ساجست برای امروز
-   ✅ ساخت instance در Desktop
-   ✅ جلوگیری از تکرار روزانه
+   ✅ منطق catch-up هوشمند (ساجست برای تاریخ گذشته)
+   ✅ جلوگیری از تکرار بر اساس created_ts
    ════════════════════════════════════════════════════════════ */
 
 import { App, normalizePath } from 'obsidian';
@@ -19,12 +18,19 @@ import { DesktopStore } from './DesktopStore';
 import { generateRecurringId } from '../utils/hash';
 import {
     startOfDay,
-    getJalaliDateFull,
-    getGregorianDateFull,
+    toJalali,
+    toGregorian,
+    pad,
 } from '../utils/jalaliDate';
 
 const FOLDER_NAME = 'FirstTask';
 const RECURRING_FILE = 'recurring.json';
+
+interface DueDateResult {
+    jalali: string;
+    gregorian: string;
+    ts: number;
+}
 
 export class RecurringManager {
     private app: App;
@@ -32,10 +38,10 @@ export class RecurringManager {
     private store: RecurringStoreFile = { ...DEFAULT_RECURRING_STORE };
 
     constructor(
-        app: App,
+        private appRef: App,
         private desktopStore: DesktopStore
     ) {
-        this.app = app;
+        this.app = appRef;
         this.filePath = normalizePath(`${FOLDER_NAME}/${RECURRING_FILE}`);
     }
 
@@ -111,7 +117,6 @@ export class RecurringManager {
        ═══════════════════════════════════════════════════════ */
     getAll(): RecurringTemplate[] {
         return Object.values(this.store.templates).sort((a, b) => {
-            /* active اول */
             if (a.active && !b.active) return -1;
             if (!a.active && b.active) return 1;
             return a.title.localeCompare(b.title, 'fa');
@@ -213,85 +218,151 @@ export class RecurringManager {
     }
 
     /* ═══════════════════════════════════════════════════════
-       🎯 محاسبه‌ی ساجست برای امروز
+       🎯 منطق هوشمند: Most Recent Due Date
+       ═══════════════════════════════════════════════════════ */
+
+    /* ─── محاسبه‌ی آخرین تاریخ سررسید ─── */
+    private computeMostRecentDueDate(
+        template: RecurringTemplate,
+        nowTs: number
+    ): DueDateResult | null {
+        const todayStart = startOfDay(nowTs);
+
+        switch (template.recurrence) {
+            /* ─── روزانه: همیشه امروز ─── */
+            case 'daily':
+                return this.tsToDateResult(todayStart);
+
+            /* ─── هفتگی: امروز یا جمعه گذشته ─── */
+            case 'weekly': {
+                if (template.weekDay === undefined) return null;
+
+                const todayDate = new Date(nowTs);
+                const todayDay = todayDate.getDay();
+                const diff = (todayDay - template.weekDay + 7) % 7;
+
+                const target = new Date(nowTs);
+                target.setDate(target.getDate() - diff);
+                target.setHours(0, 0, 0, 0);
+
+                return this.tsToDateResult(target.getTime());
+            }
+
+            /* ─── ماهانه: امروز یا ماه گذشته ─── */
+            case 'monthly': {
+                if (template.monthDay === undefined) return null;
+
+                const todayDate = new Date(nowTs);
+                const todayDay = todayDate.getDate();
+                const currentMonth = todayDate.getMonth();
+                const currentYear = todayDate.getFullYear();
+
+                /* ─── آخرین روز همین ماه ─── */
+                const lastDayThisMonth = new Date(
+                    currentYear,
+                    currentMonth + 1,
+                    0
+                ).getDate();
+
+                const targetDayThisMonth = Math.min(
+                    template.monthDay,
+                    lastDayThisMonth
+                );
+
+                if (todayDay >= targetDayThisMonth) {
+                    /* ─── همین ماه ─── */
+                    const target = new Date(
+                        currentYear,
+                        currentMonth,
+                        targetDayThisMonth
+                    );
+                    return this.tsToDateResult(target.getTime());
+                }
+
+                /* ─── ماه گذشته ─── */
+                const lastDayLastMonth = new Date(
+                    currentYear,
+                    currentMonth,
+                    0
+                ).getDate();
+
+                const targetDayLastMonth = Math.min(
+                    template.monthDay,
+                    lastDayLastMonth
+                );
+
+                const target = new Date(
+                    currentYear,
+                    currentMonth - 1,
+                    targetDayLastMonth
+                );
+                return this.tsToDateResult(target.getTime());
+            }
+
+            default:
+                return null;
+        }
+    }
+
+    /* ─── تبدیل timestamp به نتیجه ─── */
+    private tsToDateResult(ts: number): DueDateResult {
+        const d = new Date(ts);
+        const [jy, jm, jd] = toJalali(
+            d.getFullYear(),
+            d.getMonth() + 1,
+            d.getDate()
+        );
+        const [gy, gm, gd] = toGregorian(jy, jm, jd);
+
+        return {
+            jalali: `${jy}/${pad(jm)}/${pad(jd)}`,
+            gregorian: `${gy}-${pad(gm)}-${pad(gd)}`,
+            ts,
+        };
+    }
+
+    /* ─── چک: آیا تسکی از این الگو در این چرخه ساخته شده؟ ─── */
+    private hasInstanceInCycle(
+        templateId: string,
+        cycleStartTs: number
+    ): boolean {
+        const allTasks = this.desktopStore.getAll();
+
+        for (const task of allTasks) {
+            if (task.from_recurring !== templateId) continue;
+            if (task.created_ts >= cycleStartTs) return true;
+        }
+        return false;
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       🎯 ساجست‌های امروز
        ═══════════════════════════════════════════════════════ */
     getTodaysSuggestions(): RecurringSuggestion[] {
         const nowTs = Date.now();
-        const todayStart = startOfDay(nowTs);
         const suggestions: RecurringSuggestion[] = [];
 
-        const activeTemplates = this.getActive();
-
-        for (const template of activeTemplates) {
+        for (const template of this.getActive()) {
             /* ─── چک شروع ─── */
-            if (template.start_date_ts > todayStart) continue;
+            if (template.start_date_ts > startOfDay(nowTs)) continue;
 
-            /* ─── چک مطابقت با recurrence ─── */
-            if (!this.matchesToday(template, nowTs)) continue;
+            /* ─── محاسبه‌ی آخرین تاریخ سررسید ─── */
+            const dueDate = this.computeMostRecentDueDate(template, nowTs);
+            if (!dueDate) continue;
 
-            /* ─── چک تکرار: اگه instance امروز ساخته شده، رد کن ─── */
-            if (this.hasInstanceToday(template.id, nowTs)) continue;
+            /* ─── چک تکرار: آیا تسکی در این چرخه ساخته شده؟ ─── */
+            if (this.hasInstanceInCycle(template.id, dueDate.ts)) continue;
 
             /* ─── ساجست ─── */
-            const now = new Date();
             suggestions.push({
                 template,
-                instance_date_jalali: getJalaliDateFull(now).split(' - ')[0],
-                instance_date_gregorian: getGregorianDateFull(now).split(' ')[0],
-                instance_date_ts: todayStart,
+                instance_date_jalali: dueDate.jalali,
+                instance_date_gregorian: dueDate.gregorian,
+                instance_date_ts: dueDate.ts,
             });
         }
 
         return suggestions;
-    }
-
-    /* ─── چک مطابقت با امروز ─── */
-    private matchesToday(template: RecurringTemplate, nowTs: number): boolean {
-        const today = new Date(nowTs);
-
-        switch (template.recurrence) {
-            case 'daily':
-                return true;
-
-            case 'weekly': {
-                if (template.weekDay === undefined) return false;
-                return today.getDay() === template.weekDay;
-            }
-
-            case 'monthly': {
-                if (template.monthDay === undefined) return false;
-
-                const todayDay = today.getDate();
-                const lastDayOfMonth = new Date(
-                    today.getFullYear(),
-                    today.getMonth() + 1,
-                    0
-                ).getDate();
-
-                /* اگه روز تعیین‌شده بزرگ‌تر از ماه باشه → آخرین روز ماه */
-                const targetDay = Math.min(template.monthDay, lastDayOfMonth);
-
-                return todayDay === targetDay;
-            }
-
-            default:
-                return false;
-        }
-    }
-
-    /* ─── چک: آیا instance امروز ساخته شده؟ ─── */
-    private hasInstanceToday(templateId: string, nowTs: number): boolean {
-        const todayStart = startOfDay(nowTs);
-        const tomorrowStart = todayStart + 24 * 60 * 60 * 1000;
-
-        const allTasks = this.desktopStore.getAll();
-        for (const task of allTasks) {
-            if (task.from_recurring !== templateId) continue;
-            if (task.created_ts >= todayStart && task.created_ts < tomorrowStart) {
-                return true;
-            }
-        }
-        return false;
     }
 
     /* ═══════════════════════════════════════════════════════
@@ -306,14 +377,12 @@ export class RecurringManager {
             title: template.title,
             description: template.description,
             category: template.category,
-            /* تاریخ انجام = امروز */
             dueDateJalali: suggestion.instance_date_jalali,
             dueDateGregorian: suggestion.instance_date_gregorian,
             dueDateTs: suggestion.instance_date_ts,
         });
 
         if (result) {
-            /* علامت‌گذاری که از recurring اومده */
             await this.desktopStore.update(result.id, {
                 from_recurring: template.id,
             });
