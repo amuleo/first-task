@@ -1,7 +1,8 @@
 /* ════════════════════════════════════════════════════════════
-   🌐 i18n — انگلیسی + فارسی (v0.2.1)
+   🌐 i18n — انگلیسی + فارسی (v0.3.0)
    ✅ Desktop keys
-   ✅ 🆕 Import keys
+   ✅ Import keys
+   ✅ 🆕 Recurring keys + weekdays
    ════════════════════════════════════════════════════════════ */
 
 import type { Language } from '../types';
@@ -80,7 +81,7 @@ const en = {
     desktop_stats_total: 'Total',
     desktop_disabled: 'Desktop is disabled in settings',
 
-    /* ─── 🆕 Import ─── */
+    /* ─── Import ─── */
     import_title: 'Import from notes',
     import_loading: 'Scanning notes...',
     import_no_tasks: 'No pending tasks found in your notes',
@@ -101,6 +102,44 @@ const en = {
     import_button: 'Import ({count})',
     import_success: 'Imported {count} task(s)',
     import_failed: 'Import failed',
+
+    /* ─── 🆕 Recurring ─── */
+    recurring_title: 'Recurring suggestions',
+    recurring_suggestion_from: 'Due',
+    recurring_suggestion_overdue: 'Overdue',
+    recurring_add_one: 'Add',
+    recurring_add_all: 'Add all',
+    recurring_added_one: 'Task added',
+    recurring_added_many: 'Added {count} task(s)',
+
+    recurring_create_title: 'New recurring task',
+    recurring_edit_title: 'Edit recurring task',
+    recurring_type: 'Recurrence',
+    recurring_type_desc: 'How often should this task repeat?',
+    recurring_type_daily: 'Daily',
+    recurring_type_weekly: 'Weekly',
+    recurring_type_monthly: 'Monthly',
+    recurring_weekday: 'Day of week',
+    recurring_weekday_desc: 'On which day should this repeat?',
+    recurring_monthday: 'Day of month',
+    recurring_monthday_desc: 'Day 1-31 (last day if month is shorter)',
+    recurring_start_date: 'Start date',
+    recurring_start_date_desc: 'When should this recurring task begin?',
+    recurring_created: 'Recurring task created',
+    recurring_updated: 'Recurring task updated',
+    recurring_deleted: 'Recurring task deleted',
+    recurring_delete_confirm: 'Delete "{title}"?',
+    recurring_activate: 'Activate',
+    recurring_deactivate: 'Pause',
+
+    /* Weekdays */
+    weekday_sunday: 'Sunday',
+    weekday_monday: 'Monday',
+    weekday_tuesday: 'Tuesday',
+    weekday_wednesday: 'Wednesday',
+    weekday_thursday: 'Thursday',
+    weekday_friday: 'Friday',
+    weekday_saturday: 'Saturday',
 
     /* ─── Create Modal ─── */
     create_title: 'New task',
@@ -202,6 +241,13 @@ const en = {
     settings_desktop_import_mode_desc: 'When moving tasks from notes to Desktop',
     settings_desktop_import_copy: 'Copy (keep in note)',
     settings_desktop_import_move: 'Move (remove from note)',
+
+    /* ─── 🆕 Recurring Settings ─── */
+    settings_recurring: 'Recurring tasks',
+    settings_recurring_enabled: 'Enable recurring tasks',
+    settings_recurring_enabled_desc: 'Show suggestions for tasks that repeat on a schedule',
+    recurring_empty: 'No recurring tasks yet',
+    recurring_add: 'Add recurring task',
 
     /* ─── Bulk operations ─── */
     bulk_select: 'Select',
@@ -329,7 +375,7 @@ const fa: typeof en = {
     desktop_stats_total: 'کل',
     desktop_disabled: 'میز من توی تنظیمات غیرفعاله',
 
-    /* ─── 🆕 Import ─── */
+    /* ─── Import ─── */
     import_title: 'افزودن از نوت‌ها',
     import_loading: 'در حال اسکن نوت‌ها...',
     import_no_tasks: 'تسک انجام‌نشده‌ای توی نوت‌ها پیدا نشد',
@@ -350,6 +396,44 @@ const fa: typeof en = {
     import_button: 'افزودن ({count})',
     import_success: '{count} تسک اضافه شد',
     import_failed: 'افزودن ناموفق',
+
+    /* ─── 🆕 تسک‌های تکرارشونده ─── */
+    recurring_title: 'تسک‌های تکرارشونده',
+    recurring_suggestion_from: 'موعد',
+    recurring_suggestion_overdue: 'عقب‌افتاده',
+    recurring_add_one: 'افزودن',
+    recurring_add_all: 'افزودن همه',
+    recurring_added_one: 'تسک اضافه شد',
+    recurring_added_many: '{count} تسک اضافه شد',
+
+    recurring_create_title: 'تسک تکرارشونده جدید',
+    recurring_edit_title: 'ویرایش تسک تکرارشونده',
+    recurring_type: 'تکرار',
+    recurring_type_desc: 'هر چند وقت یه بار تکرار بشه؟',
+    recurring_type_daily: 'روزانه',
+    recurring_type_weekly: 'هفتگی',
+    recurring_type_monthly: 'ماهانه',
+    recurring_weekday: 'روز هفته',
+    recurring_weekday_desc: 'کدوم روز هفته تکرار بشه؟',
+    recurring_monthday: 'روز ماه',
+    recurring_monthday_desc: 'از ۱ تا ۳۱ (اگه ماه کوتاه‌تر باشه، آخرین روز)',
+    recurring_start_date: 'تاریخ شروع',
+    recurring_start_date_desc: 'از چه تاریخی شروع بشه؟',
+    recurring_created: 'تسک تکرارشونده ساخته شد',
+    recurring_updated: 'تسک تکرارشونده بروزرسانی شد',
+    recurring_deleted: 'تسک تکرارشونده حذف شد',
+    recurring_delete_confirm: '«{title}» حذف بشه؟',
+    recurring_activate: 'فعال کردن',
+    recurring_deactivate: 'غیرفعال کردن',
+
+    /* روزهای هفته */
+    weekday_sunday: 'یکشنبه',
+    weekday_monday: 'دوشنبه',
+    weekday_tuesday: 'سه‌شنبه',
+    weekday_wednesday: 'چهارشنبه',
+    weekday_thursday: 'پنجشنبه',
+    weekday_friday: 'جمعه',
+    weekday_saturday: 'شنبه',
 
     /* ─── مودال ساخت ─── */
     create_title: 'تسک جدید',
@@ -451,6 +535,13 @@ const fa: typeof en = {
     settings_desktop_import_mode_desc: 'وقتی تسکی از نوت به میز منتقل می‌شه',
     settings_desktop_import_copy: 'کپی (توی نوت بمونه)',
     settings_desktop_import_move: 'انتقال (از نوت حذف بشه)',
+
+    /* ─── 🆕 تنظیمات تکرارشونده ─── */
+    settings_recurring: 'تسک‌های تکرارشونده',
+    settings_recurring_enabled: 'فعال‌سازی تسک‌های تکرارشونده',
+    settings_recurring_enabled_desc: 'نمایش پیشنهادها برای تسک‌هایی که طبق برنامه تکرار می‌شن',
+    recurring_empty: 'هنوز تسک تکرارشونده‌ای نساختی',
+    recurring_add: 'افزودن تسک تکرارشونده',
 
     /* ─── عملیات گروهی ─── */
     bulk_select: 'انتخاب',
