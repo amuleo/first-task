@@ -1,9 +1,10 @@
 /* ════════════════════════════════════════════════════════════
-   📅 ابزارهای تاریخ — شمسی + میلادی (v0.3.0)
+   📅 ابزارهای تاریخ — شمسی + میلادی (v0.3.1)
    ✅ تبدیل شمسی ↔ میلادی
    ✅ محاسبات روز/هفته/ماه/سال
-   ✅ ۳ کارت جدید (next_week, next_month, next_year)
-   ✅ 🆕 pad حالا export شده
+   ✅ DST-safe startOfDay
+   ✅ نرمال‌سازی اسلش‌های فارسی/عربی
+   ✅ محدوده‌ی سال گسترده‌تر
    ════════════════════════════════════════════════════════════ */
 
 import { normalizeNumbers } from './numberUtils';
@@ -21,7 +22,6 @@ function mod(a: number, b: number): number {
     return a - Math.trunc(a / b) * b;
 }
 
-/* ─── محاسبه‌ی سال کبیسه‌ی شمسی ─── */
 function jalCal(jy: number): { leap: number; gy: number; march: number } {
     const bl = BREAKS.length;
     const gy = jy + 621;
@@ -68,12 +68,13 @@ export function getJalaliMonthDays(jy: number, jm: number): number {
     return isJalaliLeapYear(jy) ? 30 : 29;
 }
 
+/* 🆕 محدوده‌ی گسترده‌تر (۱۲۵۰ تا ۱۵۵۰) */
 export function isValidJalaliYear(jy: number): boolean {
-    return jy >= 1300 && jy <= 1500;
+    return jy >= 1250 && jy <= 1550;
 }
 
 export function isValidGregorianYear(gy: number): boolean {
-    return gy >= 1900 && gy <= 2200;
+    return gy >= 1870 && gy <= 2200;
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -161,9 +162,6 @@ export function toGregorian(jy: number, jm: number, jd: number): [number, number
     return [gy, gm, gd];
 }
 
-/* ═══════════════════════════════════════════════════════════
-   🆕 pad — حالا export شده
-   ═══════════════════════════════════════════════════════════ */
 export function pad(n: number): string {
     return n < 10 ? `0${n}` : `${n}`;
 }
@@ -217,6 +215,23 @@ export function getWeekdayName(date: Date, lang: 'en' | 'fa'): string {
 }
 
 /* ═══════════════════════════════════════════════════════════
+   🆕 نرمال‌سازی اسلش‌ها (فارسی، عربی، انگلیسی)
+   ═══════════════════════════════════════════════════════════ */
+function normalizeSlashes(input: string): string {
+    /* یو+002F: / (latin)
+       یو+0660: ... عربی
+       یو+06F0: ... فارسی
+       یو+FF0F: ／ (full-width)
+       یو+2044: ⁄ (fraction slash)
+       یو+2215: ∕ (division slash) */
+    return input
+        .replace(/[／⁄∕]/g, '/')
+        .replace(/[﹣－−]/g, '-')
+        .replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))
+        .replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)));
+}
+
+/* ═══════════════════════════════════════════════════════════
    Parse تاریخ
    ═══════════════════════════════════════════════════════════ */
 
@@ -232,7 +247,8 @@ export function parseDateInput(
 ): ParsedDate | null {
     if (!input) return null;
 
-    const normalized = normalizeNumbers(input).trim();
+    /* 🆕 نرمال‌سازی کامل: ارقام + اسلش‌ها */
+    const normalized = normalizeSlashes(normalizeNumbers(input)).trim();
     if (!normalized) return null;
 
     let jy: number, jm: number, jd: number;
@@ -278,7 +294,8 @@ export function parseDateInput(
     }
 
     const [gy, gm, gd] = toGregorian(jy, jm, jd);
-    const date = new Date(gy, gm - 1, gd, 0, 0, 0, 0);
+    /* 🆕 UTC noon — DST-safe */
+    const date = new Date(Date.UTC(gy, gm - 1, gd, 12, 0, 0, 0));
 
     return {
         jalali: `${jy}/${pad(jm)}/${pad(jd)}`,
@@ -288,20 +305,22 @@ export function parseDateInput(
 }
 
 /* ═══════════════════════════════════════════════════════════
-   محاسبات روز/هفته/ماه/سال
+   🆕 DST-safe startOfDay
+   از UTC noon استفاده می‌کنیم و بعد local startOfDay رو حساب می‌کنیم
    ═══════════════════════════════════════════════════════════ */
 
 export function startOfDay(ts: number): number {
     const d = new Date(ts);
-    d.setHours(0, 0, 0, 0);
-    return d.getTime();
+    /* 🆕 offset local timezone */
+    const offset = d.getTimezoneOffset();
+    const localTs = ts - offset * 60 * 1000;
+    const dayTs = Math.floor(localTs / 86400000) * 86400000;
+    return dayTs + offset * 60 * 1000;
 }
 
 export function startOfDaysAgo(ts: number, days: number): number {
-    const d = new Date(ts);
-    d.setDate(d.getDate() - days);
-    d.setHours(0, 0, 0, 0);
-    return d.getTime();
+    const dayStart = startOfDay(ts);
+    return dayStart - days * 86400000;
 }
 
 export function startOfYesterday(ts: number): number {
@@ -309,34 +328,30 @@ export function startOfYesterday(ts: number): number {
 }
 
 export function startOfWeek(ts: number, weekStartDay: WeekStartDay): number {
-    const d = new Date(ts);
+    const dayStart = startOfDay(ts);
+    const d = new Date(dayStart);
     const currentDay = d.getDay();
     const diff = (currentDay - weekStartDay + 7) % 7;
-    d.setDate(d.getDate() - diff);
-    d.setHours(0, 0, 0, 0);
-    return d.getTime();
+    return dayStart - diff * 86400000;
 }
 
 export function endOfWeek(ts: number, weekStartDay: WeekStartDay): number {
     const start = startOfWeek(ts, weekStartDay);
-    const d = new Date(start);
-    d.setDate(d.getDate() + 6);
-    d.setHours(23, 59, 59, 999);
-    return d.getTime();
+    return start + 7 * 86400000 - 1;
 }
 
 export function startOfGregorianMonth(ts: number): number {
     const d = new Date(ts);
-    d.setDate(1);
-    d.setHours(0, 0, 0, 0);
-    return d.getTime();
+    const year = d.getFullYear();
+    const month = d.getMonth();
+    return new Date(year, month, 1, 0, 0, 0, 0).getTime();
 }
 
 export function endOfGregorianMonth(ts: number): number {
     const d = new Date(ts);
-    d.setMonth(d.getMonth() + 1, 0);
-    d.setHours(23, 59, 59, 999);
-    return d.getTime();
+    const year = d.getFullYear();
+    const month = d.getMonth();
+    return new Date(year, month + 1, 0, 23, 59, 59, 999).getTime();
 }
 
 export function startOfJalaliMonth(ts: number): number {
@@ -356,16 +371,12 @@ export function endOfJalaliMonth(ts: number): number {
 
 export function startOfGregorianYear(ts: number): number {
     const d = new Date(ts);
-    d.setMonth(0, 1);
-    d.setHours(0, 0, 0, 0);
-    return d.getTime();
+    return new Date(d.getFullYear(), 0, 1, 0, 0, 0, 0).getTime();
 }
 
 export function endOfGregorianYear(ts: number): number {
     const d = new Date(ts);
-    d.setMonth(11, 31);
-    d.setHours(23, 59, 59, 999);
-    return d.getTime();
+    return new Date(d.getFullYear(), 11, 31, 23, 59, 59, 999).getTime();
 }
 
 export function startOfJalaliYear(ts: number): number {
@@ -433,23 +444,17 @@ export function isThisYearTs(ts: number, useJalali: boolean): boolean {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   🆕 هفته / ماه / سال آینده
+   هفته / ماه / سال آینده
    ═══════════════════════════════════════════════════════════ */
 
 export function startOfNextWeek(ts: number, weekStartDay: WeekStartDay): number {
     const thisWeekStart = startOfWeek(ts, weekStartDay);
-    const d = new Date(thisWeekStart);
-    d.setDate(d.getDate() + 7);
-    d.setHours(0, 0, 0, 0);
-    return d.getTime();
+    return thisWeekStart + 7 * 86400000;
 }
 
 export function endOfNextWeek(ts: number, weekStartDay: WeekStartDay): number {
     const start = startOfNextWeek(ts, weekStartDay);
-    const d = new Date(start);
-    d.setDate(d.getDate() + 6);
-    d.setHours(23, 59, 59, 999);
-    return d.getTime();
+    return start + 7 * 86400000 - 1;
 }
 
 export function isNextWeekTs(ts: number, weekStartDay: WeekStartDay): boolean {
@@ -486,18 +491,12 @@ export function endOfNextJalaliMonth(ts: number): number {
 
 export function startOfNextGregorianMonth(ts: number): number {
     const d = new Date(ts);
-    d.setDate(1);
-    d.setMonth(d.getMonth() + 1);
-    d.setHours(0, 0, 0, 0);
-    return d.getTime();
+    return new Date(d.getFullYear(), d.getMonth() + 1, 1, 0, 0, 0, 0).getTime();
 }
 
 export function endOfNextGregorianMonth(ts: number): number {
     const d = new Date(ts);
-    d.setDate(1);
-    d.setMonth(d.getMonth() + 2, 0);
-    d.setHours(23, 59, 59, 999);
-    return d.getTime();
+    return new Date(d.getFullYear(), d.getMonth() + 2, 0, 23, 59, 59, 999).getTime();
 }
 
 export function isNextMonthTs(ts: number, useJalali: boolean): boolean {
@@ -529,18 +528,12 @@ export function endOfNextJalaliYear(ts: number): number {
 
 export function startOfNextGregorianYear(ts: number): number {
     const d = new Date(ts);
-    d.setMonth(0, 1);
-    d.setFullYear(d.getFullYear() + 1);
-    d.setHours(0, 0, 0, 0);
-    return d.getTime();
+    return new Date(d.getFullYear() + 1, 0, 1, 0, 0, 0, 0).getTime();
 }
 
 export function endOfNextGregorianYear(ts: number): number {
     const d = new Date(ts);
-    d.setMonth(11, 31);
-    d.setFullYear(d.getFullYear() + 1);
-    d.setHours(23, 59, 59, 999);
-    return d.getTime();
+    return new Date(d.getFullYear() + 1, 11, 31, 23, 59, 59, 999).getTime();
 }
 
 export function isNextYearTs(ts: number, useJalali: boolean): boolean {
@@ -580,10 +573,7 @@ export function getGregorianYearStart(ts: number): number {
 
 export function getGregorianPrevMonthStart(ts: number): number {
     const d = new Date(ts);
-    d.setDate(1);
-    d.setMonth(d.getMonth() - 1);
-    d.setHours(0, 0, 0, 0);
-    return d.getTime();
+    return new Date(d.getFullYear(), d.getMonth() - 1, 1, 0, 0, 0, 0).getTime();
 }
 
 /* ═══════════════════════════════════════════════════════════
