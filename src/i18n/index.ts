@@ -1,5 +1,6 @@
 /* ════════════════════════════════════════════════════════════
-   🌐 i18n — انگلیسی + فارسی (v0.1.2)
+   🌐 i18n — انگلیسی + فارسی (v0.2.0)
+   ✅ Desktop keys اضافه شد
    ════════════════════════════════════════════════════════════ */
 
 import type { Language } from '../types';
@@ -63,6 +64,20 @@ const en = {
     planner_stat_all: 'All',
     planner_tasks_in: 'Tasks in',
 
+    /* ─── 🆕 Desktop ─── */
+    desktop_title: 'My Desktop',
+    desktop_create_title: 'New Desktop task',
+    desktop_new_task: 'New task',
+    desktop_empty: 'Your desktop is empty',
+    desktop_empty_hint: 'Create a task here without a note',
+    desktop_empty_completed: 'No completed tasks yet',
+    desktop_badge: 'Desktop',
+    desktop_stats_today: 'Today',
+    desktop_stats_this_week: 'This week',
+    desktop_stats_this_month: 'This month',
+    desktop_stats_this_year: 'This year',
+    desktop_stats_total: 'Total',
+
     /* ─── Create Modal ─── */
     create_title: 'New task',
     field_title: 'Title',
@@ -101,7 +116,7 @@ const en = {
     btn_unpin: 'Unpin',
 
     /* ─── Confirm ─── */
-    confirm_delete_body: 'Delete this task? The line will be removed from the note.',
+    confirm_delete_body: 'Delete this task?',
 
     /* ─── Settings ─── */
     settings_title: 'First Task Settings',
@@ -150,6 +165,19 @@ const en = {
     settings_planner_cards_next_month: 'Next month',
     settings_planner_cards_this_year: 'This year',
     settings_planner_cards_next_year: 'Next year',
+
+    /* ─── 🆕 Desktop Settings ─── */
+    settings_desktop: 'My Desktop',
+    settings_desktop_enabled: 'Enable Desktop',
+    settings_desktop_enabled_desc: 'Show the Desktop panel for tasks without notes',
+    settings_desktop_show_in_tasks: 'Show Desktop tasks in Tasks panel',
+    settings_desktop_show_in_tasks_desc: 'Also display Desktop tasks alongside note-based tasks',
+    settings_desktop_show_in_planner: 'Show Desktop tasks in Planner',
+    settings_desktop_show_in_planner_desc: 'Include Desktop tasks in the Planner view',
+    settings_desktop_import_mode: 'Default import mode',
+    settings_desktop_import_mode_desc: 'When moving tasks from notes to Desktop',
+    settings_desktop_import_copy: 'Copy (keep in note)',
+    settings_desktop_import_move: 'Move (remove from note)',
 
     /* ─── Bulk operations ─── */
     bulk_select: 'Select',
@@ -259,6 +287,20 @@ const fa: typeof en = {
     planner_stat_all: 'همه',
     planner_tasks_in: 'تسک‌های',
 
+    /* ─── 🆕 میز من ─── */
+    desktop_title: 'میز من',
+    desktop_create_title: 'تسک جدید روی میز',
+    desktop_new_task: 'تسک جدید',
+    desktop_empty: 'میزت خالیه',
+    desktop_empty_hint: 'اینجا می‌تونی بدون نوت تسک بسازی',
+    desktop_empty_completed: 'هنوز تسکی انجام نشده',
+    desktop_badge: 'میز من',
+    desktop_stats_today: 'امروز',
+    desktop_stats_this_week: 'این هفته',
+    desktop_stats_this_month: 'این ماه',
+    desktop_stats_this_year: 'امسال',
+    desktop_stats_total: 'کل',
+
     /* ─── مودال ساخت ─── */
     create_title: 'تسک جدید',
     field_title: 'عنوان',
@@ -297,7 +339,7 @@ const fa: typeof en = {
     btn_unpin: 'برداشتن پین',
 
     /* ─── تأیید ─── */
-    confirm_delete_body: 'این تسک حذف بشه؟ خط از نوت پاک می‌شه.',
+    confirm_delete_body: 'این تسک حذف بشه؟',
 
     /* ─── تنظیمات ─── */
     settings_title: 'تنظیمات تسک اول',
@@ -346,6 +388,19 @@ const fa: typeof en = {
     settings_planner_cards_next_month: 'ماه آینده',
     settings_planner_cards_this_year: 'امسال',
     settings_planner_cards_next_year: 'سال آینده',
+
+    /* ─── 🆕 تنظیمات میز من ─── */
+    settings_desktop: 'میز من',
+    settings_desktop_enabled: 'فعال‌سازی میز من',
+    settings_desktop_enabled_desc: 'نمایش پنل میز برای تسک‌های بدون نوت',
+    settings_desktop_show_in_tasks: 'نمایش تسک‌های میز در پنل تسک‌ها',
+    settings_desktop_show_in_tasks_desc: 'تسک‌های میز کنار تسک‌های نوت‌ها هم نمایش داده بشن',
+    settings_desktop_show_in_planner: 'نمایش تسک‌های میز در پلنر',
+    settings_desktop_show_in_planner_desc: 'تسک‌های میز توی نمای پلنر هم بیان',
+    settings_desktop_import_mode: 'حالت انتقال پیش‌فرض',
+    settings_desktop_import_mode_desc: 'وقتی تسکی از نوت به میز منتقل می‌شه',
+    settings_desktop_import_copy: 'کپی (توی نوت بمونه)',
+    settings_desktop_import_move: 'انتقال (از نوت حذف بشه)',
 
     /* ─── عملیات گروهی ─── */
     bulk_select: 'انتخاب',
@@ -408,7 +463,9 @@ export function t(
     key: TranslationKey,
     params?: Record<string, string>
 ): string {
-    let text = translations[lang][key] ?? translations.en[key] ?? key;
+    const dict = (translations as any)[lang] || translations.en;
+    let text = dict[key] ?? (translations.en as any)[key] ?? key;
+
     if (params) {
         for (const [k, v] of Object.entries(params)) {
             text = text.replace(new RegExp(`\\{${k}\\}`, 'g'), v);
