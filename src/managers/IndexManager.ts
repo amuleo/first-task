@@ -1,8 +1,9 @@
 /* ════════════════════════════════════════════════════════════
-   🗂️ مدیریت ایندکس — v0.3.0
-   ✅ Debounced save برای سرعت بالا
-   ✅ Backup خودکار در صورت خرابی
-   ✅ Guard ایمنی در cleanupOrphans
+   🗂️ مدیریت ایندکس — v0.2.1
+   ✅ Debounced save برای سرعت
+   ✅ flushSave برای unload
+   ✅ Backup خودکار
+   ✅ Guard ایمنی cleanup
    ✅ Grace period برای orphanها
    ════════════════════════════════════════════════════════════ */
 
@@ -22,8 +23,6 @@ const README_FILE = 'DO-NOT-DELETE.md';
 const GITIGNORE_FILE = '.gitignore';
 
 const ORPHAN_GRACE_PERIOD_MS = 30 * 24 * 60 * 60 * 1000;
-
-/* 🆕 زمان debounce برای save */
 const SAVE_DEBOUNCE_MS = 300;
 
 const DEFAULT_INDEX: TaskIndexFile = {
@@ -68,7 +67,7 @@ export class IndexManager {
     private index: TaskIndexFile = { ...DEFAULT_INDEX };
     private fileCache: FileCacheFile = { ...DEFAULT_CACHE };
 
-    /* 🆕 Debounced save state */
+    /* Debounced save state */
     private indexSaveTimer: number | null = null;
     private indexDirty = false;
 
@@ -136,9 +135,7 @@ export class IndexManager {
                     console.warn(
                         `[First Task] Corrupted index backed up to: ${backupPath}`
                     );
-                } catch (_) {
-                    /* ignore */
-                }
+                } catch (_) { /* ignore */ }
                 this.index = { ...DEFAULT_INDEX };
                 return;
             }
@@ -154,7 +151,7 @@ export class IndexManager {
         }
     }
 
-    /* ─── Save Index — مستقیم (forced) ─── */
+    /* ─── Save Index — forced ─── */
     async saveIndex(): Promise<void> {
         try {
             this.index.last_updated = Date.now();
@@ -166,12 +163,10 @@ export class IndexManager {
         }
     }
 
-    /* 🆕 Save Index — debounced */
+    /* ─── Save Index — debounced ─── */
     private scheduleIndexSave(): void {
         this.indexDirty = true;
-
         if (this.indexSaveTimer !== null) return;
-
         this.indexSaveTimer = window.setTimeout(async () => {
             this.indexSaveTimer = null;
             if (this.indexDirty) {
@@ -180,7 +175,7 @@ export class IndexManager {
         }, SAVE_DEBOUNCE_MS);
     }
 
-    /* 🆕 Flush — برای unload */
+    /* ─── Flush همه saveهای debounced ─── */
     async flushSave(): Promise<void> {
         if (this.indexSaveTimer !== null) {
             window.clearTimeout(this.indexSaveTimer);
@@ -229,12 +224,9 @@ export class IndexManager {
         }
     }
 
-    /* 🆕 Debounced cache save */
     private scheduleCacheSave(): void {
         this.cacheDirty = true;
-
         if (this.cacheSaveTimer !== null) return;
-
         this.cacheSaveTimer = window.setTimeout(async () => {
             this.cacheSaveTimer = null;
             if (this.cacheDirty) {
@@ -244,7 +236,7 @@ export class IndexManager {
     }
 
     /* ═══════════════════════════════════════════════════════
-       گرفتن ورودی
+       خواندن entry
        ═══════════════════════════════════════════════════════ */
     getEntry(taskId: string): TaskIndexEntry {
         const existing = this.index.tasks[taskId];
@@ -261,7 +253,7 @@ export class IndexManager {
     }
 
     /* ═══════════════════════════════════════════════════════
-       آپدیت — حالا debounced
+       آپدیت — debounced
        ═══════════════════════════════════════════════════════ */
     async updateEntry(
         taskId: string,
@@ -272,7 +264,6 @@ export class IndexManager {
             ...existing,
             ...patch,
         };
-        /* 🆕 فقط schedule کن، نه save مستقیم */
         this.scheduleIndexSave();
     }
 
@@ -292,12 +283,13 @@ export class IndexManager {
     }
 
     /* ═══════════════════════════════════════════════════════
-       cleanupOrphans
+       cleanupOrphans — با guard ایمنی
        ═══════════════════════════════════════════════════════ */
     async cleanupOrphans(activeIds: Set<string>): Promise<number> {
         const totalEntries = Object.keys(this.index.tasks).length;
         const totalActive = activeIds.size;
 
+        /* Guard ایمنی */
         if (totalEntries > 5 && totalActive < totalEntries * 0.5) {
             console.warn(
                 `[First Task] Skipping cleanupOrphans: ` +
@@ -344,7 +336,6 @@ export class IndexManager {
 
     updateFileCache(filePath: string, entry: FileCacheEntry): void {
         this.fileCache.files[filePath] = entry;
-        /* 🆕 فقط schedule کن */
         this.scheduleCacheSave();
     }
 
