@@ -36,12 +36,11 @@ export class RecurringManager {
     private app: App;
     private filePath: string;
     private store: RecurringStoreFile = { ...DEFAULT_RECURRING_STORE };
+    private desktopStore: DesktopStore;
 
-    constructor(
-        private appRef: App,
-        private desktopStore: DesktopStore
-    ) {
-        this.app = appRef;
+    constructor(app: App, desktopStore: DesktopStore) {
+        this.app = app;
+        this.desktopStore = desktopStore;
         this.filePath = normalizePath(`${FOLDER_NAME}/${RECURRING_FILE}`);
     }
 
