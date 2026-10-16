@@ -1,11 +1,12 @@
 /* ════════════════════════════════════════════════════════════
-   🆔 ابزارهای هش و ID — v0.2.0
+   🆔 ابزارهای هش و ID — v0.3.0
    ✅ hashContent برای کش فایل‌ها
    ✅ generateTaskId برای تسک‌های نوت‌محور
-   ✅ 🆕 generateDesktopTaskId برای تسک‌های Desktop
+   ✅ generateDesktopTaskId برای تسک‌های Desktop
+   ✅ 🆕 generateRecurringId برای الگوهای تکرارشونده
    ════════════════════════════════════════════════════════════ */
 
-/* ─── FNV-1a hash (سریع و قابل اعتماد برای حجم پایین) ─── */
+/* ─── FNV-1a hash ─── */
 function fnv1a(input: string): string {
     let hash = 2166136261;
     for (let i = 0; i < input.length; i++) {
@@ -17,7 +18,6 @@ function fnv1a(input: string): string {
 
 /* ═══════════════════════════════════════════════════════════
    🆔 generateTaskId — برای تسک‌های نوت‌محور
-   بر اساس: مسیر فایل + عنوان + شماره تکرار
    ═══════════════════════════════════════════════════════════ */
 export function generateTaskId(
     sourceFile: string,
@@ -31,15 +31,21 @@ export function generateTaskId(
 }
 
 /* ═══════════════════════════════════════════════════════════
-   🆕 generateDesktopTaskId — برای تسک‌های Desktop
-   ID یکتا، پایدار، مستقل از محتوا
-   ─ فرمت: timestamp-base36 + random-base36
-   ─ مثال: "lq4k8f-9a3b1c2d"
+   🆔 generateDesktopTaskId — برای تسک‌های Desktop
    ═══════════════════════════════════════════════════════════ */
 export function generateDesktopTaskId(): string {
     const ts = Date.now().toString(36);
     const rand = Math.random().toString(36).substring(2, 10);
     return `${ts}-${rand}`;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   🆕 generateRecurringId — برای الگوهای تکرارشونده
+   ═══════════════════════════════════════════════════════════ */
+export function generateRecurringId(): string {
+    const ts = Date.now().toString(36);
+    const rand = Math.random().toString(36).substring(2, 10);
+    return `rec-${ts}-${rand}`;
 }
 
 /* ═══════════════════════════════════════════════════════════
