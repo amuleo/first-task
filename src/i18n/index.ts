@@ -1,7 +1,7 @@
 /* ════════════════════════════════════════════════════════════
-   🌐 i18n — انگلیسی + فارسی (v0.4.0)
-   ✅ Desktop + Import + Recurring
-   ✅ 🆕 Smart Suggestions + Archive + Global Stats
+   🌐 i18n — انگلیسی + فارسی (v0.2.1)
+   ✅ Desktop + Import + Recurring + Suggestions + Archive
+   ✅ 🆕 Weekly modes + badge_recurring
    ════════════════════════════════════════════════════════════ */
 
 import type { Language } from '../types';
@@ -12,11 +12,9 @@ import type { Language } from '../types';
 const en = {
     plugin_name: 'First Task',
 
-    /* ─── Tabs ─── */
     tab_pending: 'Tasks',
     tab_completed: 'Completed',
 
-    /* ─── Panel ─── */
     panel_title: 'Tasks',
     panel_title_completed: 'Completed tasks',
     panel_empty: 'All tasks are done!',
@@ -29,7 +27,6 @@ const en = {
     panel_no_category: 'No category',
     panel_all_categories: 'All categories',
 
-    /* ─── Stats ─── */
     stats_today: 'Today',
     stats_yesterday: 'Yesterday',
     stats_this_week: 'This week',
@@ -40,19 +37,17 @@ const en = {
     stats_global_total_completed: 'Total done',
     stats_global_total_archived: 'Archived',
 
-    /* ─── Task ─── */
     task_pending: 'Pending',
     task_done: 'Done',
     pinned_badge: 'Pinned',
+    badge_recurring: 'Recurring',
 
-    /* ─── Dynamic categories ─── */
     category_today: 'Today',
     category_tomorrow: 'Tomorrow',
     category_this_week: 'This week',
     category_this_month: 'This month',
     category_this_year: 'This year',
 
-    /* ─── Planner ─── */
     planner_title: 'Planner',
     planner_no_tasks: 'No tasks here',
     planner_stat_past: 'Past due',
@@ -68,7 +63,6 @@ const en = {
     planner_stat_all: 'All',
     planner_tasks_in: 'Tasks in',
 
-    /* ─── Desktop ─── */
     desktop_title: 'My Desktop',
     desktop_create_title: 'New Desktop task',
     desktop_new_task: 'New task',
@@ -83,7 +77,6 @@ const en = {
     desktop_stats_total: 'Total',
     desktop_disabled: 'Desktop is disabled in settings',
 
-    /* ─── Import ─── */
     import_title: 'Import from notes',
     import_loading: 'Scanning notes...',
     import_no_tasks: 'No pending tasks found in your notes',
@@ -105,7 +98,6 @@ const en = {
     import_success: 'Imported {count} task(s)',
     import_failed: 'Import failed',
 
-    /* ─── Recurring ─── */
     recurring_title: 'Recurring suggestions',
     recurring_suggestion_from: 'Due',
     recurring_suggestion_overdue: 'Overdue',
@@ -123,6 +115,15 @@ const en = {
     recurring_type_monthly: 'Monthly',
     recurring_weekday: 'Day of week',
     recurring_weekday_desc: 'On which day should this repeat?',
+    /* 🆕 Weekly mode */
+    recurring_weekly_mode: 'Weekly mode',
+    recurring_weekly_mode_desc: 'How should this repeat weekly?',
+    recurring_weekly_mode_single: 'One day per week',
+    recurring_weekly_mode_multiple: 'Multiple days',
+    recurring_weekly_mode_every_day: 'Every day',
+    recurring_weekly_mode_every_day_hint: 'This task will appear every day',
+    recurring_weekdays_pick: 'Pick days',
+    recurring_no_weekdays: 'Pick at least one day',
     recurring_monthday: 'Day of month',
     recurring_monthday_desc: 'Day 1-31 (last day if month is shorter)',
     recurring_start_date: 'Start date',
@@ -134,7 +135,6 @@ const en = {
     recurring_activate: 'Activate',
     recurring_deactivate: 'Pause',
 
-    /* Weekdays */
     weekday_sunday: 'Sunday',
     weekday_monday: 'Monday',
     weekday_tuesday: 'Tuesday',
@@ -143,7 +143,6 @@ const en = {
     weekday_friday: 'Friday',
     weekday_saturday: 'Saturday',
 
-    /* ─── 🆕 Smart Suggestions ─── */
     smart_title: 'Suggestions',
     smart_type_from_notes: 'From notes',
     smart_type_from_pattern: 'Pattern detected',
@@ -155,7 +154,6 @@ const en = {
     smart_action_create_recurring: 'Make recurring',
     smart_action_dismiss: 'Dismiss',
 
-    /* ─── Create Modal ─── */
     create_title: 'New task',
     field_title: 'Title',
     field_title_placeholder: 'What to do?',
@@ -166,7 +164,6 @@ const en = {
     field_source_file: 'Add to note',
     field_source_file_hint: 'The task will be added to this note as markdown',
 
-    /* ─── Details Modal ─── */
     details_title: 'Task details',
     details_source: 'From note',
     details_status: 'Status',
@@ -178,10 +175,8 @@ const en = {
     details_no_description: 'No description',
     details_dynamic_categories: 'Time categories',
 
-    /* ─── Edit Modal ─── */
     edit_title: 'Edit task',
 
-    /* ─── Buttons ─── */
     btn_cancel: 'Cancel',
     btn_create: 'Create',
     btn_edit: 'Edit',
@@ -192,10 +187,8 @@ const en = {
     btn_pin: 'Pin',
     btn_unpin: 'Unpin',
 
-    /* ─── Confirm ─── */
     confirm_delete_body: 'Delete this task?',
 
-    /* ─── Settings ─── */
     settings_title: 'First Task Settings',
     settings_general: 'General',
     settings_language: 'Language',
@@ -243,7 +236,6 @@ const en = {
     settings_planner_cards_this_year: 'This year',
     settings_planner_cards_next_year: 'Next year',
 
-    /* ─── Desktop Settings ─── */
     settings_desktop: 'My Desktop',
     settings_desktop_enabled: 'Enable Desktop',
     settings_desktop_enabled_desc: 'Show the Desktop panel for tasks without notes',
@@ -256,19 +248,16 @@ const en = {
     settings_desktop_import_copy: 'Copy (keep in note)',
     settings_desktop_import_move: 'Move (remove from note)',
 
-    /* ─── Recurring Settings ─── */
     settings_recurring: 'Recurring tasks',
     settings_recurring_enabled: 'Enable recurring tasks',
     settings_recurring_enabled_desc: 'Show suggestions for tasks that repeat on a schedule',
     recurring_empty: 'No recurring tasks yet',
     recurring_add: 'Add recurring task',
 
-    /* ─── 🆕 Suggestions Settings ─── */
     settings_suggestions: 'Smart suggestions',
     settings_suggestions_enabled: 'Enable smart suggestions',
     settings_suggestions_enabled_desc: 'Get smart tips from your notes, patterns, and forgotten tasks',
 
-    /* ─── 🆕 Archive Settings ─── */
     settings_archive: 'Auto-archive',
     settings_archive_enabled: 'Enable auto-archive',
     settings_archive_enabled_desc: 'Move old completed tasks to a separate archive file',
@@ -289,7 +278,6 @@ const en = {
     archive_last_run: 'Last run: {date}',
     archive_never_run: 'Never run yet',
 
-    /* ─── Bulk operations ─── */
     bulk_select: 'Select',
     bulk_cancel: 'Cancel',
     bulk_selected_count: '{count} selected',
@@ -324,7 +312,6 @@ const en = {
     notice_bulk_updated: 'Tasks updated',
     notice_bulk_moved: 'Moved {count} task(s) to Desktop',
 
-    /* ─── Notices ─── */
     notice_task_created: 'Task created',
     notice_task_updated: 'Task updated',
     notice_task_completed: 'Task marked as done',
@@ -338,7 +325,6 @@ const en = {
     notice_rescan_failed: 'Rescan failed: {error}',
     notice_invalid_date: 'Invalid date format',
 
-    /* ─── 🆕 Archive Notices ─── */
     notice_archive_success: 'Archived {count} task(s)',
     notice_archive_skipped: 'Not enough tasks to archive',
     notice_archive_none: 'No eligible tasks for archiving',
@@ -352,11 +338,9 @@ const en = {
 const fa: typeof en = {
     plugin_name: 'تسک اول',
 
-    /* ─── تب‌ها ─── */
     tab_pending: 'تسک ها',
     tab_completed: 'انجام شده',
 
-    /* ─── پنل ─── */
     panel_title: 'تسک ها',
     panel_title_completed: 'تسک های انجام شده',
     panel_empty: 'همه‌ی تسک‌ها انجام شدن!',
@@ -369,7 +353,6 @@ const fa: typeof en = {
     panel_no_category: 'بدون دسته',
     panel_all_categories: 'همه دسته‌ها',
 
-    /* ─── آمار ─── */
     stats_today: 'امروز',
     stats_yesterday: 'دیروز',
     stats_this_week: 'این هفته',
@@ -380,19 +363,17 @@ const fa: typeof en = {
     stats_global_total_completed: 'کل انجام‌شده',
     stats_global_total_archived: 'آرشیو شده',
 
-    /* ─── تسک ─── */
     task_pending: 'در انتظار',
     task_done: 'انجام شده',
     pinned_badge: 'پین شده',
+    badge_recurring: 'تکرارشونده',
 
-    /* ─── دسته‌بندی داینامیک ─── */
     category_today: 'امروز',
     category_tomorrow: 'فردا',
     category_this_week: 'این هفته',
     category_this_month: 'این ماه',
     category_this_year: 'امسال',
 
-    /* ─── پلنر ─── */
     planner_title: 'پلنر',
     planner_no_tasks: 'تسکی اینجا نیست',
     planner_stat_past: 'گذشته',
@@ -408,7 +389,6 @@ const fa: typeof en = {
     planner_stat_all: 'همه',
     planner_tasks_in: 'تسک‌های',
 
-    /* ─── میز من ─── */
     desktop_title: 'میز من',
     desktop_create_title: 'تسک جدید روی میز',
     desktop_new_task: 'تسک جدید',
@@ -423,7 +403,6 @@ const fa: typeof en = {
     desktop_stats_total: 'کل',
     desktop_disabled: 'میز من توی تنظیمات غیرفعاله',
 
-    /* ─── Import ─── */
     import_title: 'افزودن از نوت‌ها',
     import_loading: 'در حال اسکن نوت‌ها...',
     import_no_tasks: 'تسک انجام‌نشده‌ای توی نوت‌ها پیدا نشد',
@@ -445,7 +424,6 @@ const fa: typeof en = {
     import_success: '{count} تسک اضافه شد',
     import_failed: 'افزودن ناموفق',
 
-    /* ─── تسک‌های تکرارشونده ─── */
     recurring_title: 'تسک‌های تکرارشونده',
     recurring_suggestion_from: 'موعد',
     recurring_suggestion_overdue: 'عقب‌افتاده',
@@ -463,6 +441,14 @@ const fa: typeof en = {
     recurring_type_monthly: 'ماهانه',
     recurring_weekday: 'روز هفته',
     recurring_weekday_desc: 'کدوم روز هفته تکرار بشه؟',
+    recurring_weekly_mode: 'حالت هفتگی',
+    recurring_weekly_mode_desc: 'هفتگی چطور تکرار بشه؟',
+    recurring_weekly_mode_single: 'یه روز در هفته',
+    recurring_weekly_mode_multiple: 'چند روز',
+    recurring_weekly_mode_every_day: 'هر روز',
+    recurring_weekly_mode_every_day_hint: 'این تسک هر روز نمایش داده می‌شه',
+    recurring_weekdays_pick: 'روزها رو انتخاب کن',
+    recurring_no_weekdays: 'حداقل یه روز انتخاب کن',
     recurring_monthday: 'روز ماه',
     recurring_monthday_desc: 'از ۱ تا ۳۱ (اگه ماه کوتاه‌تر باشه، آخرین روز)',
     recurring_start_date: 'تاریخ شروع',
@@ -474,7 +460,6 @@ const fa: typeof en = {
     recurring_activate: 'فعال کردن',
     recurring_deactivate: 'غیرفعال کردن',
 
-    /* روزهای هفته */
     weekday_sunday: 'یکشنبه',
     weekday_monday: 'دوشنبه',
     weekday_tuesday: 'سه‌شنبه',
@@ -483,7 +468,6 @@ const fa: typeof en = {
     weekday_friday: 'جمعه',
     weekday_saturday: 'شنبه',
 
-    /* ─── 🆕 پیشنهادهای هوشمند ─── */
     smart_title: 'پیشنهادها',
     smart_type_from_notes: 'از نوت‌ها',
     smart_type_from_pattern: 'الگو شناسایی شد',
@@ -495,7 +479,6 @@ const fa: typeof en = {
     smart_action_create_recurring: 'تکرارشونده کن',
     smart_action_dismiss: 'رد کن',
 
-    /* ─── مودال ساخت ─── */
     create_title: 'تسک جدید',
     field_title: 'عنوان',
     field_title_placeholder: 'چی کار کنم؟',
@@ -506,7 +489,6 @@ const fa: typeof en = {
     field_source_file: 'افزودن به نوت',
     field_source_file_hint: 'تسک به صورت مارک‌داون به این نوت اضافه می‌شه',
 
-    /* ─── مودال جزئیات ─── */
     details_title: 'جزئیات تسک',
     details_source: 'از نوت',
     details_status: 'وضعیت',
@@ -518,10 +500,8 @@ const fa: typeof en = {
     details_no_description: 'بدون توضیحات',
     details_dynamic_categories: 'دسته‌های زمانی',
 
-    /* ─── مودال ویرایش ─── */
     edit_title: 'ویرایش تسک',
 
-    /* ─── دکمه‌ها ─── */
     btn_cancel: 'لغو',
     btn_create: 'ایجاد',
     btn_edit: 'ویرایش',
@@ -532,10 +512,8 @@ const fa: typeof en = {
     btn_pin: 'پین کردن',
     btn_unpin: 'برداشتن پین',
 
-    /* ─── تأیید ─── */
     confirm_delete_body: 'این تسک حذف بشه؟',
 
-    /* ─── تنظیمات ─── */
     settings_title: 'تنظیمات تسک اول',
     settings_general: 'عمومی',
     settings_language: 'زبان',
@@ -583,7 +561,6 @@ const fa: typeof en = {
     settings_planner_cards_this_year: 'امسال',
     settings_planner_cards_next_year: 'سال آینده',
 
-    /* ─── تنظیمات میز من ─── */
     settings_desktop: 'میز من',
     settings_desktop_enabled: 'فعال‌سازی میز من',
     settings_desktop_enabled_desc: 'نمایش پنل میز برای تسک‌های بدون نوت',
@@ -596,19 +573,16 @@ const fa: typeof en = {
     settings_desktop_import_copy: 'کپی (توی نوت بمونه)',
     settings_desktop_import_move: 'انتقال (از نوت حذف بشه)',
 
-    /* ─── تنظیمات تکرارشونده ─── */
     settings_recurring: 'تسک‌های تکرارشونده',
     settings_recurring_enabled: 'فعال‌سازی تسک‌های تکرارشونده',
     settings_recurring_enabled_desc: 'نمایش پیشنهادها برای تسک‌هایی که طبق برنامه تکرار می‌شن',
     recurring_empty: 'هنوز تسک تکرارشونده‌ای نساختی',
     recurring_add: 'افزودن تسک تکرارشونده',
 
-    /* ─── 🆕 تنظیمات پیشنهادها ─── */
     settings_suggestions: 'پیشنهادهای هوشمند',
     settings_suggestions_enabled: 'فعال‌سازی پیشنهادهای هوشمند',
     settings_suggestions_enabled_desc: 'پیشنهادهای هوشمند بر اساس نوت‌ها، الگوها و تسک‌های فراموش‌شده',
 
-    /* ─── 🆕 تنظیمات آرشیو ─── */
     settings_archive: 'آرشیو خودکار',
     settings_archive_enabled: 'فعال‌سازی آرشیو خودکار',
     settings_archive_enabled_desc: 'تسک‌های قدیمی انجام‌شده به یه فایل جدا منتقل بشن',
@@ -629,7 +603,6 @@ const fa: typeof en = {
     archive_last_run: 'آخرین اجرا: {date}',
     archive_never_run: 'هنوز اجرا نشده',
 
-    /* ─── عملیات گروهی ─── */
     bulk_select: 'انتخاب',
     bulk_cancel: 'انصراف',
     bulk_selected_count: '{count} تسک انتخاب شده',
@@ -664,7 +637,6 @@ const fa: typeof en = {
     notice_bulk_updated: 'تسک‌ها بروزرسانی شدن',
     notice_bulk_moved: '{count} تسک به میز من منتقل شد',
 
-    /* ─── اعلان‌ها ─── */
     notice_task_created: 'تسک ساخته شد',
     notice_task_updated: 'تسک بروزرسانی شد',
     notice_task_completed: 'تسک انجام شد',
@@ -678,7 +650,6 @@ const fa: typeof en = {
     notice_rescan_failed: 'اسکن ناموفق: {error}',
     notice_invalid_date: 'قالب تاریخ اشتباهه',
 
-    /* ─── 🆕 اعلان‌های آرشیو ─── */
     notice_archive_success: '{count} تسک آرشیو شد',
     notice_archive_skipped: 'به تعداد لازم نرسیده',
     notice_archive_none: 'تسک واجد شرطی برای آرشیو نیست',
