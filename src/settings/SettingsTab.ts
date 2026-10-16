@@ -1,7 +1,8 @@
 /* ════════════════════════════════════════════════════════════
-   ⚙️ تب تنظیمات — v0.2.3
-   ✅ حفظ دقیق موقعیت اسکرول با minHeight موقت
-   ✅ scrollTo برای بازگردانی مطمئن
+   ⚙️ تب تنظیمات — v0.3.0
+   ✅ 🎯 رفع کامل باگ پرش اسکرول
+   ✅ visibility toggle به‌جای rebuild
+   ✅ موبایل + دسکتاپ
    ════════════════════════════════════════════════════════════ */
 
 import { App, PluginSettingTab, Setting, setIcon } from 'obsidian';
@@ -18,30 +19,17 @@ import { displayString, displayNumber } from '../utils/numberUtils';
 export class FirstTaskSettingsTab extends PluginSettingTab {
     plugin: FirstTaskPlugin;
     private refreshTimer: number | null = null;
-    private isFirstRender = true;
+
+    /* 🆕 container های مخفی/نمایان */
+    private recurringDetailsEl: HTMLElement | null = null;
+    private archiveDetailsEl: HTMLElement | null = null;
 
     constructor(app: App, plugin: FirstTaskPlugin) {
         super(app, plugin);
         this.plugin = plugin;
     }
 
-    /* ─── پیدا کردن scroll parent ─── */
-    private getScrollParent(el: HTMLElement): HTMLElement | null {
-        let parent: HTMLElement | null = el.parentElement;
-        while (parent) {
-            const style = window.getComputedStyle(parent);
-            const overflowY = style.overflowY;
-            if (
-                (overflowY === 'auto' || overflowY === 'scroll') &&
-                parent.scrollHeight > parent.clientHeight
-            ) {
-                return parent;
-            }
-            parent = parent.parentElement;
-        }
-        return null;
-    }
-
+    /* ─── فقط برای تغییرات واقعی (زبان / add-delete الگو) ─── */
     private scheduleRefresh(): void {
         if (this.refreshTimer !== null) {
             window.clearTimeout(this.refreshTimer);
@@ -52,24 +40,23 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
         }, 50);
     }
 
+    /* ─── toggle visibility بدون rebuild ─── */
+    private updateRecurringVisibility(): void {
+        if (!this.recurringDetailsEl) return;
+        const enabled = this.plugin.settings.desktop.recurringEnabled;
+        this.recurringDetailsEl.classList.toggle('is-hidden', !enabled);
+    }
+
+    private updateArchiveVisibility(): void {
+        if (!this.archiveDetailsEl) return;
+        const enabled = this.plugin.settings.desktop.autoArchiveEnabled;
+        this.archiveDetailsEl.classList.toggle('is-hidden', !enabled);
+    }
+
     display(): void {
         const { containerEl } = this;
-
-        /* 🆕 ذخیره‌ی موقعیت اسکرول */
-        const scrollParent = this.getScrollParent(containerEl);
-        const savedScroll = scrollParent?.scrollTop ?? 0;
-        const shouldRestoreScroll = !this.isFirstRender && savedScroll > 0;
-
-        /* 🆕 ذخیره‌ی ارتفاع قبلی */
-        const prevHeight = shouldRestoreScroll ? containerEl.offsetHeight : 0;
-
         containerEl.empty();
         containerEl.addClass('first-task-settings');
-
-        /* 🆕 ست کردن minHeight موقت برای جلوگیری از پرش */
-        if (shouldRestoreScroll && prevHeight > 0) {
-            containerEl.style.minHeight = prevHeight + 'px';
-        }
 
         const lang = this.plugin.settings.language;
         applyDirection(containerEl, lang);
@@ -89,6 +76,7 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
                 dd.onChange(async (v) => {
                     this.plugin.settings.language = v as Language;
                     await this.plugin.saveSettings();
+                    /* 🆕 زبان تغییر می‌کند → rebuild لازم است */
                     this.scheduleRefresh();
                 });
             });
@@ -311,12 +299,16 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
                     this.plugin.settings.desktop.recurringEnabled = v;
                     await this.plugin.saveSettings();
                     this.plugin.refreshPanel();
-                    this.scheduleRefresh();
+                    /* 🆕 فقط visibility عوض می‌شود، نه rebuild */
+                    this.updateRecurringVisibility();
                 }));
 
-        if (this.plugin.settings.desktop.recurringEnabled) {
-            this.renderRecurringList(containerEl, lang);
-        }
+        /* 🆕 container داینامیک — همیشه ساخته می‌شود */
+        this.recurringDetailsEl = containerEl.createDiv({
+            cls: 'first-task-settings-dynamic',
+        });
+        this.renderRecurringList(this.recurringDetailsEl, lang);
+        this.updateRecurringVisibility();
 
         /* ═══════ پیشنهادهای هوشمند ═══════ */
         new Setting(containerEl)
@@ -347,104 +339,20 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
                 .onChange(async (v) => {
                     this.plugin.settings.desktop.autoArchiveEnabled = v;
                     await this.plugin.saveSettings();
-                    this.scheduleRefresh();
+                    /* 🆕 فقط visibility عوض می‌شود، نه rebuild */
+                    this.updateArchiveVisibility();
                 }));
 
-        if (this.plugin.settings.desktop.autoArchiveEnabled) {
-            new Setting(containerEl)
-                .setName(t(lang, 'settings_archive_count'))
-                .setDesc(t(lang, 'settings_archive_count_desc'))
-                .addDropdown(dd => {
-                    const options = [100, 500, 1000, 2000];
-                    for (const n of options) {
-                        dd.addOption(String(n), displayNumber(n, lang));
-                    }
-                    dd.setValue(String(this.plugin.settings.desktop.autoArchiveCount));
-                    dd.onChange(async (v) => {
-                        this.plugin.settings.desktop.autoArchiveCount = parseInt(v);
-                        await this.plugin.saveSettings();
-                    });
-                });
-
-            new Setting(containerEl)
-                .setName(t(lang, 'settings_archive_days'))
-                .setDesc(t(lang, 'settings_archive_days_desc'))
-                .addDropdown(dd => {
-                    dd.addOption('30', t(lang, 'archive_days_30'));
-                    dd.addOption('60', t(lang, 'archive_days_60'));
-                    dd.addOption('90', t(lang, 'archive_days_90'));
-                    dd.addOption('180', t(lang, 'archive_days_180'));
-                    dd.addOption('365', t(lang, 'archive_days_365'));
-                    dd.setValue(String(this.plugin.settings.desktop.autoArchiveDays));
-                    dd.onChange(async (v) => {
-                        this.plugin.settings.desktop.autoArchiveDays = parseInt(v) as 30 | 60 | 90 | 180 | 365;
-                        await this.plugin.saveSettings();
-                    });
-                });
-
-            new Setting(containerEl)
-                .setName(t(lang, 'settings_archive_mode'))
-                .setDesc(t(lang, 'settings_archive_mode_desc'))
-                .addDropdown(dd => {
-                    dd.addOption('threshold', t(lang, 'archive_mode_threshold'));
-                    dd.addOption('always', t(lang, 'archive_mode_always'));
-                    dd.setValue(this.plugin.settings.desktop.autoArchiveMode);
-                    dd.onChange(async (v) => {
-                        this.plugin.settings.desktop.autoArchiveMode = v as 'threshold' | 'always';
-                        await this.plugin.saveSettings();
-                    });
-                });
-
-            const lastTs = this.plugin.archiveManager.getLastArchiveTs();
-            const statusText = lastTs > 0
-                ? t(lang, 'archive_last_run', {
-                    date: displayString(this.formatDate(lastTs), lang),
-                })
-                : t(lang, 'archive_never_run');
-
-            new Setting(containerEl)
-                .setName(t(lang, 'archive_run_now'))
-                .setDesc(statusText)
-                .addButton(btn => btn
-                    .setButtonText(t(lang, 'archive_run_now'))
-                    .setCta()
-                    .onClick(async () => {
-                        await this.handleManualArchive();
-                    }));
-        }
-
-        /* 🆕 بازگرداندن موقعیت اسکرول */
-        this.isFirstRender = false;
-
-        if (shouldRestoreScroll && scrollParent) {
-            /* sync restoration */
-            scrollParent.scrollTop = savedScroll;
-
-            const restore = () => {
-                if (scrollParent.isConnected) {
-                    scrollParent.scrollTo({
-                        top: savedScroll,
-                        behavior: 'instant' as ScrollBehavior,
-                    });
-                }
-            };
-
-            requestAnimationFrame(restore);
-            requestAnimationFrame(() => requestAnimationFrame(restore));
-            setTimeout(restore, 0);
-            setTimeout(restore, 16);
-            setTimeout(restore, 50);
-            setTimeout(restore, 100);
-
-            /* پاک کردن minHeight بعد از آماده شدن */
-            setTimeout(() => {
-                containerEl.style.minHeight = '';
-            }, 150);
-        }
+        /* 🆕 container داینامیک — همیشه ساخته می‌شود */
+        this.archiveDetailsEl = containerEl.createDiv({
+            cls: 'first-task-settings-dynamic',
+        });
+        this.renderArchiveDetails(this.archiveDetailsEl, lang);
+        this.updateArchiveVisibility();
     }
 
     /* ═══════════════════════════════════════════════════════
-       Recurring List
+       Recurring List — داخل container
        ═══════════════════════════════════════════════════════ */
     private renderRecurringList(parent: HTMLElement, lang: Language): void {
         const templates = this.plugin.recurringManager.getAll();
@@ -561,6 +469,72 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
         };
     }
 
+    /* ═══════════════════════════════════════════════════════
+       Archive Details — داخل container
+       ═══════════════════════════════════════════════════════ */
+    private renderArchiveDetails(parent: HTMLElement, lang: Language): void {
+        new Setting(parent)
+            .setName(t(lang, 'settings_archive_count'))
+            .setDesc(t(lang, 'settings_archive_count_desc'))
+            .addDropdown(dd => {
+                const options = [100, 500, 1000, 2000];
+                for (const n of options) {
+                    dd.addOption(String(n), displayNumber(n, lang));
+                }
+                dd.setValue(String(this.plugin.settings.desktop.autoArchiveCount));
+                dd.onChange(async (v) => {
+                    this.plugin.settings.desktop.autoArchiveCount = parseInt(v);
+                    await this.plugin.saveSettings();
+                });
+            });
+
+        new Setting(parent)
+            .setName(t(lang, 'settings_archive_days'))
+            .setDesc(t(lang, 'settings_archive_days_desc'))
+            .addDropdown(dd => {
+                dd.addOption('30', t(lang, 'archive_days_30'));
+                dd.addOption('60', t(lang, 'archive_days_60'));
+                dd.addOption('90', t(lang, 'archive_days_90'));
+                dd.addOption('180', t(lang, 'archive_days_180'));
+                dd.addOption('365', t(lang, 'archive_days_365'));
+                dd.setValue(String(this.plugin.settings.desktop.autoArchiveDays));
+                dd.onChange(async (v) => {
+                    this.plugin.settings.desktop.autoArchiveDays = parseInt(v) as 30 | 60 | 90 | 180 | 365;
+                    await this.plugin.saveSettings();
+                });
+            });
+
+        new Setting(parent)
+            .setName(t(lang, 'settings_archive_mode'))
+            .setDesc(t(lang, 'settings_archive_mode_desc'))
+            .addDropdown(dd => {
+                dd.addOption('threshold', t(lang, 'archive_mode_threshold'));
+                dd.addOption('always', t(lang, 'archive_mode_always'));
+                dd.setValue(this.plugin.settings.desktop.autoArchiveMode);
+                dd.onChange(async (v) => {
+                    this.plugin.settings.desktop.autoArchiveMode = v as 'threshold' | 'always';
+                    await this.plugin.saveSettings();
+                });
+            });
+
+        const lastTs = this.plugin.archiveManager.getLastArchiveTs();
+        const statusText = lastTs > 0
+            ? t(lang, 'archive_last_run', {
+                date: displayString(this.formatDate(lastTs), lang),
+            })
+            : t(lang, 'archive_never_run');
+
+        new Setting(parent)
+            .setName(t(lang, 'archive_run_now'))
+            .setDesc(statusText)
+            .addButton(btn => btn
+                .setButtonText(t(lang, 'archive_run_now'))
+                .setCta()
+                .onClick(async () => {
+                    await this.handleManualArchive();
+                }));
+    }
+
     private async handleManualArchive(): Promise<void> {
         const lang = this.plugin.settings.language;
 
@@ -583,6 +557,7 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
             }
 
             this.plugin.refreshPanel();
+            /* 🆕 فقط برای آپدیت status text */
             this.scheduleRefresh();
         } catch (e) {
             console.warn('[First Task] Manual archive failed:', e);
