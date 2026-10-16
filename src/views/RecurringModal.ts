@@ -1,7 +1,7 @@
 /* ════════════════════════════════════════════════════════════
-   🔄 RecurringModal — v0.2.2
-   ✅ بدون پرش اسکرول (فقط بخش داینامیک re-render می‌شه)
-   ✅ هفتگی چندتایی
+   🔄 RecurringModal — v0.2.3
+   ✅ بدون پرش اسکرول
+   ✅ ترتیب روزها بر اساس weekStartDay
    ════════════════════════════════════════════════════════════ */
 
 import { App, Modal, Setting } from 'obsidian';
@@ -22,6 +22,15 @@ const WEEKDAY_KEYS = [
     'weekday_saturday',
 ] as const;
 
+/* 🆕 ترتیب روزها بر اساس weekStartDay */
+function getOrderedWeekDays(weekStartDay: number): number[] {
+    const order: number[] = [];
+    for (let i = 0; i < 7; i++) {
+        order.push((weekStartDay + i) % 7);
+    }
+    return order;
+}
+
 export class RecurringModal extends Modal {
     plugin: FirstTaskPlugin;
     existingTemplate: RecurringTemplate | null;
@@ -29,7 +38,6 @@ export class RecurringModal extends Modal {
 
     private submitting = false;
 
-    /* ─── فیلدها ─── */
     private titleValue = '';
     private descriptionValue = '';
     private categoryValue = '';
@@ -42,7 +50,6 @@ export class RecurringModal extends Modal {
     private dateGregorian = '';
     private dateTs = 0;
 
-    /* 🆕 container داینامیک */
     private dynamicContainer: HTMLElement | null = null;
 
     constructor(
@@ -106,7 +113,6 @@ export class RecurringModal extends Modal {
         const useJalali = this.plugin.settings.useJalaliDate;
         applyDirection(contentEl, lang);
 
-        /* ─── عنوان ─── */
         contentEl.createEl('h3', {
             text: this.existingTemplate
                 ? t(lang, 'recurring_edit_title')
@@ -114,7 +120,7 @@ export class RecurringModal extends Modal {
             cls: 'first-task-modal-title',
         });
 
-        /* ─── عنوان تسک ─── */
+        /* ─── عنوان ─── */
         new Setting(contentEl)
             .setName(t(lang, 'field_title'))
             .addText(text => {
@@ -164,12 +170,11 @@ export class RecurringModal extends Modal {
                 dd.setValue(this.recurrenceValue);
                 dd.onChange(v => {
                     this.recurrenceValue = v as RecurrenceType;
-                    /* 🆕 فقط بخش داینامیک رو re-render کن */
                     this.renderDynamicSection();
                 });
             });
 
-        /* ─── 🆕 container داینامیک ─── */
+        /* ─── container داینامیک ─── */
         this.dynamicContainer = contentEl.createDiv({
             cls: 'first-task-recurring-dynamic',
         });
@@ -226,14 +231,11 @@ export class RecurringModal extends Modal {
     }
 
     /* ═══════════════════════════════════════════════════════
-       🆕 فقط بخش داینامیک رو دوباره بساز
+       فقط بخش داینامیک
        ═══════════════════════════════════════════════════════ */
     private renderDynamicSection(): void {
         if (!this.dynamicContainer) return;
-
-        /* ─── فقط محتوای این container رو پاک کن ─── */
         this.dynamicContainer.empty();
-
         this.renderDynamicContent();
     }
 
@@ -264,7 +266,11 @@ export class RecurringModal extends Modal {
                     .setName(t(lang, 'recurring_weekday'))
                     .setDesc(t(lang, 'recurring_weekday_desc'))
                     .addDropdown(dd => {
-                        for (let i = 0; i < 7; i++) {
+                        /* 🆕 ترتیب از weekStartDay */
+                        const orderedDays = getOrderedWeekDays(
+                            this.plugin.settings.weekStartDay
+                        );
+                        for (const i of orderedDays) {
                             dd.addOption(String(i), t(lang, WEEKDAY_KEYS[i] as any));
                         }
                         dd.setValue(String(this.singleWeekDay));
@@ -284,11 +290,17 @@ export class RecurringModal extends Modal {
 
                 const chips = wrap.createDiv({ cls: 'first-task-weekday-chips' });
 
-                for (let i = 0; i < 7; i++) {
+                /* 🆕 ترتیب از weekStartDay */
+                const orderedDays = getOrderedWeekDays(
+                    this.plugin.settings.weekStartDay
+                );
+
+                for (const i of orderedDays) {
                     const isActive = this.selectedWeekDays.has(i);
                     const chip = chips.createEl('button', {
                         cls: 'first-task-weekday-chip' + (isActive ? ' is-active' : ''),
                     });
+                    chip.dataset.day = String(i);
                     chip.setText(t(lang, WEEKDAY_KEYS[i] as any));
                     chip.onclick = (e) => {
                         e.preventDefault();
@@ -300,7 +312,6 @@ export class RecurringModal extends Modal {
                         } else {
                             this.selectedWeekDays.add(i);
                         }
-                        /* 🆕 فقط chip‌ها رو آپدیت کن، نه کل modal رو */
                         this.updateChipsUI();
                     };
                 }
@@ -327,12 +338,15 @@ export class RecurringModal extends Modal {
         }
     }
 
-    /* 🆕 فقط chipها رو آپدیت کن (بدون re-render کل) */
+    /* 🆕 فقط chipها رو آپدیت کن */
     private updateChipsUI(): void {
         if (!this.dynamicContainer) return;
         const chips = this.dynamicContainer.querySelectorAll('.first-task-weekday-chip');
-        chips.forEach((chip, i) => {
-            const isActive = this.selectedWeekDays.has(i);
+        chips.forEach((chip) => {
+            const dayStr = (chip as HTMLElement).dataset.day;
+            if (dayStr === undefined) return;
+            const day = parseInt(dayStr);
+            const isActive = this.selectedWeekDays.has(day);
             chip.classList.toggle('is-active', isActive);
         });
     }
