@@ -4,6 +4,7 @@
    ✅ visibility toggle به‌جای rebuild
    ✅ بخش‌های disabled کم‌رنگ + غیرقابل کلیک
    ✅ موبایل + دسکتاپ
+   ✅ 🆕 Jalali/WeekStart → rescan برای آمار درست
    ════════════════════════════════════════════════════════════ */
 
 import { App, PluginSettingTab, Setting, setIcon } from 'obsidian';
@@ -90,6 +91,8 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
                 .onChange(async (v) => {
                     this.plugin.settings.useJalaliDate = v;
                     await this.plugin.saveSettings();
+                    /* 🆕 recompute stats چون آمار based on jalali/gregorian هست */
+                    await this.plugin.taskManager.rescanAll();
                     this.plugin.refreshPanel();
                 }));
 
@@ -104,6 +107,8 @@ export class FirstTaskSettingsTab extends PluginSettingTab {
                 dd.onChange(async (v) => {
                     this.plugin.settings.weekStartDay = parseInt(v) as WeekStartDay;
                     await this.plugin.saveSettings();
+                    /* 🆕 recompute stats چون this_week based on weekStartDay هست */
+                    await this.plugin.taskManager.rescanAll();
                     this.plugin.refreshPanel();
                 });
             });
