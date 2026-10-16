@@ -1,9 +1,9 @@
 /* ════════════════════════════════════════════════════════════
-   📋 مدیریت تسک‌ها — v0.1.3 (نهایی)
-   ✅ فلگ ready — جلوگیری از cleanup قبل از initialize
-   ✅ بازیابی خودکار متادیتا از orphanها
+   📋 مدیریت تسک‌ها — v0.3.0
+   ✅ رفع باگ refresh بعد از add/delete/update
    ✅ رفع باگ آمار (تسک‌های [x] بدون completed_ts)
    ✅ Bulk complete/restore
+   ✅ Auto-fill created time
    ════════════════════════════════════════════════════════════ */
 
 import { App, TFile } from 'obsidian';
@@ -39,8 +39,6 @@ export class TaskManager {
         last_month: 0, this_year: 0, total: 0,
     };
     private lastSyncTs = 0;
-
-    /* 🆕 فلگ آماده بودن */
     private ready = false;
 
     constructor(
@@ -89,14 +87,12 @@ export class TaskManager {
             }
         }
 
-        /* 🆕 بازیابی متادیتا از orphanها قبل از اعمال */
         await this.recoverOrphanMetadata(newTasks);
 
         for (const task of newTasks.values()) {
             const entry = this.index.getEntry(task._id);
             this.applyEntry(task, entry);
 
-            /* 🆕 ذخیره _title و _source_file برای بازیابی‌های بعدی */
             if (entry._title !== task.title || entry._source_file !== task._source_file) {
                 await this.index.updateEntry(task._id, {
                     _title: task.title,
@@ -115,8 +111,6 @@ export class TaskManager {
 
         this.tasks = newTasks;
         this.lastSyncTs = Date.now();
-
-        /* 🆕 حالا آماده‌ست */
         this.ready = true;
 
         await this.index.saveFileCache();
@@ -125,8 +119,7 @@ export class TaskManager {
     }
 
     /* ═══════════════════════════════════════════════════════
-       🆕 بازیابی خودکار متادیتا
-       وقتی ID عوض شده ولی عنوان + فایل همونه، متادیتا رو منتقل کن
+       بازیابی خودکار متادیتا
        ═══════════════════════════════════════════════════════ */
     private async recoverOrphanMetadata(
         newTasks: Map<string, ExtractedTask>
@@ -134,7 +127,6 @@ export class TaskManager {
         const currentIds = new Set(newTasks.keys());
         const allEntries = this.index.exportAllEntries();
 
-        /* orphanها رو گروه‌بندی کن بر اساس فایل */
         const orphansByFile = new Map<string, Array<[string, TaskIndexEntry]>>();
         for (const [id, entry] of allEntries) {
             if (currentIds.has(id)) continue;
@@ -148,7 +140,6 @@ export class TaskManager {
         let recovered = 0;
 
         for (const [filePath, orphans] of orphansByFile) {
-            /* تسک‌های جدید این فایل که هنوز متادیتا ندارن */
             const tasksWithoutMeta: Array<[string, ExtractedTask]> = [];
             for (const [taskId, task] of newTasks) {
                 if (task._source_file !== filePath) continue;
@@ -156,7 +147,6 @@ export class TaskManager {
                 tasksWithoutMeta.push([taskId, task]);
             }
 
-            /* مطابقت بر اساس عنوان */
             for (const [orphanId, orphanEntry] of orphans) {
                 if (!orphanEntry._title) continue;
 
@@ -166,7 +156,6 @@ export class TaskManager {
                 if (matchIdx === -1) continue;
 
                 const [taskId] = tasksWithoutMeta.splice(matchIdx, 1)[0];
-
                 await this.index.moveEntry(orphanId, taskId);
                 recovered++;
             }
@@ -203,10 +192,6 @@ export class TaskManager {
         });
     }
 
-    /* ═══════════════════════════════════════════════════════
-       اگر تسک انجام‌شده‌ست ولی completed_ts نداره
-       → از mtime فایل استفاده کن
-       ═══════════════════════════════════════════════════════ */
     private async ensureCompletedTime(task: ExtractedTask): Promise<void> {
         if (!task.completed) return;
         if (task.completed_ts > 0) return;
@@ -255,7 +240,6 @@ export class TaskManager {
 
         const tasks = this.extractor.extractFromContent(content, file.path);
 
-        /* 🆕 بازیابی متادیتای orphanهای همین فایل */
         const currentIds = new Set(tasks.map(t => t._id));
         const orphans: Array<[string, TaskIndexEntry]> = [];
         for (const [id, entry] of this.index.exportAllEntries()) {
@@ -284,7 +268,6 @@ export class TaskManager {
             const entry = this.index.getEntry(task._id);
             this.applyEntry(task, entry);
 
-            /* 🆕 ذخیره _title و _source_file */
             if (entry._title !== task.title || entry._source_file !== task._source_file) {
                 await this.index.updateEntry(task._id, {
                     _title: task.title,
@@ -311,7 +294,6 @@ export class TaskManager {
 
         await this.index.saveFileCache();
 
-        /* 🆕 فقط وقتی آماده‌ایم پاکسازی کن */
         if (this.ready) {
             await this.index.cleanupOrphans(new Set(this.tasks.keys()));
         }
@@ -335,7 +317,7 @@ export class TaskManager {
     }
 
     /* ═══════════════════════════════════════════════════════
-       آمار
+       آمار — الگوریتم اصلاح‌شده
        ═══════════════════════════════════════════════════════ */
     private recomputeStats(): void {
         const now = Date.now();
@@ -713,6 +695,7 @@ export class TaskManager {
         }
     }
 
+    /* 🆕 createTask با await روی rescanFile */
     async createTask(
         title: string,
         sourceFile: string,
@@ -756,6 +739,7 @@ export class TaskManager {
                 created_ts: now.getTime(),
             });
 
+            /* 🆕 await روی rescanFile تا مطمئن بشیم لیست آپدیت شده */
             await this.rescanFile(file);
             return true;
         } catch (e) {
