@@ -1,7 +1,7 @@
 /* ════════════════════════════════════════════════════════════
-   🔄 RecurringModal — v0.2.1
-   ✅ هفتگی چندتایی: single / multiple / every-day
-   ✅ ۷ چیپ برای انتخاب روزها (multiple)
+   🔄 RecurringModal — v0.2.2
+   ✅ بدون پرش اسکرول (فقط بخش داینامیک re-render می‌شه)
+   ✅ هفتگی چندتایی
    ════════════════════════════════════════════════════════════ */
 
 import { App, Modal, Setting } from 'obsidian';
@@ -42,6 +42,9 @@ export class RecurringModal extends Modal {
     private dateGregorian = '';
     private dateTs = 0;
 
+    /* 🆕 container داینامیک */
+    private dynamicContainer: HTMLElement | null = null;
+
     constructor(
         app: App,
         plugin: FirstTaskPlugin,
@@ -59,7 +62,6 @@ export class RecurringModal extends Modal {
             this.categoryValue = existingTemplate.category;
             this.recurrenceValue = existingTemplate.recurrence;
 
-            /* ─── WeekDays backward compat ─── */
             if (existingTemplate.weekDays && existingTemplate.weekDays.length > 0) {
                 this.selectedWeekDays = new Set(existingTemplate.weekDays);
                 this.singleWeekDay = existingTemplate.weekDays[0];
@@ -68,7 +70,6 @@ export class RecurringModal extends Modal {
                 this.singleWeekDay = existingTemplate.weekDay;
             }
 
-            /* ─── WeeklyMode ─── */
             if (existingTemplate.weeklyMode) {
                 this.weeklyMode = existingTemplate.weeklyMode;
             } else if (this.selectedWeekDays.size === 7) {
@@ -89,10 +90,13 @@ export class RecurringModal extends Modal {
     }
 
     onOpen(): void {
-        this.render();
+        this.renderFull();
     }
 
-    private render(): void {
+    /* ═══════════════════════════════════════════════════════
+       رندر کامل (فقط یک بار)
+       ═══════════════════════════════════════════════════════ */
+    private renderFull(): void {
         const { contentEl } = this;
         contentEl.empty();
         contentEl.addClass('first-task-modal-content');
@@ -102,6 +106,7 @@ export class RecurringModal extends Modal {
         const useJalali = this.plugin.settings.useJalaliDate;
         applyDirection(contentEl, lang);
 
+        /* ─── عنوان ─── */
         contentEl.createEl('h3', {
             text: this.existingTemplate
                 ? t(lang, 'recurring_edit_title')
@@ -109,7 +114,7 @@ export class RecurringModal extends Modal {
             cls: 'first-task-modal-title',
         });
 
-        /* ─── عنوان ─── */
+        /* ─── عنوان تسک ─── */
         new Setting(contentEl)
             .setName(t(lang, 'field_title'))
             .addText(text => {
@@ -159,93 +164,17 @@ export class RecurringModal extends Modal {
                 dd.setValue(this.recurrenceValue);
                 dd.onChange(v => {
                     this.recurrenceValue = v as RecurrenceType;
-                    this.render();
+                    /* 🆕 فقط بخش داینامیک رو re-render کن */
+                    this.renderDynamicSection();
                 });
             });
 
-        /* ─── هفتگی: mode selector ─── */
-        if (this.recurrenceValue === 'weekly') {
-            new Setting(contentEl)
-                .setName(t(lang, 'recurring_weekly_mode'))
-                .setDesc(t(lang, 'recurring_weekly_mode_desc'))
-                .addDropdown(dd => {
-                    dd.addOption('single', t(lang, 'recurring_weekly_mode_single'));
-                    dd.addOption('multiple', t(lang, 'recurring_weekly_mode_multiple'));
-                    dd.addOption('every-day', t(lang, 'recurring_weekly_mode_every_day'));
-                    dd.setValue(this.weeklyMode);
-                    dd.onChange(v => {
-                        this.weeklyMode = v as WeeklyMode;
-                        this.render();
-                    });
-                });
+        /* ─── 🆕 container داینامیک ─── */
+        this.dynamicContainer = contentEl.createDiv({
+            cls: 'first-task-recurring-dynamic',
+        });
 
-            /* ─── single: dropdown ─── */
-            if (this.weeklyMode === 'single') {
-                new Setting(contentEl)
-                    .setName(t(lang, 'recurring_weekday'))
-                    .setDesc(t(lang, 'recurring_weekday_desc'))
-                    .addDropdown(dd => {
-                        for (let i = 0; i < 7; i++) {
-                            dd.addOption(String(i), t(lang, WEEKDAY_KEYS[i] as any));
-                        }
-                        dd.setValue(String(this.singleWeekDay));
-                        dd.onChange(v => {
-                            this.singleWeekDay = parseInt(v);
-                            this.selectedWeekDays = new Set([this.singleWeekDay]);
-                        });
-                    });
-            }
-
-            /* ─── multiple: چیپ‌ها ─── */
-            if (this.weeklyMode === 'multiple') {
-                const wrap = contentEl.createDiv({ cls: 'first-task-weekday-chips-wrap' });
-                wrap.createDiv({
-                    cls: 'first-task-weekday-chips-label',
-                    text: t(lang, 'recurring_weekdays_pick'),
-                });
-
-                const chips = wrap.createDiv({ cls: 'first-task-weekday-chips' });
-
-                for (let i = 0; i < 7; i++) {
-                    const isActive = this.selectedWeekDays.has(i);
-                    const chip = chips.createEl('button', {
-                        cls: 'first-task-weekday-chip' + (isActive ? ' is-active' : ''),
-                    });
-                    chip.setText(t(lang, WEEKDAY_KEYS[i] as any));
-                    chip.onclick = () => {
-                        if (this.selectedWeekDays.has(i)) {
-                            /* حداقل یکی بمونه */
-                            if (this.selectedWeekDays.size > 1) {
-                                this.selectedWeekDays.delete(i);
-                            }
-                        } else {
-                            this.selectedWeekDays.add(i);
-                        }
-                        this.render();
-                    };
-                }
-            }
-
-            /* ─── every-day: نمایش ساده ─── */
-            if (this.weeklyMode === 'every-day') {
-                const info = contentEl.createDiv({ cls: 'first-task-weekday-info' });
-                info.setText('☀️ ' + t(lang, 'recurring_weekly_mode_every_day_hint'));
-            }
-        }
-
-        /* ─── ماهانه ─── */
-        if (this.recurrenceValue === 'monthly') {
-            new Setting(contentEl)
-                .setName(t(lang, 'recurring_monthday'))
-                .setDesc(t(lang, 'recurring_monthday_desc'))
-                .addDropdown(dd => {
-                    for (let i = 1; i <= 31; i++) {
-                        dd.addOption(String(i), String(i));
-                    }
-                    dd.setValue(String(this.monthDayValue));
-                    dd.onChange(v => { this.monthDayValue = parseInt(v); });
-                });
-        }
+        this.renderDynamicContent();
 
         /* ─── تاریخ شروع ─── */
         const todayDisplay = getTodayDateInput(useJalali);
@@ -296,6 +225,121 @@ export class RecurringModal extends Modal {
         saveBtn.onclick = () => this.submit();
     }
 
+    /* ═══════════════════════════════════════════════════════
+       🆕 فقط بخش داینامیک رو دوباره بساز
+       ═══════════════════════════════════════════════════════ */
+    private renderDynamicSection(): void {
+        if (!this.dynamicContainer) return;
+
+        /* ─── فقط محتوای این container رو پاک کن ─── */
+        this.dynamicContainer.empty();
+
+        this.renderDynamicContent();
+    }
+
+    private renderDynamicContent(): void {
+        if (!this.dynamicContainer) return;
+
+        const lang = this.plugin.settings.language;
+        const parent = this.dynamicContainer;
+
+        /* ─── هفتگی ─── */
+        if (this.recurrenceValue === 'weekly') {
+            new Setting(parent)
+                .setName(t(lang, 'recurring_weekly_mode'))
+                .setDesc(t(lang, 'recurring_weekly_mode_desc'))
+                .addDropdown(dd => {
+                    dd.addOption('single', t(lang, 'recurring_weekly_mode_single'));
+                    dd.addOption('multiple', t(lang, 'recurring_weekly_mode_multiple'));
+                    dd.addOption('every-day', t(lang, 'recurring_weekly_mode_every_day'));
+                    dd.setValue(this.weeklyMode);
+                    dd.onChange(v => {
+                        this.weeklyMode = v as WeeklyMode;
+                        this.renderDynamicSection();
+                    });
+                });
+
+            if (this.weeklyMode === 'single') {
+                new Setting(parent)
+                    .setName(t(lang, 'recurring_weekday'))
+                    .setDesc(t(lang, 'recurring_weekday_desc'))
+                    .addDropdown(dd => {
+                        for (let i = 0; i < 7; i++) {
+                            dd.addOption(String(i), t(lang, WEEKDAY_KEYS[i] as any));
+                        }
+                        dd.setValue(String(this.singleWeekDay));
+                        dd.onChange(v => {
+                            this.singleWeekDay = parseInt(v);
+                            this.selectedWeekDays = new Set([this.singleWeekDay]);
+                        });
+                    });
+            }
+
+            if (this.weeklyMode === 'multiple') {
+                const wrap = parent.createDiv({ cls: 'first-task-weekday-chips-wrap' });
+                wrap.createDiv({
+                    cls: 'first-task-weekday-chips-label',
+                    text: t(lang, 'recurring_weekdays_pick'),
+                });
+
+                const chips = wrap.createDiv({ cls: 'first-task-weekday-chips' });
+
+                for (let i = 0; i < 7; i++) {
+                    const isActive = this.selectedWeekDays.has(i);
+                    const chip = chips.createEl('button', {
+                        cls: 'first-task-weekday-chip' + (isActive ? ' is-active' : ''),
+                    });
+                    chip.setText(t(lang, WEEKDAY_KEYS[i] as any));
+                    chip.onclick = (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (this.selectedWeekDays.has(i)) {
+                            if (this.selectedWeekDays.size > 1) {
+                                this.selectedWeekDays.delete(i);
+                            }
+                        } else {
+                            this.selectedWeekDays.add(i);
+                        }
+                        /* 🆕 فقط chip‌ها رو آپدیت کن، نه کل modal رو */
+                        this.updateChipsUI();
+                    };
+                }
+            }
+
+            if (this.weeklyMode === 'every-day') {
+                const info = parent.createDiv({ cls: 'first-task-weekday-info' });
+                info.setText('☀️ ' + t(lang, 'recurring_weekly_mode_every_day_hint'));
+            }
+        }
+
+        /* ─── ماهانه ─── */
+        if (this.recurrenceValue === 'monthly') {
+            new Setting(parent)
+                .setName(t(lang, 'recurring_monthday'))
+                .setDesc(t(lang, 'recurring_monthday_desc'))
+                .addDropdown(dd => {
+                    for (let i = 1; i <= 31; i++) {
+                        dd.addOption(String(i), String(i));
+                    }
+                    dd.setValue(String(this.monthDayValue));
+                    dd.onChange(v => { this.monthDayValue = parseInt(v); });
+                });
+        }
+    }
+
+    /* 🆕 فقط chipها رو آپدیت کن (بدون re-render کل) */
+    private updateChipsUI(): void {
+        if (!this.dynamicContainer) return;
+        const chips = this.dynamicContainer.querySelectorAll('.first-task-weekday-chip');
+        chips.forEach((chip, i) => {
+            const isActive = this.selectedWeekDays.has(i);
+            chip.classList.toggle('is-active', isActive);
+        });
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       Submit
+       ═══════════════════════════════════════════════════════ */
     private async submit(): Promise<void> {
         if (this.submitting) return;
         const lang = this.plugin.settings.language;
@@ -306,7 +350,6 @@ export class RecurringModal extends Modal {
             return;
         }
 
-        /* ─── اگه multiple ولی هیچ روزی انتخاب نشده ─── */
         if (this.recurrenceValue === 'weekly' &&
             this.weeklyMode === 'multiple' &&
             this.selectedWeekDays.size === 0) {
@@ -317,7 +360,6 @@ export class RecurringModal extends Modal {
             return;
         }
 
-        /* ─── تاریخ شروع ─── */
         let startJalali = this.dateJalali;
         let startGregorian = this.dateGregorian;
         let startTs = this.dateTs;
@@ -332,7 +374,6 @@ export class RecurringModal extends Modal {
             }
         }
 
-        /* ─── محاسبه‌ی weekDays و weekDay ─── */
         let weekDay: number | undefined;
         let weekDays: number[] | undefined;
         let weeklyMode: WeeklyMode | undefined;
@@ -376,10 +417,7 @@ export class RecurringModal extends Modal {
                 );
 
                 if (ok) {
-                    this.plugin.toastManager.show(
-                        t(lang, 'recurring_updated'),
-                        'success'
-                    );
+                    this.plugin.toastManager.show(t(lang, 'recurring_updated'), 'success');
                     this.onDone();
                     this.close();
                 } else {
@@ -403,10 +441,7 @@ export class RecurringModal extends Modal {
                 });
 
                 if (result) {
-                    this.plugin.toastManager.show(
-                        t(lang, 'recurring_created'),
-                        'success'
-                    );
+                    this.plugin.toastManager.show(t(lang, 'recurring_created'), 'success');
                     this.onDone();
                     this.close();
                 } else {
@@ -425,5 +460,6 @@ export class RecurringModal extends Modal {
 
     onClose(): void {
         this.contentEl.empty();
+        this.dynamicContainer = null;
     }
 }
