@@ -1,8 +1,8 @@
 /* ════════════════════════════════════════════════════════════
-   🔄 RecurringManager — تسک‌های تکرارشونده (v0.3.0)
-   ✅ فایل جدا: FirstTask/recurring.json
+   🔄 RecurringManager — تسک‌های تکرارشونده (v0.2.1)
    ✅ ۳ نوع: روزانه / هفتگی / ماهانه
-   ✅ منطق catch-up هوشمند (ساجست برای تاریخ گذشته)
+   ✅ 🆕 هفتگی چندتایی (single / multiple / every-day)
+   ✅ منطق catch-up هوشمند
    ✅ جلوگیری از تکرار بر اساس created_ts
    ════════════════════════════════════════════════════════════ */
 
@@ -69,7 +69,6 @@ export class RecurringManager {
         }
     }
 
-    /* ─── Load ─── */
     private async load(): Promise<void> {
         try {
             const content = await this.app.vault.adapter.read(this.filePath);
@@ -100,7 +99,6 @@ export class RecurringManager {
         }
     }
 
-    /* ─── Save ─── */
     async save(): Promise<void> {
         try {
             this.store.last_updated = Date.now();
@@ -147,6 +145,8 @@ export class RecurringManager {
         category?: string;
         recurrence: 'daily' | 'weekly' | 'monthly';
         weekDay?: number;
+        weekDays?: number[];
+        weeklyMode?: 'single' | 'multiple' | 'every-day';
         monthDay?: number;
         startDateJalali: string;
         startDateGregorian: string;
@@ -161,6 +161,8 @@ export class RecurringManager {
                 category: data.category || '',
                 recurrence: data.recurrence,
                 weekDay: data.weekDay,
+                weekDays: data.weekDays,
+                weeklyMode: data.weeklyMode,
                 monthDay: data.monthDay,
                 start_date_jalali: data.startDateJalali,
                 start_date_gregorian: data.startDateGregorian,
@@ -219,8 +221,6 @@ export class RecurringManager {
     /* ═══════════════════════════════════════════════════════
        🎯 منطق هوشمند: Most Recent Due Date
        ═══════════════════════════════════════════════════════ */
-
-    /* ─── محاسبه‌ی آخرین تاریخ سررسید ─── */
     private computeMostRecentDueDate(
         template: RecurringTemplate,
         nowTs: number
@@ -228,82 +228,123 @@ export class RecurringManager {
         const todayStart = startOfDay(nowTs);
 
         switch (template.recurrence) {
-            /* ─── روزانه: همیشه امروز ─── */
             case 'daily':
                 return this.tsToDateResult(todayStart);
 
-            /* ─── هفتگی: امروز یا جمعه گذشته ─── */
-            case 'weekly': {
-                if (template.weekDay === undefined) return null;
+            case 'weekly':
+                return this.computeWeeklyDueDate(template, nowTs);
 
-                const todayDate = new Date(nowTs);
-                const todayDay = todayDate.getDay();
-                const diff = (todayDay - template.weekDay + 7) % 7;
-
-                const target = new Date(nowTs);
-                target.setDate(target.getDate() - diff);
-                target.setHours(0, 0, 0, 0);
-
-                return this.tsToDateResult(target.getTime());
-            }
-
-            /* ─── ماهانه: امروز یا ماه گذشته ─── */
-            case 'monthly': {
-                if (template.monthDay === undefined) return null;
-
-                const todayDate = new Date(nowTs);
-                const todayDay = todayDate.getDate();
-                const currentMonth = todayDate.getMonth();
-                const currentYear = todayDate.getFullYear();
-
-                /* ─── آخرین روز همین ماه ─── */
-                const lastDayThisMonth = new Date(
-                    currentYear,
-                    currentMonth + 1,
-                    0
-                ).getDate();
-
-                const targetDayThisMonth = Math.min(
-                    template.monthDay,
-                    lastDayThisMonth
-                );
-
-                if (todayDay >= targetDayThisMonth) {
-                    /* ─── همین ماه ─── */
-                    const target = new Date(
-                        currentYear,
-                        currentMonth,
-                        targetDayThisMonth
-                    );
-                    return this.tsToDateResult(target.getTime());
-                }
-
-                /* ─── ماه گذشته ─── */
-                const lastDayLastMonth = new Date(
-                    currentYear,
-                    currentMonth,
-                    0
-                ).getDate();
-
-                const targetDayLastMonth = Math.min(
-                    template.monthDay,
-                    lastDayLastMonth
-                );
-
-                const target = new Date(
-                    currentYear,
-                    currentMonth - 1,
-                    targetDayLastMonth
-                );
-                return this.tsToDateResult(target.getTime());
-            }
+            case 'monthly':
+                return this.computeMonthlyDueDate(template, nowTs);
 
             default:
                 return null;
         }
     }
 
-    /* ─── تبدیل timestamp به نتیجه ─── */
+    /* ─── هفتگی ─── */
+    private computeWeeklyDueDate(
+        template: RecurringTemplate,
+        nowTs: number
+    ): DueDateResult | null {
+        const weekDays = this.resolveWeekDays(template);
+        if (weekDays.length === 0) return null;
+
+        /* ─── اگه every-day: مثل روزانه ─── */
+        if (template.weeklyMode === 'every-day' || weekDays.length === 7) {
+            return this.tsToDateResult(startOfDay(nowTs));
+        }
+
+        const todayDate = new Date(nowTs);
+        const todayDay = todayDate.getDay();
+
+        /* ─── امروز توی لیست هست؟ ─── */
+        if (weekDays.includes(todayDay)) {
+            return this.tsToDateResult(startOfDay(nowTs));
+        }
+
+        /* ─── نزدیک‌ترین روز قبلی ─── */
+        let minDiff = 8;
+        for (const wd of weekDays) {
+            const diff = (todayDay - wd + 7) % 7;
+            if (diff > 0 && diff < minDiff) {
+                minDiff = diff;
+            }
+        }
+
+        if (minDiff === 8) return null;
+
+        const target = new Date(nowTs);
+        target.setDate(target.getDate() - minDiff);
+        target.setHours(0, 0, 0, 0);
+
+        return this.tsToDateResult(target.getTime());
+    }
+
+    /* ─── تبدیل weekDay قدیمی → آرایه ─── */
+    private resolveWeekDays(template: RecurringTemplate): number[] {
+        /* اگه weekDays هست، استفاده کن */
+        if (template.weekDays && template.weekDays.length > 0) {
+            return template.weekDays;
+        }
+        /* اگه weekDay قدیمی هست، تبدیل کن */
+        if (template.weekDay !== undefined) {
+            return [template.weekDay];
+        }
+        return [];
+    }
+
+    /* ─── ماهانه ─── */
+    private computeMonthlyDueDate(
+        template: RecurringTemplate,
+        nowTs: number
+    ): DueDateResult | null {
+        if (template.monthDay === undefined) return null;
+
+        const todayDate = new Date(nowTs);
+        const todayDay = todayDate.getDate();
+        const currentMonth = todayDate.getMonth();
+        const currentYear = todayDate.getFullYear();
+
+        const lastDayThisMonth = new Date(
+            currentYear,
+            currentMonth + 1,
+            0
+        ).getDate();
+
+        const targetDayThisMonth = Math.min(
+            template.monthDay,
+            lastDayThisMonth
+        );
+
+        if (todayDay >= targetDayThisMonth) {
+            const target = new Date(
+                currentYear,
+                currentMonth,
+                targetDayThisMonth
+            );
+            return this.tsToDateResult(target.getTime());
+        }
+
+        const lastDayLastMonth = new Date(
+            currentYear,
+            currentMonth,
+            0
+        ).getDate();
+
+        const targetDayLastMonth = Math.min(
+            template.monthDay,
+            lastDayLastMonth
+        );
+
+        const target = new Date(
+            currentYear,
+            currentMonth - 1,
+            targetDayLastMonth
+        );
+        return this.tsToDateResult(target.getTime());
+    }
+
     private tsToDateResult(ts: number): DueDateResult {
         const d = new Date(ts);
         const [jy, jm, jd] = toJalali(
@@ -320,7 +361,6 @@ export class RecurringManager {
         };
     }
 
-    /* ─── چک: آیا تسکی از این الگو در این چرخه ساخته شده؟ ─── */
     private hasInstanceInCycle(
         templateId: string,
         cycleStartTs: number
@@ -335,24 +375,20 @@ export class RecurringManager {
     }
 
     /* ═══════════════════════════════════════════════════════
-       🎯 ساجست‌های امروز
+       ساجست‌های امروز
        ═══════════════════════════════════════════════════════ */
     getTodaysSuggestions(): RecurringSuggestion[] {
         const nowTs = Date.now();
         const suggestions: RecurringSuggestion[] = [];
 
         for (const template of this.getActive()) {
-            /* ─── چک شروع ─── */
             if (template.start_date_ts > startOfDay(nowTs)) continue;
 
-            /* ─── محاسبه‌ی آخرین تاریخ سررسید ─── */
             const dueDate = this.computeMostRecentDueDate(template, nowTs);
             if (!dueDate) continue;
 
-            /* ─── چک تکرار: آیا تسکی در این چرخه ساخته شده؟ ─── */
             if (this.hasInstanceInCycle(template.id, dueDate.ts)) continue;
 
-            /* ─── ساجست ─── */
             suggestions.push({
                 template,
                 instance_date_jalali: dueDate.jalali,
@@ -365,7 +401,7 @@ export class RecurringManager {
     }
 
     /* ═══════════════════════════════════════════════════════
-       🎯 ساخت instance از الگو
+       ساخت instance
        ═══════════════════════════════════════════════════════ */
     async createInstanceFromSuggestion(
         suggestion: RecurringSuggestion
@@ -392,7 +428,7 @@ export class RecurringManager {
     }
 
     /* ═══════════════════════════════════════════════════════
-       اطلاعات کمکی
+       کمکی
        ═══════════════════════════════════════════════════════ */
     getCount(): number {
         return Object.keys(this.store.templates).length;
